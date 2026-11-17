@@ -6,11 +6,15 @@ export const SwapItemSchema = z.object({
   n: z.string().min(1),
   p: z.number().nonnegative(),
   s: z.number().nonnegative(),
+  t: z.number().nonnegative().optional(),
+  f: z.number().nonnegative().optional(),
+  k: z.number().nonnegative().optional(),
 });
 
 export const ReceiptItemSchema = SwapItemSchema.extend({
   junk: z.union([z.literal(0), z.literal(1)]).optional(),
   swap: SwapItemSchema.optional(),
+  x: z.enum(['alcohol', 'energy']).optional(),
 });
 
 export const ReceiptSchema = z.object({

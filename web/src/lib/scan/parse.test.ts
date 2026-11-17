@@ -111,7 +111,7 @@ describe('parseEnrichment', () => {
         { i: 1, sugar_g: 0, junk: false, swap_name: '', swap_price: 0, swap_sugar_g: 0 },
       ],
     }, 2);
-    expect(m.get(0)).toEqual({ sugar: 106, junk: true, swap: { n: 'Минералка 1 л', p: 280, s: 0 } });
+    expect(m.get(0)).toEqual({ sugar: 106, salt: 0, fat: 0, kcal: 0, flag: null, junk: true, swap: { n: 'Минералка 1 л', p: 280, s: 0, t: 0, f: 0, k: 0 } });
     expect(m.get(1)?.swap).toBeNull();
   });
 
@@ -125,7 +125,7 @@ describe('parseEnrichment', () => {
       ],
     }, 2);
     expect([...m.keys()]).toEqual([1]);
-    expect(m.get(1)).toEqual({ sugar: 3, junk: false, swap: null });
+    expect(m.get(1)).toEqual({ sugar: 3, salt: 0, fat: 0, kcal: 0, flag: null, junk: false, swap: null });
   });
 
   it('мусор → пустая карта (чек соберётся по справочнику)', () => {
@@ -144,4 +144,15 @@ describe('normalizeDate', () => {
     ['2027-01-01', ''],
     ['1999-01-01', ''],
   ])('%s → %s', (s, want) => expect(normalizeDate(s, now)).toBe(want));
+
+  it('соль, жиры, калории, алкоголь и показатели замены читаются; мусор в новых полях не валит чек', () => {
+    const m = parseEnrichment({ items: [
+      { i: 0, sugar_g: 0, salt_g: '9,2', sat_fat_g: 36, kcal: 1160, flag: '', junk: true, swap_name: 'Грудка 400 г', swap_price: 1700, swap_sugar_g: 0, swap_salt_g: 3.2, swap_sat_fat_g: 1.2, swap_kcal: 560 },
+      { i: 1, sugar_g: 0, salt_g: -5, sat_fat_g: 'много', kcal: null, flag: 'alcohol', junk: true, swap_name: '', swap_price: 0, swap_sugar_g: 0 },
+      { i: 2, sugar_g: 10, flag: 'что-то', junk: false, swap_name: '', swap_price: 0, swap_sugar_g: 0 },
+    ] }, 3);
+    expect(m.get(0)).toMatchObject({ salt: 9.2, fat: 36, kcal: 1160, flag: null, swap: { n: 'Грудка 400 г', t: 3.2, f: 1.2, k: 560 } });
+    expect(m.get(1)).toMatchObject({ salt: 0, fat: 0, kcal: 0, flag: 'alcohol' });
+    expect(m.get(2)).toMatchObject({ sugar: 10, flag: null });
+  });
 });

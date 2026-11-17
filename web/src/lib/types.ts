@@ -1,13 +1,22 @@
 // Общие типы «Чек-апа». Файл — контракт между частями приложения.
 
-/** Замена товара в том же магазине. */
+/** Показатели, которые считает «Чек-ап». */
+export type MetricId = 'sugar' | 'salt' | 'fat' | 'kcal';
+
+/** Замена товара в том же магазине. Показатели — на всю позицию (с учётом количества). */
 export type SwapItem = {
   /** название */
   n: string;
   /** цена позиции, ₸ */
   p: number;
-  /** добавленный сахар на всю позицию, г */
+  /** добавленный сахар, г */
   s: number;
+  /** соль, г (у старых чеков поля нет — считаем 0) */
+  t?: number;
+  /** насыщенные жиры, г */
+  f?: number;
+  /** калории, ккал */
+  k?: number;
 };
 
 /** Позиция чека. */
@@ -16,6 +25,8 @@ export type ReceiptItem = SwapItem & {
   junk?: 0 | 1;
   /** чем заменить */
   swap?: SwapItem;
+  /** алкоголь или энергетик: считаются отдельной строкой */
+  x?: 'alcohol' | 'energy';
 };
 
 /** Чек. */
@@ -37,7 +48,7 @@ export type Receipt = {
 export type AnalyzedItem = ReceiptItem & {
   i: number;
   swapped: boolean;
-  active: SwapItem & { junk?: 0 | 1 };
+  active: SwapItem & { junk?: 0 | 1; x?: 'alcohol' | 'energy' };
 };
 
 /** Результат analyze(). */
@@ -49,6 +60,12 @@ export type Analysis = {
   sugar: number;
   /** кубиков сахара (1 кубик = 5 г) */
   cubes: number;
+  /** всего по каждому показателю: сахар, соль, жиры — г, калории — ккал */
+  totals: Record<MetricId, number>;
+  /** кубиков по каждому показателю (размер кубика у каждого свой, см. engine.ts) */
+  cubesBy: Record<MetricId, number>;
+  /** алкоголь и энергетики: сколько позиций и на какую сумму, ₸ */
+  flagged: { count: number; sum: number; alcohol: number; energy: number };
   /** сумма вредных товаров, ₸ */
   junk: number;
   junkCount: number;

@@ -1,6 +1,7 @@
 // Профиль семьи в localStorage. Только для клиентских компонентов.
 // От состава семьи зависит норма сахара, с которой сравнивается неделя.
-import { CUBE_G, DAILY_G } from './engine';
+import { CUBE_G, DAILY_G, METRICS } from './engine';
+import type { MetricId } from './types';
 
 export type Profile = {
   adults: number;
@@ -79,7 +80,12 @@ export const profile = {
   },
 };
 
+/** Норма показателя на всю семью в день: сахар, соль, жиры — г, калории — ккал. */
+export const familyDaily = (p: Pick<Profile, 'adults' | 'kids'>, m: MetricId) => p.adults * METRICS[m].adult + p.kids * METRICS[m].kid;
+/** Норма в кубиках в день (у каждого показателя свой размер кубика). */
+export const familyDailyCubesOf = (p: Pick<Profile, 'adults' | 'kids'>, m: MetricId) => Math.round(familyDaily(p, m) / METRICS[m].cubeG);
+
 /** Норма добавленного сахара на всю семью, г в день. */
-export const familyDailyG = (p: Pick<Profile, 'adults' | 'kids'>) => p.adults * ADULT_G + p.kids * KID_G;
+export const familyDailyG = (p: Pick<Profile, 'adults' | 'kids'>) => familyDaily(p, 'sugar');
 /** То же в кубиках. */
 export const familyDailyCubes = (p: Pick<Profile, 'adults' | 'kids'>) => Math.round(familyDailyG(p) / CUBE_G);

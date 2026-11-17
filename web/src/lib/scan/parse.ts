@@ -5,7 +5,11 @@ import { EnrichmentSchema, ExtractionSchema } from './model';
 
 export type Line = { name: string; qty: number; price: number };
 export type Extracted = { store: string; date: string; lines: Line[] };
-export type Estimate = { sugar: number; junk: boolean; swap: { n: string; p: number; s: number } | null };
+export type EstimateSwap = { n: string; p: number; s: number; t: number; f: number; k: number };
+/** Оценка модели по позиции: сахар, соль, насыщенные жиры (г), калории (ккал) и замена. */
+export type Estimate = { sugar: number; salt: number; fat: number; kcal: number; flag: 'alcohol' | 'energy' | null; junk: boolean; swap: EstimateSwap | null };
+
+const nonNeg = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0);
 
 const MAX_LINES = 80;
 const MAX_PRICE = 10_000_000; // ₸ за строку — больше на кассе не бывает
@@ -67,8 +71,12 @@ export function parseEnrichment(raw: unknown, count: number): Map<number, Estima
     const swapOk = swapName && Number.isFinite(it.swap_price) && it.swap_price > 0 && Number.isFinite(it.swap_sugar_g) && it.swap_sugar_g >= 0;
     out.set(it.i, {
       sugar: it.sugar_g,
+      salt: nonNeg(it.salt_g),
+      fat: nonNeg(it.sat_fat_g),
+      kcal: nonNeg(it.kcal),
+      flag: it.flag === 'alcohol' || it.flag === 'energy' ? it.flag : null,
       junk: it.junk,
-      swap: swapOk ? { n: swapName, p: Math.round(it.swap_price), s: it.swap_sugar_g } : null,
+      swap: swapOk ? { n: swapName, p: Math.round(it.swap_price), s: it.swap_sugar_g, t: nonNeg(it.swap_salt_g), f: nonNeg(it.swap_sat_fat_g), k: nonNeg(it.swap_kcal) } : null,
     });
   }
   return out;

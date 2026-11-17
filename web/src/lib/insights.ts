@@ -1,8 +1,8 @@
 // Неделя и достижения: чистые расчёты поверх истории чеков (без DOM).
 import { RECEIPTS } from './data';
-import { analyze, CUBE_G } from './engine';
-import { familyDailyG, type Profile } from './profile';
-import type { Analysis, HistoryEntry, Receipt } from './types';
+import { analyze, cubesOfValue, METRIC_IDS, METRICS, valueOf } from './engine';
+import { familyDaily, type Profile } from './profile';
+import type { Analysis, HistoryEntry, MetricId, Receipt } from './types';
 
 export const receiptOf = (e: HistoryEntry): Receipt | null => e.receipt ?? RECEIPTS.find(r => r.id === e.receiptId) ?? null;
 
@@ -10,8 +10,31 @@ const DOW = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 const isoOf = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export type DayStat = { iso: string; label: string; day: number; cubes: number; today: boolean };
+export type DayStat = {
+  iso: string; label: string; day: number;
+  /** кубиков сахара за день (как раньше) */
+  cubes: number;
+  /** кубиков по каждому показателю */
+  by: Record<MetricId, number>;
+  today: boolean;
+};
 export type WeekReceipt = { entry: HistoryEntry; receipt: Receipt; analysis: Analysis; base: Analysis };
+
+/** Неделя по одному показателю. */
+export type MetricWeek = {
+  /** всего за неделю: г (сахар, соль, жиры) или ккал */
+  total: number;
+  cubes: number;
+  /** норма семьи на 7 дней, кубиков */
+  normCubes: number;
+  /** доля от недельной нормы, 0..∞ */
+  ratio: number;
+  /** главные источники: название и количество */
+  sources: { name: string; value: number }[];
+  /** на сколько кубиков заменами стало меньше */
+  cubesSaved: number;
+};
+
 export type WeekStats = {
   days: DayStat[];
   receipts: WeekReceipt[];
@@ -21,30 +44,36 @@ export type WeekStats = {
   /** потрачено на вредное, ₸ */
   junk: number;
   total: number;
+  /** на алкоголь и энергетики, ₸ */
+  flagged: number;
   /** сэкономлено заменами, ₸ (может быть отрицательным) */
   saved: number;
   cubesSaved: number;
-  /** норма семьи на 7 дней, кубиков */
+  /** норма семьи на 7 дней, кубиков (сахар) */
   normCubes: number;
-  /** доля от недельной нормы, 0..∞ */
+  /** доля от недельной нормы, 0..∞ (сахар) */
   ratio: number;
   sources: { name: string; grams: number }[];
+  /** то же самое по каждому показателю */
+  metrics: Record<MetricId, MetricWeek>;
   from: string;
   to: string;
 };
 
 /** Последние 7 дней, включая сегодня; чек относится к дню своей даты. */
 export function weekStats(entries: HistoryEntry[], p: Pick<Profile, 'adults' | 'kids'>, now = new Date()): WeekStats {
+  const zero = (): Record<MetricId, number> => ({ sugar: 0, salt: 0, fat: 0, kcal: 0 });
   const days: DayStat[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    days.push({ iso: isoOf(d), label: DOW[d.getDay()], day: d.getDate(), cubes: 0, today: i === 0 });
+    days.push({ iso: isoOf(d), label: DOW[d.getDay()], day: d.getDate(), cubes: 0, by: zero(), today: i === 0 });
   }
   const byIso = new Map(days.map(d => [d.iso, d]));
 
   const receipts: WeekReceipt[] = [];
-  const bySource = new Map<string, number>();
-  let sugar = 0, junk = 0, total = 0, saved = 0, cubesSaved = 0;
+  const bySource = Object.fromEntries(METRIC_IDS.map(m => [m, new Map<string, number>()])) as Record<MetricId, Map<string, number>>;
+  const amount = zero(), cubesSavedBy = zero();
+  let junk = 0, total = 0, saved = 0, flagged = 0;
 
   for (const entry of entries) {
     const day = byIso.get(entry.date);
@@ -53,23 +82,33 @@ export function weekStats(entries: HistoryEntry[], p: Pick<Profile, 'adults' | '
     const analysis = analyze(receipt, entry.swaps);
     const base = analyze(receipt, []);
     receipts.push({ entry, receipt, analysis, base });
-    day.cubes += analysis.cubes;
-    sugar += analysis.sugar; junk += analysis.junk; total += analysis.total;
+    junk += analysis.junk; total += analysis.total; flagged += analysis.flagged.sum;
     saved += base.total - analysis.total;
-    cubesSaved += base.cubes - analysis.cubes;
-    for (const it of analysis.items) {
-      if (it.active.s > 0) bySource.set(it.active.n, (bySource.get(it.active.n) ?? 0) + it.active.s);
+    for (const m of METRIC_IDS) {
+      amount[m] += analysis.totals[m];
+      day.by[m] += analysis.cubesBy[m];
+      cubesSavedBy[m] += base.cubesBy[m] - analysis.cubesBy[m];
+      for (const it of analysis.items) {
+        const v = valueOf(it.active, m);
+        if (v > 0) bySource[m].set(it.active.n, (bySource[m].get(it.active.n) ?? 0) + v);
+      }
     }
+    day.cubes = day.by.sugar;
   }
 
-  const normCubes = Math.round(familyDailyG(p) * 7 / CUBE_G);
-  const cubes = Math.round(sugar / CUBE_G);
-  const sources = [...bySource].map(([name, grams]) => ({ name, grams })).sort((a, b) => b.grams - a.grams).slice(0, 4);
+  const metrics = Object.fromEntries(METRIC_IDS.map(m => {
+    const normCubes = Math.round(familyDaily(p, m) * 7 / METRICS[m].cubeG);
+    const cubes = cubesOfValue(amount[m], m);
+    const sources = [...bySource[m]].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 4);
+    return [m, { total: Math.round(amount[m] * 10) / 10, cubes, normCubes, ratio: normCubes ? cubes / normCubes : 0, sources, cubesSaved: cubesSavedBy[m] } satisfies MetricWeek];
+  })) as Record<MetricId, MetricWeek>;
 
+  const sugar = metrics.sugar;
   return {
-    days, receipts, sugar, cubes, junk, total, saved, cubesSaved, normCubes,
-    ratio: normCubes ? cubes / normCubes : 0,
-    sources, from: days[0].iso, to: days[6].iso,
+    days, receipts, sugar: sugar.total, cubes: sugar.cubes, junk, total, flagged, saved, cubesSaved: sugar.cubesSaved,
+    normCubes: sugar.normCubes, ratio: sugar.ratio,
+    sources: sugar.sources.map(s => ({ name: s.name, grams: s.value })),
+    metrics, from: days[0].iso, to: days[6].iso,
   };
 }
 
@@ -105,7 +144,7 @@ export function badges(entries: HistoryEntry[], p: Pick<Profile, 'adults' | 'kid
     { id: 'swap', icon: 'swap', title: 'Первая замена', desc: 'Включи замену в любом чеке', done: swapped },
     { id: 'three', icon: 'stack', title: 'Три чека', desc: 'Собери три чека в истории', done: n >= 3, progress: cap(n, 3) },
     { id: 'clean', icon: 'leaf', title: 'Чистая корзина', desc: 'Чек с оценкой 80 и выше', done: clean },
-    { id: 'bomb', icon: 'bomb', title: 'Сахарная бомба', desc: 'Найди чек с оценкой ниже 40', done: bomb },
+    { id: 'bomb', icon: 'bomb', title: 'Корзина-бомба', desc: 'Найди чек с оценкой ниже 40', done: bomb },
     { id: 'minus50', icon: 'minus', title: 'Минус 50 кубиков', desc: 'Убери заменами 50 кубиков сахара', done: cubesSaved >= 50, progress: cap(cubesSaved, 50) },
     { id: 'saver', icon: 'coin', title: 'Экономист', desc: 'Сэкономь заменами 1 000 ₸', done: saved >= 1000, progress: cap(saved, 1000) },
     { id: 'norm', icon: 'shield', title: 'Неделя в норме', desc: 'Два чека за неделю и сахар не выше нормы семьи', done: w.receipts.length >= 2 && w.ratio <= 1 },

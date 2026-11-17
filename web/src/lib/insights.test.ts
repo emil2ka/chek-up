@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RECEIPTS } from './data';
 import { analyze } from './engine';
 import { badges, weekStats } from './insights';
-import { familyDailyCubes, familyDailyG } from './profile';
+import { familyDaily, familyDailyCubes, familyDailyCubesOf, familyDailyG } from './profile';
 import { CATALOG, searchCatalog } from './catalog';
 import type { HistoryEntry } from './types';
 
@@ -40,17 +40,44 @@ describe('weekStats', () => {
     expect(w.sugar).toBe(sum);
     expect(w.cubes).toBe(Math.round(sum / 5));
     expect(w.receipts).toHaveLength(3);
-    expect(w.days.find(d => d.iso === '2026-11-16')!.cubes).toBe(62);
+    expect(w.days.find(d => d.iso === '2026-11-16')!.cubes).toBe(73);
     expect(w.days.find(d => d.iso === '2026-11-14')!.cubes).toBe(192);
     expect(w.ratio).toBeGreaterThan(1);
     expect(w.sources[0].grams).toBeGreaterThanOrEqual(w.sources[1].grams);
   });
 
   it('учитывает замены: меньше сахара и есть экономия', () => {
-    const w = weekStats([entry('week', [1, 3, 10])], solo, NOW);
-    expect(w.cubes).toBe(15);
+    const w = weekStats([entry('week', [1, 3, 11])], solo, NOW); // кола, сок, питьевой йогурт
+    expect(w.cubes).toBe(26);
     expect(w.saved).toBe(540);
     expect(w.cubesSaved).toBe(47);
+  });
+
+  it('считает все четыре показателя: итог, кубики, норму и источники', () => {
+    const w = weekStats([entry('week'), entry('fit')], solo, NOW);
+    const a = analyze(RECEIPTS[0]), b = analyze(RECEIPTS[2]);
+    for (const m of ['sugar', 'salt', 'fat', 'kcal'] as const) {
+      expect(w.metrics[m].total).toBeCloseTo(a.totals[m] + b.totals[m], 1);
+      expect(w.metrics[m].normCubes).toBe(70); // у каждого показателя норма взрослого — 10 кубиков в день
+    }
+    expect(w.metrics.salt.sources[0].name).toMatch(/Колбаса/);   // больше всего соли — в колбасе
+    expect(w.metrics.fat.sources[0].name).toMatch(/Сыр|Яйцо|Колбаса|Молоко|Шоколад|Лосось/);
+    expect(w.days.find(d => d.iso === '2026-11-16')!.by.salt).toBe(analyze(RECEIPTS[0]).cubesBy.salt);
+    expect(w.flagged).toBe(1240);
+  });
+
+  it('замены меняют и соль: колбаса → куриная грудка', () => {
+    const i = RECEIPTS[0].items.findIndex(x => x.n.startsWith('Колбаса'));
+    const w0 = weekStats([entry('week')], solo, NOW), w1 = weekStats([entry('week', [i])], solo, NOW);
+    expect(w1.metrics.salt.total).toBeLessThan(w0.metrics.salt.total - 5);
+    expect(w1.metrics.salt.cubesSaved).toBeGreaterThan(10);
+  });
+
+  it('норма семьи у каждого показателя своя', () => {
+    const fam = { adults: 2, kids: 1 };
+    expect([familyDaily(fam, 'sugar'), familyDaily(fam, 'salt'), familyDaily(fam, 'fat'), familyDaily(fam, 'kcal')]).toEqual([130, 13, 56, 5500]);
+    expect(familyDailyCubesOf(fam, 'salt')).toBe(26);
+    expect(weekStats([], fam, NOW).metrics.kcal.normCubes).toBe(193); // 5500 ккал × 7 дней / 200
   });
 
   it('не берёт чеки старше семи дней и чеки из будущего', () => {
@@ -71,7 +98,7 @@ describe('badges', () => {
     expect(badges([], solo, NOW).every(b => !b.done)).toBe(true);
   });
 
-  it('первый чек, чистая корзина и сахарная бомба', () => {
+  it('первый чек, чистая корзина и корзина-бомба', () => {
     const list = badges([entry('party'), entry('fit')], solo, NOW);
     expect(get(list, 'first').done).toBe(true);
     expect(get(list, 'clean').done).toBe(true);

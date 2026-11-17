@@ -1,11 +1,19 @@
 'use client';
-// «Продукты»: справочник «Сколько сахара в…» с поиском и разделами.
+// «Продукты»: справочник «Что внутри» с поиском, разделами и выбором показателя (сахар, соль, жиры, калории).
 import { useMemo, useState } from 'react';
-import { CATS, searchCatalog, type Cat } from '@/lib/catalog';
-import { CUBES, CUBE_G, DAILY_G, pl, type Forms } from '@/lib/engine';
+import { CATS, catalogValue, searchCatalog, type Cat } from '@/lib/catalog';
+import { amountTxt, cubeLabel, CUBES, cubesOfValue, METRICS, pl, type Forms } from '@/lib/engine';
+import type { MetricId } from '@/lib/types';
+import { MetricTabs } from '@/components/ui/MetricTabs';
 import { IconArrow, IconClose, IconSearch } from '@/components/icons';
 
 const PRODUCTS: Forms = ['продукт', 'продукта', 'продуктов'];
+const SORT_HINT: Record<MetricId, string> = {
+  sugar: 'сначала самые сладкие',
+  salt: 'сначала самые солёные',
+  fat: 'сначала самые жирные',
+  kcal: 'сначала самые калорийные',
+};
 /** столько клеточек-кубиков рисуем в строке, остальное — «+N» */
 const STRIP = 24;
 
@@ -13,14 +21,16 @@ export function Catalog() {
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState<Cat | 'all'>('all');
   const [open, setOpen] = useState<string | null>(null);
-  const items = useMemo(() => searchCatalog(query, cat), [query, cat]);
+  const [metric, setMetric] = useState<MetricId>('sugar');
+  const mdef = METRICS[metric];
+  const items = useMemo(() => searchCatalog(query, cat, metric), [query, cat, metric]);
 
   return (
     <div className="flex min-h-full flex-col">
       <header className="px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-5 text-white">
         <h1 className="font-display text-[clamp(30px,9.4vw,38px)] leading-[.98] font-black tracking-[-.045em]">
-          <span className="rise block">Сколько сахара</span>
-          <span className="rise block" style={{ animationDelay: '60ms' }}>в <span className="hl">продуктах</span></span>
+          <span className="rise block">Что внутри</span>
+          <span className="rise block" style={{ animationDelay: '60ms' }}><span className="hl">продуктов</span></span>
         </h1>
 
         <label className="on-light rise mt-5 flex h-14 items-center gap-3 rounded-[20px] bg-white pr-1.5 pl-4 text-ink shadow-[0_14px_30px_-12px_color-mix(in_srgb,var(--ink)_55%,transparent)] focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-white" style={{ animationDelay: '120ms' }}>
@@ -62,11 +72,13 @@ export function Catalog() {
             );
           })}
         </ul>
+
+        <MetricTabs value={metric} onChange={m => { setMetric(m); setOpen(null); }} className="rise mt-3" />
       </header>
 
       <section className="on-light relative flex-1 rounded-t-sheet bg-white px-3 pt-5 pb-6 text-ink shadow-panel" aria-live="polite">
         <p className="px-2 pb-2.5 text-[13px] font-bold text-mute">
-          {items.length} {pl(items.length, PRODUCTS)} · сначала самые сладкие
+          {items.length} {pl(items.length, PRODUCTS)} · {SORT_HINT[metric]}
         </p>
 
         {items.length === 0 ? (
@@ -77,9 +89,10 @@ export function Catalog() {
         ) : (
           <ul className="grid gap-2">
             {items.map(it => {
-              const cubes = Math.round(it.g / CUBE_G);
+              const val = catalogValue(it, metric);
+              const cubes = cubesOfValue(val, metric);
               const expanded = open === it.id;
-              const pct = Math.round(it.g / DAILY_G * 100);
+              const pct = Math.round(val / mdef.adult * 100);
               const cells = Math.min(cubes, STRIP);
               return (
                 <li key={it.id} className={`rounded-[22px] transition-colors ${expanded ? 'bg-[color-mix(in_srgb,var(--blue-3)_22%,var(--tint))]' : 'bg-tint'}`}>
@@ -100,13 +113,13 @@ export function Catalog() {
                       </span>
                     ) : (
                       <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-extrabold text-good">
-                        <i className="dot good" />{it.g > 0 ? 'почти нет' : 'без сахара'}
+                        <i className="dot good" />{val > 0 ? 'почти нет' : `без ${mdef.of}`}
                       </span>
                     )}
                     {cubes > 0 && (
                       <span className="col-span-2 flex flex-wrap items-center gap-[3px]" aria-hidden="true">
                         {Array.from({ length: cells }, (_, i) => (
-                          <i key={i} className="size-2.75 rounded-[3px] bg-blue-1 shadow-[inset_-1.5px_-1.5px_0_color-mix(in_srgb,var(--ink)_28%,transparent)]" />
+                          <i key={i} className="size-2.75 rounded-[3px] shadow-[inset_-1.5px_-1.5px_0_color-mix(in_srgb,var(--ink)_28%,transparent)]" style={{ background: mdef.color }} />
                         ))}
                         {cubes > cells && <b className="ml-1 text-xs font-extrabold text-blue-1">+{cubes - cells}</b>}
                       </span>
@@ -116,9 +129,9 @@ export function Catalog() {
                   {expanded && (
                     <div className="rise grid gap-2 px-4 pb-4" style={{ animationDuration: '320ms' }}>
                       <p className="text-[15px] leading-snug font-semibold">
-                        {it.g > 0
-                          ? <>Около <b>{it.g} г</b> добавленного сахара — это <b>{pct}%</b> дневной нормы взрослого.</>
-                          : <>Добавленного сахара нет. Можно не считать.</>}
+                        {val > 0
+                          ? <>В порции около <b>{amountTxt(val, metric)}</b> {metric === 'sugar' ? 'добавленного сахара' : mdef.of} — это <b>{pct}%</b> дневной нормы взрослого.</>
+                          : <>{metric === 'sugar' ? 'Добавленного сахара' : mdef.label} здесь нет. Можно не считать.</>}
                       </p>
                       {it.swap && (
                         <p className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2.5 text-[15px] leading-snug font-bold text-good">
@@ -135,7 +148,7 @@ export function Catalog() {
         )}
 
         <p className="mt-5 px-2 text-xs leading-relaxed font-semibold text-mute">
-          Значения примерные, по типичным товарам в магазинах. 1 кубик = {CUBE_G} г сахара, норма взрослого — до {DAILY_G} г в день.
+          Значения примерные, по типичным товарам в магазинах. 1 кубик {mdef.of} = {cubeLabel(metric)}. Норма: {mdef.norm}.
         </p>
       </section>
     </div>

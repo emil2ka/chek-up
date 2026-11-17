@@ -2,15 +2,16 @@
 // Знакомство при первом запуске: три шага и состав семьи. Можно пропустить.
 import { useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { CUBES, CUBE_G, DAILY_G, pl } from '@/lib/engine';
-import { ADULT_G, KID_G, MAX_ADULTS, MAX_KIDS, familyDailyCubes, profile as profileStore, type Profile } from '@/lib/profile';
+import { METRICS, pl, CUBES } from '@/lib/engine';
+import { MAX_ADULTS, MAX_KIDS, familyDailyCubes, profile as profileStore, type Profile } from '@/lib/profile';
 import { IconArrow, IconCube } from '@/components/icons';
 import { Stepper } from '@/components/ui/Stepper';
 
 const STEPS = 3;
-const NORM = DAILY_G / CUBE_G;
-/** в литре колы 106 г сахара */
-const COLA = Math.round(106 / CUBE_G);
+const NORM = 10; // норма взрослого у каждого показателя — около 10 кубиков в день
+/** в литре колы 106 г сахара, а в 400 г докторской колбасы около 9 г соли */
+const COLA = Math.round(106 / METRICS.sugar.cubeG);
+const SAUSAGE = Math.round(8.8 / METRICS.salt.cubeG);
 
 export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): void }) {
   const reduce = useReducedMotion();
@@ -68,7 +69,7 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
                   Чек знает, что ты <span className="hl">ешь</span>
                 </h1>
                 <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  Сфоткай чек из магазина — покажем, сколько в корзине добавленного сахара, и подскажем, что заменить.
+                  Сфоткай чек из магазина — покажем, сколько в корзине сахара, соли, насыщенных жиров и калорий и сколько на это ушло денег. И подскажем, что заменить.
                 </p>
               </>
             )}
@@ -83,10 +84,10 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
                   ))}
                 </ul>
                 <h1 className="font-display text-[clamp(34px,10.6vw,44px)] leading-[.98] font-black tracking-[-.045em] text-balance">
-                  1 кубик — это <span className="hl">{CUBE_G} г</span> сахара
+                  Всё считаем <span className="hl">кубиками</span>
                 </h1>
                 <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  Норма взрослого — до {NORM} {pl(NORM, CUBES)} в день. В одном литре колы их {COLA}.
+                  Кубик у каждого показателя свой: 5 г сахара, 0,5 г соли, 2 г жиров или 200 ккал. Норма взрослого — около {NORM} {pl(NORM, CUBES)} каждого в день. В литре колы {COLA} кубиков сахара, в докторской колбасе на 400 г — {SAUSAGE} кубиков соли.
                 </p>
               </>
             )}
@@ -100,11 +101,11 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
                   От этого зависит норма сахара на неделю. Изменить можно в профиле.
                 </p>
                 <div className="mt-6 grid gap-2.5">
-                  <Stepper tone="glass" label="Взрослые" hint={`до ${ADULT_G} г в день`} value={profile.adults} min={1} max={MAX_ADULTS} onChange={v => profileStore.update({ adults: v })} />
-                  <Stepper tone="glass" label="Дети" hint={`до ${KID_G} г в день`} value={profile.kids} min={0} max={MAX_KIDS} onChange={v => profileStore.update({ kids: v })} />
+                  <Stepper tone="glass" label="Взрослые" hint={`до ${METRICS.sugar.adult} г сахара и ${METRICS.salt.adult} г соли в день`} value={profile.adults} min={1} max={MAX_ADULTS} onChange={v => profileStore.update({ adults: v })} />
+                  <Stepper tone="glass" label="Дети" hint={`до ${METRICS.sugar.kid} г сахара и ${METRICS.salt.kid} г соли в день`} value={profile.kids} min={0} max={MAX_KIDS} onChange={v => profileStore.update({ kids: v })} />
                 </div>
                 <p className="mt-5 text-[16px] font-semibold text-white/92" aria-live="polite">
-                  Норма семьи — <b className="font-display text-xl font-black">{familyDailyCubes(profile)}</b> {pl(familyDailyCubes(profile), CUBES)} в день
+                  Норма семьи — <b className="font-display text-xl font-black">{familyDailyCubes(profile)}</b> {pl(familyDailyCubes(profile), CUBES)} сахара в день
                 </p>
               </>
             )}

@@ -73,6 +73,29 @@ export const shopItems = pgTable(
   t => [primaryKey({ columns: [t.userId, t.name] })],
 );
 
+/**
+ * Цены из отсканированных чеков для сравнения магазинов. Хранится только «категория товара + цена за кг/л + магазин + дата»;
+ * по названию чека и пользователю купленное не восстановить. Строки привязаны к чеку: правится или удаляется чек — меняются они.
+ */
+export const pricePoints = pgTable(
+  'price_points',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    entryId: text('entry_id').notNull(),
+    /** ключ категории справочника распознавания: soda, sausage, cheese… */
+    category: text('category').notNull(),
+    /** нормализованное название магазина: «Magnum», «Small» */
+    store: text('store').notNull(),
+    /** ₸ за 1000 г или 1000 мл */
+    unitPrice: integer('unit_price').notNull(),
+    /** «л» или «кг» — для подписи */
+    unit: text('unit').notNull(),
+    /** дата чека YYYY-MM-DD */
+    seenOn: text('seen_on').notNull(),
+  },
+  t => [primaryKey({ columns: [t.userId, t.entryId, t.category] }), index('price_points_cat_idx').on(t.category, t.store)],
+);
+
 /** Счётчики для достижений. Только растут, поэтому сливаются через max. */
 export const stats = pgTable('stats', {
   userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),

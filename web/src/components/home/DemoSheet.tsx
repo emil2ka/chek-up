@@ -87,7 +87,7 @@ export function DemoSheet({ onClose, onPick }: Props) {
                   >
                     <span className="grid h-21.5 place-content-center justify-items-center rounded-[18px] bg-sky text-white shadow-[inset_0_-4px_0_color-mix(in_srgb,var(--ink)_18%,transparent)]">
                       <b className="font-display text-[30px] leading-none font-black tracking-[-.05em]">{a.cubes}</b>
-                      <small className="mt-1 text-xs font-bold text-white/88">{pl(a.cubes, CUBES)}</small>
+                      <small className="mt-1 text-xs font-bold text-white/88">{pl(a.cubes, CUBES)} сахара</small>
                     </span>
                     <span className="grid min-w-0 gap-0.5">
                       <span className="font-display text-base leading-[1.2] font-bold tracking-[-.02em]">{r.title}</span>

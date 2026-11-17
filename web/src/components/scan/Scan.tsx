@@ -3,14 +3,17 @@
 // быстро сменяющиеся позиции с сахаром и растущий счётчик кубиков.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { analyze, CUBES, dateRu, pl } from '@/lib/engine';
+import { amountTxt, analyze, CUBES, cubesOfValue, dateRu, METRICS, pl, valueOf } from '@/lib/engine';
+import type { MetricId } from '@/lib/types';
 import { recognize } from '@/lib/recognize';
 import type { ScanResponse } from '@/lib/schema';
 import type { Receipt } from '@/lib/types';
 import { IconClose } from '@/components/icons';
 
 const DURATION = 2600; // мс — минимум; настоящее распознавание может идти дольше
-const WAIT = ['Ищу сладкие позиции', 'Разбираю сокращения кассы', 'Сверяю со справочником', 'Считаю сахар по позициям'];
+const WAIT = ['Ищу сладкое, солёное и жирное', 'Разбираю сокращения кассы', 'Сверяю со справочником', 'Считаю сахар, соль и жиры'];
+/** по этим показателям ищем «вредное» в ленте сканера (калории — не вред сами по себе) */
+const SCANNED: MetricId[] = ['sugar', 'salt', 'fat'];
 const LINES = [92, 64, 80, 48, 86, 70, 58, 90, 44, 76, 66, 84, 52, 72];
 const nb = (s: string) => s.replace(/(\d) (?=\S)/g, '$1 '); // «270 г» не разрывать
 
@@ -64,14 +67,18 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
       const r = res.receipt;
       setFound(r);
       const a = analyze(r);
-      const sweet = a.items.filter(it => it.active.s > 0);
+      // позиции, где чего-то хотя бы кубик; для каждой показываем самый выраженный показатель
+      const worst = (it: (typeof a.items)[number]) => SCANNED.map(m => ({ m, v: valueOf(it.active, m), c: cubesOfValue(valueOf(it.active, m), m) })).sort((x, y) => y.c - x.c)[0];
+      const sweet = a.items.filter(it => worst(it).c >= 1);
+      const all = SCANNED.reduce((s, m) => s + a.cubesBy[m], 0);
       const startAt = Math.max(150, performance.now() - t0);
       // если ответ пришёл поздно, всё равно даём позициям ~1,6 с, чтобы их успели прочитать
       const span = Math.max(Math.min(1600, sweet.length * 320), DURATION - startAt - 450);
       const step = sweet.length ? span / sweet.length : span;
       sweet.forEach((it, k) => later(() => {
-        setTick({ k, name: nb(it.active.n), grams: `${it.active.s} г сахара` });
-        setCount(Math.round(a.cubes * (k + 1) / sweet.length));
+        const w = worst(it);
+        setTick({ k, name: nb(it.active.n), grams: `${amountTxt(w.v, w.m).replace(' ', '\u00A0')} ${METRICS[w.m].of}` });
+        setCount(Math.round(all * (k + 1) / sweet.length));
       }, startAt + k * step));
       later(() => cb.current.onDone(res), Math.max(DURATION, performance.now() - t0 + 300));
     }).catch(err => {
@@ -188,7 +195,7 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
           >
             {count}
           </motion.b>
-          <span className="mt-1.5 text-sm font-bold text-white/86">{pl(count, CUBES)} сахара найдено</span>
+          <span className="mt-1.5 text-sm font-bold text-white/86">{pl(count, CUBES)} сахара, соли и жиров найдено</span>
         </p>
       </div>
     </div>

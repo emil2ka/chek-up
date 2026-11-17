@@ -175,6 +175,18 @@ export function startSync(): () => void {
   };
 }
 
+/** Запрос к серверу от имени этого устройства (токен берётся или создаётся сам; устаревший токен заменяется). */
+export async function postAuthed(path: string, body: unknown): Promise<unknown> {
+  let auth = currentAuth() ?? (await register());
+  try {
+    return await call(path, { token: auth.token, body });
+  } catch (e) {
+    if (!(e instanceof SyncError) || e.httpStatus !== 401) throw e;
+    auth = await register();
+    return call(path, { token: auth.token, body });
+  }
+}
+
 // ── связывание устройств ──
 /** Короткий код для входа в этот аккаунт с другого устройства (живёт 10 минут). */
 export async function createLinkCode(): Promise<string> {

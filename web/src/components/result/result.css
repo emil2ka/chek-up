@@ -14,7 +14,8 @@
 .rs *, .rs *::before, .rs *::after { box-sizing: border-box; }
 :where(.rs) :where(p, h2, ul) { margin: 0; padding: 0; }
 :where(.rs) ul { list-style: none; }
-:where(.rs) button {
+/* вкладки показателей (role=tab) стилизуются утилитами Tailwind, а они лежат в @layer и проиграли бы этому сбросу */
+:where(.rs) button:where(:not([role='tab'])) {
   font: inherit; color: inherit; margin: 0; border: 0; background: none; padding: 0;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
@@ -27,14 +28,14 @@
 /* ——— верх: синий фон, цифра, куча ——— */
 .rs-hero {
   position: relative;
-  height: calc(100vh - 204px);
-  height: clamp(420px, calc(100svh - 204px), 700px);
+  height: calc(100vh - 190px);
+  height: clamp(470px, calc(100svh - 190px), 740px);
   background: var(--sky);
   color: var(--white);
 }
 /* низкие телефоны: чтобы под кучей влезли две строки замен даже с переносом названий */
 @media (max-height: 700px) {
-  .rs-hero { height: clamp(400px, calc(100svh - 236px), 700px); }
+  .rs-hero { height: clamp(440px, calc(100svh - 224px), 740px); }
 }
 .rs-hero::before { /* мягкий свет за цифрой */
   content: ''; position: absolute; left: 50%; top: 18%; width: 120%; aspect-ratio: 1;
@@ -199,6 +200,33 @@
   animation: none;
 }
 .rs-src-sw { display: flex; align-items: flex-start; gap: 5px; margin-top: 6px; font: 600 13px/1.3 var(--font-t); color: #0E8A51; }
+
+/* переключатель показателей под шапкой */
+.rs-tabs { position: relative; z-index: 4; margin: 10px 12px 0; }
+
+/* цена вреда */
+.rs-harm-big { padding: 0 4px; font: 600 15px/1.3 var(--font-t); color: var(--mute); }
+.rs-harm-big b { display: block; margin-bottom: 2px; font: 900 34px/1 var(--font-d); letter-spacing: -.04em; color: var(--ink); }
+.rs-harm-sub { margin-top: 8px; padding: 0 4px; font: 600 14px/1.4 var(--font-t); color: var(--mute); }
+.rs-harm-top { display: grid; gap: 6px; margin-top: 14px; }
+.rs-harm-top li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 16px; background: var(--tint); }
+.rs-harm-n { min-width: 0; font: 600 14px/1.3 var(--font-t); }
+.rs-harm-v { display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap; font: 700 13px/1 var(--font-t); color: var(--mute); }
+.rs-harm-v b { font: 800 14px/1 var(--font-d); color: var(--ink); letter-spacing: -.02em; }
+.rs-harm-v::after { content: 'куб.'; }
+.rs-offer { align-items: center !important; }
+.rs-offer .rs-harm-n small { display: block; margin-top: 3px; font: 600 12px/1.35 var(--font-t); color: var(--mute); }
+.rs-offer-s { white-space: nowrap; font: 800 15px/1 var(--font-d); color: #0E8A51; letter-spacing: -.02em; }
+
+/* алкоголь и энергетики */
+.rs-flag { padding: 18px 16px; border-radius: 24px; background: color-mix(in srgb, var(--bad) 8%, var(--white)); }
+.rs-flag .rs-h { padding: 0; margin-bottom: 8px; }
+.rs-flag-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rs-flag-sum { font: 900 30px/1 var(--font-d); letter-spacing: -.04em; }
+.rs-flag-share { font: 800 15px/1 var(--font-d); color: var(--bad); }
+.rs-flag-list { display: grid; gap: 6px; margin-top: 12px; }
+.rs-flag-list li { display: flex; justify-content: space-between; gap: 12px; font: 600 14px/1.35 var(--font-t); }
+.rs-flag-list b { white-space: nowrap; font: 800 14px/1.35 var(--font-d); }
 
 /* на вредное */
 .rs-junk { padding: 18px 16px; border-radius: 24px; background: var(--tint); }

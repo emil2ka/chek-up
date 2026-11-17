@@ -1,30 +1,35 @@
 // Расчёты экрана результата: чистые функции без DOM (перенос prototype/src/result-model.js).
-import { analyze, verdict, pl, money, CUBE_G, DAILY_G, CUBES, DAYS, type Forms } from '@/lib/engine';
-import type { Analysis, Receipt, Tone } from '@/lib/types';
+// Все списки считаются для выбранного показателя: сахар, соль, жиры или калории.
+import {
+  analyze, amountTxt, cubeLabel, cubesOfValue, money, pl, valueOf, verdict,
+  CUBE_G, CUBES, DAILY_G, DAYS, METRICS, METRIC_IDS, type Forms,
+} from '@/lib/engine';
+import type { Analysis, MetricId, Receipt, Tone } from '@/lib/types';
 
 export const POINTS: Forms = ['балл', 'балла', 'баллов'];
 export const JUNK: Forms = ['вредный товар', 'вредных товара', 'вредных товаров'];
-export const NOTE = `1 кубик = ${CUBE_G} г сахара. Норма ВОЗ — до ${DAILY_G} г добавленного сахара в день. Оценка примерная и не заменяет консультацию врача.`;
+export const NOTE = `Кубик у каждого показателя свой: ${METRIC_IDS.map(cubeLabel).join(', ')}. Норма взрослого — около 10 кубиков в день по каждому (ориентир ВОЗ; сахар — до ${DAILY_G} г). Оценка примерная и не заменяет консультацию врача.`;
 
-export const cubesOf = (g: number) => Math.round(g / CUBE_G);
 export const cubesTxt = (n: number) => `${n} ${pl(n, CUBES)}`;
-/** подпись под большой цифрой: «кубика сахара» */
-export const capOf = (n: number) => `${pl(n, CUBES)} сахара`;
 const signed = (n: number, f: (n: number) => string) => (n > 0 ? '−' : n < 0 ? '+' : '') + f(Math.abs(n));
+/** «Соли в чеке…» — родительный падеж с заглавной буквы */
+const Of = (m: MetricId) => METRICS[m].of[0].toUpperCase() + METRICS[m].of.slice(1);
 
 export type SwapRow = { i: number; from: string; to: string; cubes: string; price: string };
 
-/** Позиции с заменой — неизменны для чека. */
-export function swapRows(receipt: Receipt): SwapRow[] {
+/** Позиции с заменой, которые меняют выбранный показатель, — неизменны для чека. */
+export function swapRows(receipt: Receipt, m: MetricId = 'sugar'): SwapRow[] {
   const rows: SwapRow[] = [];
   receipt.items.forEach((it, i) => {
     if (!it.swap) return;
+    const delta = cubesOfValue(valueOf(it, m), m) - cubesOfValue(valueOf(it.swap, m), m);
+    if (!delta) return;
     rows.push({
       i,
       from: it.n,
       to: it.swap.n,
-      cubes: signed(cubesOf(it.s) - cubesOf(it.swap.s), cubesTxt), // «−21 кубик»
-      price: signed(it.p - it.swap.p, money),                      // «−340 ₸» или «+150 ₸»
+      cubes: signed(delta, cubesTxt), // «−21 кубик»
+      price: signed(it.p - it.swap.p, money), // «−340 ₸» или «+150 ₸»
     });
   });
   return rows;
@@ -33,7 +38,7 @@ export function swapRows(receipt: Receipt): SwapRow[] {
 export type SourceRow = {
   i: number;
   name: string;
-  grams: string;
+  amount: string;
   cubes: string;
   /** ширина полосы, % */
   width: number;
@@ -43,10 +48,31 @@ export type SourceRow = {
   swapTo: string;
 };
 
+/** «Цена вреда»: сколько денег ушло на продукты с этим показателем и во сколько обошёлся кубик. */
+export type HarmPrice = {
+  /** ₸ на позиции, где есть хотя бы кубик показателя */
+  spend: number;
+  cubes: number;
+  /** ₸ за один кубик */
+  perCube: number;
+  /** самые дорогие покупки */
+  top: { name: string; price: number; cubes: number }[];
+};
+
+export function harmPrice(a: Analysis, m: MetricId): HarmPrice {
+  const rows = a.items
+    .map(it => ({ name: it.active.n, price: it.active.p, cubes: cubesOfValue(valueOf(it.active, m), m) }))
+    .filter(r => r.cubes >= 1);
+  const spend = rows.reduce((s, r) => s + r.price, 0);
+  const cubes = rows.reduce((s, r) => s + r.cubes, 0);
+  return { spend, cubes, perCube: cubes ? spend / cubes : 0, top: [...rows].sort((x, y) => y.price - x.price).slice(0, 3) };
+}
+
 export type ResultModel = {
   analysis: Analysis;
   base: Analysis;
   swaps: number[];
+  metric: MetricId;
   /** под это количество подбирается размер кубика */
   maxCubes: number;
   tone: Tone;
@@ -54,17 +80,21 @@ export type ResultModel = {
   srLabel: string;
   summary: null | { points: string; kind: 'save' | 'extra' | 'same'; label: string; money: string };
   sources: SourceRow[];
+  harm: HarmPrice;
   junk: { sum: string; share: string; tone: Tone; width: number; of: string; days: string };
+  /** алкоголь и энергетики; null, если их в чеке нет */
+  flagged: null | { sum: string; share: string; lines: { name: string; price: string; kind: 'alcohol' | 'energy' }[] };
   shareText: string;
 };
 
-/** Всё, что показывает экран при данном наборе замен. */
-export function resultModel(receipt: Receipt, swaps: Iterable<number>): ResultModel {
+/** Всё, что показывает экран при данном наборе замен и выбранном показателе. */
+export function resultModel(receipt: Receipt, swaps: Iterable<number>, metric: MetricId = 'sugar'): ResultModel {
   const on = swaps instanceof Set ? (swaps as Set<number>) : new Set(swaps);
   const base = analyze(receipt, []);
   const a = analyze(receipt, on);
   const v = verdict(a.score);
   const verdictLow = v.label.toLowerCase();
+  const m = METRICS[metric];
 
   const save = base.total - a.total;
   const summary: ResultModel['summary'] = on.size ? {
@@ -74,23 +104,23 @@ export function resultModel(receipt: Receipt, swaps: Iterable<number>): ResultMo
     money: save ? money(Math.abs(save)) : '',
   } : null;
 
-  const srcItems = receipt.items.map((it, i) => ({ it, i })).filter(({ it }) => it.s > 0).sort((x, y) => y.it.s - x.it.s);
-  const maxS = srcItems.length ? srcItems[0].it.s : 1;
-  const sources = srcItems.map(({ it, i }): SourceRow => {
-    const c = cubesOf(it.s);
+  const src = receipt.items.map((it, i) => ({ it, i })).filter(({ it }) => valueOf(it, metric) > 0).sort((x, y) => valueOf(y.it, metric) - valueOf(x.it, metric)).slice(0, 8);
+  const maxV = src.length ? valueOf(src[0].it, metric) : 1;
+  const sources = src.map(({ it, i }): SourceRow => {
+    const val = valueOf(it, metric), c = cubesOfValue(val, metric);
     return {
       i,
       name: it.n,
-      grams: `${it.s} г`,
+      amount: amountTxt(val, metric),
       cubes: c ? cubesTxt(c) : 'меньше кубика',
-      width: Math.max(4, it.s / maxS * 100),
+      width: Math.max(4, val / maxV * 100),
       cells: Math.max(1, c),
       off: a.items[i].swapped,
-      swapTo: it.swap ? `${it.swap.n} — ${it.swap.s} г` : '',
+      swapTo: it.swap ? `${it.swap.n} — ${amountTxt(valueOf(it.swap, metric), metric)}` : '',
     };
   });
 
-  const d = Math.round(a.days);
+  const d = Math.round(a.totals[metric] / m.adult);
   const junk: ResultModel['junk'] = {
     sum: money(a.junk),
     share: `${Math.round(a.share * 100)}% чека`,
@@ -100,25 +130,37 @@ export function resultModel(receipt: Receipt, swaps: Iterable<number>): ResultMo
       ? `${a.junkCount} ${pl(a.junkCount, JUNK)} из ${money(a.total)} всего`
       : `Вредных товаров нет — весь чек ${money(a.total)} на нормальную еду`,
     days: d >= 1
-      ? `Сахара в чеке — на ${d} ${pl(d, DAYS)} для одного взрослого`
-      : 'Сахара в чеке меньше дневной нормы взрослого',
+      ? `${Of(metric)} в чеке — на ${d} ${pl(d, DAYS)} для одного взрослого`
+      : `${Of(metric)} в чеке меньше дневной нормы взрослого`,
   };
 
-  let shareText = `Мой чек в «Чек-ап»: ${a.cubes} ${pl(a.cubes, CUBES)} сахара, оценка ${a.score} из 100 — ${verdictLow}.`;
-  if (on.size && base.cubes > a.cubes) shareText += ` С заменами минус ${cubesTxt(base.cubes - a.cubes)}${save > 0 ? ` и ${money(save)} экономии` : ''}.`;
-  shareText += ' А сколько сахара в твоей корзине?';
+  const flagged: ResultModel['flagged'] = a.flagged.count
+    ? {
+        sum: money(a.flagged.sum),
+        share: `${Math.round(a.flagged.sum / (a.total || 1) * 100)}% чека`,
+        lines: a.items.filter(it => it.active.x).map(it => ({ name: it.active.n, price: money(it.active.p), kind: it.active.x! })),
+      }
+    : null;
+
+  const parts = (['sugar', 'salt', 'fat'] as const).map(k => `${a.cubesBy[k]} ${pl(a.cubesBy[k], CUBES)} ${METRICS[k].of}`);
+  let shareText = `Мой чек в «Чек-ап»: ${parts.join(', ')}, оценка ${a.score} из 100 — ${verdictLow}.`;
+  if (on.size && base.score < a.score) shareText += ` С заменами оценка ${a.score}${save > 0 ? ` и ${money(save)} экономии` : ''}.`;
+  shareText += ' А что в твоей корзине?';
 
   return {
     analysis: a,
     base,
     swaps: [...on].sort((x, y) => x - y),
-    maxCubes: Math.max(1, base.cubes, a.cubes),
+    metric,
+    maxCubes: Math.max(1, base.cubesBy[metric], a.cubesBy[metric]),
     tone: v.tone,
     pill: `${a.score} из 100 · ${verdictLow}`,
-    srLabel: `${a.cubes} ${pl(a.cubes, CUBES)} сахара, оценка ${a.score} из 100, ${verdictLow}`,
+    srLabel: `${a.cubesBy[metric]} ${pl(a.cubesBy[metric], CUBES)} ${m.of}, оценка ${a.score} из 100, ${verdictLow}`,
     summary,
     sources,
+    harm: harmPrice(a, metric),
     junk,
+    flagged,
     shareText,
   };
 }
@@ -128,3 +170,5 @@ export function cubeSize(width: number, avail: number, count: number): number {
   const s = Math.sqrt(0.64 * width * Math.max(80, avail) / Math.max(1, count));
   return Math.round(Math.max(12, Math.min(s, width / 7.4, 56)) * 2) / 2;
 }
+
+export { CUBE_G };

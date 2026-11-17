@@ -2,15 +2,13 @@
 // Главный экран: заголовок, кнопки, живые кубики внизу, шторка с примерами и «Мои чеки».
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { CUBES, CUBE_G, DAILY_G, pl } from '@/lib/engine';
-import { SugarPile } from '@/lib/pile';
+import { SugarPile, PALETTES } from '@/lib/pile';
 import type { HistoryEntry, Receipt } from '@/lib/types';
 import { IconCamera, IconCube, IconReceipt } from '@/components/icons';
 import { DemoSheet } from './DemoSheet';
 import { MyChecks } from './MyChecks';
 
 const HOME_CUBES = 9;
-const NORM_CUBES = DAILY_G / CUBE_G;
 
 type Props = {
   /** гидратация закончилась — можно запускать canvas и показывать историю */
@@ -42,6 +40,8 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
     try {
       pile = new SugarPile(canvas, {
         floorRadius,
+        // кубики четырёх цветов вперемешку: сахар, соль, жиры, калории
+        palette: [PALETTES.sugar, PALETTES.salt, PALETTES.fat, PALETTES.kcal],
         onCount: n => { if (hintRef.current) hintRef.current.hidden = !(n > 0); },
       });
     } catch (err) {
@@ -96,20 +96,20 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
 
           <div className="mt-5.5 short:mt-2.5">
             <h1 className="font-display text-[clamp(38px,12.2vw,53px)] leading-[.98] font-black tracking-[-.045em] text-balance text-white short:text-[clamp(34px,10.5vw,46px)]">
-              <span className="rise block">Сколько</span>
-              <span className="rise block" style={{ '--d': '60ms' } as CSSProperties}><span className="hl">сахара</span></span>
+              <span className="rise block">Что</span>
+              <span className="rise block" style={{ '--d': '60ms' } as CSSProperties}><span className="hl">прячется</span></span>
               <span className="rise block" style={{ '--d': '120ms' } as CSSProperties}>в&nbsp;твоём</span>
               <span className="rise block" style={{ '--d': '180ms' } as CSSProperties}>чеке?</span>
             </h1>
             <p className="rise mt-4.5 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
-              Сфоткай чек из магазина. Покажем сахар кубиками и подскажем, что заменить.
+              Сфоткай чек из магазина. Покажем сахар, соль, жиры и калории кубиками, во сколько тебе обошлось вредное, и подскажем, чем заменить.
             </p>
             <p
               className="rise mt-4 inline-flex items-center gap-2 rounded-full bg-ink/18 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold text-white/92 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)]"
               style={{ '--d': '280ms' } as CSSProperties}
             >
               <IconCube className="size-6 text-white" />
-              <span>Норма ВОЗ — до <b className="font-display font-extrabold">{NORM_CUBES}</b> {pl(NORM_CUBES, CUBES)} в день</span>
+              <span>Норма — около <b className="font-display font-extrabold">10</b> кубиков в день по каждому показателю</span>
             </p>
           </div>
 

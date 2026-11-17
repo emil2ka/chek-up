@@ -1,6 +1,6 @@
 // Куча на экране результата: размер кубика, раскладка по размеру героя, счётчик (перенос prototype/src/result-pile.js).
 // Не строит разметку — получает готовые элементы; вызывается из эффекта Result.tsx.
-import { SugarPile } from '@/lib/pile';
+import { SugarPile, type PilePalette } from '@/lib/pile';
 import { cubeSize } from './model';
 
 export type PileEls = {
@@ -14,9 +14,9 @@ export type PileEls = {
 };
 export type PileHandle = { set(n: number): void; destroy(): void };
 
-export function attachPile({ hero, head, sheet, canvas }: PileEls, maxCubes: number, onCount: (n: number) => void): PileHandle {
+export function attachPile({ hero, head, sheet, canvas }: PileEls, maxCubes: number, onCount: (n: number) => void, palette?: PilePalette | readonly PilePalette[]): PileHandle {
   const radius = parseFloat(getComputedStyle(sheet).borderTopLeftRadius) || 0;
-  const pile = new SugarPile(canvas, { onCount, floorRadius: radius });
+  const pile = new SugarPile(canvas, { onCount, floorRadius: radius, palette });
 
   let lw = 0, lh = 0;
   const relayout = () => {

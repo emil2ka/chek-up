@@ -1,9 +1,13 @@
 // Карточка для «Поделиться»: картинка 1080×1920 в стиле «Гора сахара». Только для клиента.
-import { CUBES, pl } from './engine';
-import type { Tone } from './types';
+import { capOf, METRIC_IDS, METRICS } from './engine';
+import { PALETTES, type PilePalette } from './pile';
+import type { MetricId, Tone } from './types';
 
 export type ShareCardData = {
-  cubes: number;
+  /** какой показатель на большой цифре */
+  metric: MetricId;
+  /** кубиков по каждому показателю */
+  cubesBy: Record<MetricId, number>;
   score: number;
   /** «так себе» */
   verdict: string;
@@ -30,7 +34,7 @@ function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number,
   else c.rect(x, y, w, h);
 }
 
-function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, rnd: () => number) {
+function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, rnd: () => number, pal: PilePalette) {
   c.save();
   c.translate(x, y);
   c.rotate(angle);
@@ -38,13 +42,13 @@ function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angl
   c.shadowBlur = s * 0.3;
   c.shadowOffsetY = s * 0.14;
   const g = c.createLinearGradient(-s / 2, -s / 2, s / 2, s / 2);
-  g.addColorStop(0, '#fff');
-  g.addColorStop(1, '#D5DEF8');
+  g.addColorStop(0, pal.body[0]);
+  g.addColorStop(1, pal.body[2]);
   c.fillStyle = g;
   roundRect(c, -s / 2, -s / 2, s, s, s * 0.17);
   c.fill();
   c.shadowColor = 'transparent';
-  c.fillStyle = 'rgba(120, 140, 210, .5)';
+  c.fillStyle = `rgba(${pal.grainA}, .5)`;
   for (let i = 0; i < 6; i++) {
     const d = Math.max(2, s * 0.045);
     c.fillRect((rnd() - 0.5) * s * 0.7, (rnd() - 0.5) * s * 0.7, d, d);
@@ -60,7 +64,7 @@ function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angl
 }
 
 /** Кубики рядами снизу вверх, с небольшим разбросом — как улёгшаяся куча. */
-function pile(c: CanvasRenderingContext2D, count: number, floorY: number, top: number) {
+function pile(c: CanvasRenderingContext2D, count: number, floorY: number, top: number, pal: PilePalette) {
   const n = Math.min(count, MAX_DRAWN);
   if (!n) return;
   const rnd = seeded(count * 7919 + 13);
@@ -82,7 +86,7 @@ function pile(c: CanvasRenderingContext2D, count: number, floorY: number, top: n
     })));
     if (left <= 0) break;
   }
-  for (let r = layout.length - 1; r >= 0; r--) for (const p of layout[r]) cube(c, p.x, p.y, s, p.a, rnd);
+  for (let r = layout.length - 1; r >= 0; r--) for (const p of layout[r]) cube(c, p.x, p.y, s, p.a, rnd, pal);
 }
 
 export async function renderShareCard(d: ShareCardData): Promise<Blob> {
@@ -135,7 +139,8 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillStyle = '#fff';
   c.font = `500 56px ${FONT_D}`;
   c.fillText('В моём чеке', W / 2, 510);
-  const num = String(d.cubes);
+  const cubes = d.cubesBy[d.metric];
+  const num = String(cubes);
   let size = num.length >= 3 ? 400 : 480;
   c.font = `900 ${size}px ${FONT_D}`;
   while (c.measureText(num).width > W - 140 && size > 200) { size -= 20; c.font = `900 ${size}px ${FONT_D}`; }
@@ -143,22 +148,34 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillText(num, W / 2, 530 + size * 0.78);
   c.shadowColor = 'transparent';
   c.font = `500 56px ${FONT_D}`;
-  c.fillText(`${pl(d.cubes, CUBES)} сахара`, W / 2, 530 + size * 0.78 + 96);
+  c.fillText(capOf(cubes, d.metric), W / 2, 530 + size * 0.78 + 96);
 
   // куча и белая карточка
   const sheetTop = H - 330;
-  pile(c, d.cubes, sheetTop + 6, 530 + size * 0.78 + 150);
+  pile(c, cubes, sheetTop + 6, 530 + size * 0.78 + 150, PALETTES[d.metric]);
   c.shadowColor = 'rgba(8, 20, 90, .35)'; c.shadowBlur = 70; c.shadowOffsetY = -18;
   c.fillStyle = '#fff';
   roundRect(c, 0, sheetTop, W, 420, 84); c.fill();
   c.shadowColor = 'transparent';
   c.fillStyle = '#0D1440';
-  c.font = `800 54px ${FONT_D}`;
-  c.fillText('А сколько в твоей корзине?', W / 2, sheetTop + 128);
+  c.font = `800 50px ${FONT_D}`;
+  c.fillText('А сколько в твоей корзине?', W / 2, sheetTop + 104);
+  // четыре показателя в ряд: цветная точка, число и название
+  const colW = (W - 120) / METRIC_IDS.length;
+  METRIC_IDS.forEach((m, i) => {
+    const cx = 60 + colW * (i + 0.5);
+    c.fillStyle = METRICS[m].color;
+    c.beginPath(); c.arc(cx - 70, sheetTop + 168, 11, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#0D1440';
+    c.font = `900 56px ${FONT_D}`;
+    c.fillText(String(d.cubesBy[m]), cx + 10, sheetTop + 186);
+    c.fillStyle = '#6B76A8';
+    c.font = `700 32px ${FONT_T}`;
+    c.fillText(METRICS[m].label, cx, sheetTop + 232);
+  });
   c.fillStyle = '#6B76A8';
-  c.font = `700 40px ${FONT_T}`;
-  c.fillText(d.where, W / 2, sheetTop + 204);
-  c.fillText('1 кубик = 5 г сахара', W / 2, sheetTop + 262);
+  c.font = `700 36px ${FONT_T}`;
+  c.fillText(d.where, W / 2, sheetTop + 296);
 
   return new Promise<Blob>((resolve, reject) =>
     cv.toBlob(b => (b ? resolve(b) : reject(new Error('не удалось собрать картинку'))), 'image/png'),

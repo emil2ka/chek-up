@@ -14,9 +14,13 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import type { ResultProps } from '@/lib/types';
-import { dateRu, verdict } from '@/lib/engine';
+import { capOf, CUBES, dateRu, METRICS, money, pl, verdict } from '@/lib/engine';
+import { PALETTES } from '@/lib/pile';
 import { shareCard } from '@/lib/shareCard';
-import { capOf, NOTE, resultModel, swapRows, type ResultModel } from './model';
+import type { MetricId } from '@/lib/types';
+import { MetricTabs } from '@/components/ui/MetricTabs';
+import { NOTE, resultModel, swapRows, type ResultModel } from './model';
+import { Prices } from './Prices';
 import { attachPile, type PileHandle } from './attachPile';
 import './result.css';
 
@@ -42,10 +46,12 @@ const sortNums = (a: number, b: number) => a - b;
 
 export default function Result({ receipt, swaps, onBack, onScan, onChange }: ResultProps) {
   const [on, setOn] = useState<number[]>(() => [...new Set(swaps)].sort(sortNums));
-  const model = useMemo(() => resultModel(receipt, on), [receipt, on]);
-  const rows = useMemo(() => swapRows(receipt), [receipt]);
-  const maxCubes = useMemo(() => resultModel(receipt, []).maxCubes, [receipt]);
-  const cubes = model.analysis.cubes;
+  const [metric, setMetric] = useState<MetricId>('sugar');
+  const model = useMemo(() => resultModel(receipt, on, metric), [receipt, on, metric]);
+  const rows = useMemo(() => swapRows(receipt, metric), [receipt, metric]);
+  const maxCubes = useMemo(() => resultModel(receipt, [], metric).maxCubes, [receipt, metric]);
+  const cubes = model.analysis.cubesBy[metric];
+  const mdef = METRICS[metric];
 
   const [srcReady, setSrcReady] = useState(false);
   const [toast, setToast] = useState({ id: 0, text: '', on: false });
@@ -72,7 +78,7 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
     const paint = (n: number) => {
       shown = n;
       num.textContent = String(n);
-      cap.textContent = capOf(n);
+      cap.textContent = capOf(n, metric);
       num.classList.toggle('is-3', n >= 100);
     };
     paint(0);
@@ -82,14 +88,14 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
       if (!reduced) num.animate?.([{ transform: 'scale(1.045)' }, { transform: 'scale(1)' }], { duration: 160, easing: 'ease-out' });
     };
 
-    const pile = attachPile({ hero, head, sheet, canvas }, maxCubes, onCount);
+    const pile = attachPile({ hero, head, sheet, canvas }, maxCubes, onCount, PALETTES[metric]);
     pileRef.current = pile;
     pile.set(target());
     return () => {
       pile.destroy();
       if (pileRef.current === pile) pileRef.current = null;
     };
-  }, [receipt, maxCubes]);
+  }, [receipt, maxCubes, metric]);
 
   // замены → куча
   useEffect(() => { pileRef.current?.set(cubes); }, [cubes]);
@@ -131,7 +137,8 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
     try {
       const a = model.analysis;
       const how = await shareCard({
-        cubes: a.cubes,
+        metric,
+        cubesBy: a.cubesBy,
         score: a.score,
         verdict: verdict(a.score).label.toLowerCase(),
         tone: model.tone,
@@ -152,7 +159,7 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
     catch { say('Не получилось скопировать'); }
   };
 
-  const { summary, junk } = model;
+  const { summary, junk, harm, flagged } = model;
 
   return (
     <div className="rs">
@@ -165,10 +172,11 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
           </div>
           <button className="rs-ic" type="button" aria-label="Поделиться результатом" onClick={share}><Icon name="share" /></button>
         </header>
+        <MetricTabs value={metric} onChange={setMetric} className="rs-tabs" />
         <div className="rs-head" ref={headRef}>
           <p className="rs-kick">В твоём чеке</p>
           <b className="rs-num" aria-hidden="true" ref={numRef}>0</b>
-          <p className="rs-cap" aria-hidden="true" ref={capRef}>{capOf(0)}</p>
+          <p className="rs-cap" aria-hidden="true" ref={capRef}>{capOf(0, metric)}</p>
           <p className="rs-sr">{model.srLabel}</p>
         </div>
         <canvas className="rs-pile" ref={canvasRef} role="img" aria-label="Куча кубиков сахара. Нажми, чтобы подбросить" />
@@ -193,7 +201,7 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
               ))}
             </ul>
           ) : (
-            <p className="rs-empty">Заменять нечего — в этом чеке нет сладких позиций с понятной заменой.</p>
+            <p className="rs-empty">{`На этой вкладке заменять нечего: в чеке нет позиций с ${mdef.of} и понятной заменой.`}</p>
           )}
           <p className="rs-sum" aria-live="polite" hidden={!summary}>
             {summary && (
@@ -206,21 +214,38 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
         </section>
 
         <section className="rs-sec" aria-labelledby="rs-h-src">
-          <h2 id="rs-h-src" className="rs-h">Откуда сахар</h2>
+          <h2 id="rs-h-src" className="rs-h">{`Откуда ${mdef.label.toLowerCase()}`}</h2>
           <ul className={`rs-src${srcReady ? ' is-ready' : ''}`}>
             {model.sources.length ? model.sources.map(s => (
               <li key={s.i} className={`rs-src-i${s.off ? ' is-off' : ''}`}>
                 <div className="rs-src-t">
                   <span className="rs-src-n">{s.name}</span>
-                  <span className="rs-src-v"><b>{s.grams}</b>{s.cubes}</span>
+                  <span className="rs-src-v"><b>{s.amount}</b>{s.cubes}</span>
                 </div>
                 <div className="rs-src-bar" aria-hidden="true">
                   <i style={{ width: `${s.width}%`, '--n': s.cells } as CSSProperties} />
                 </div>
                 {s.off && <p className="rs-src-sw"><Icon name="arrow" className="rs-arr" /><span>{s.swapTo}</span></p>}
               </li>
-            )) : <li className="rs-empty">Добавленного сахара в чеке нет.</li>}
+            )) : <li className="rs-empty">{`${mdef.label} в чеке не нашлись.`}</li>}
           </ul>
+        </section>
+
+        <section className="rs-sec rs-harm" aria-labelledby="rs-h-harm">
+          <h2 id="rs-h-harm" className="rs-h">Цена вреда</h2>
+          {harm.cubes ? (
+            <>
+              <p className="rs-harm-big"><b>{money(harm.perCube)}</b> за кубик {mdef.of}</p>
+              <p className="rs-harm-sub">{`На эти покупки ушло ${money(harm.spend)}, в них ${harm.cubes} ${pl(harm.cubes, CUBES)} ${mdef.of}.`}</p>
+              <ul className="rs-harm-top">
+                {harm.top.map(t => (
+                  <li key={t.name}><span className="rs-harm-n">{t.name}</span><span className="rs-harm-v"><b>{money(t.price)}</b>{t.cubes}</span></li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="rs-empty">{`Продуктов с заметным количеством ${mdef.of} в чеке нет — платить за вред не пришлось.`}</p>
+          )}
         </section>
 
         <section className="rs-sec rs-junk" aria-labelledby="rs-h-junk">
@@ -233,6 +258,23 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
           <p className="rs-junk-of">{junk.of}</p>
           <p className="rs-days"><Icon name="cal" /><span>{junk.days}</span></p>
         </section>
+
+        <Prices receipt={receipt} />
+
+        {flagged && (
+          <section className="rs-sec rs-flag" aria-labelledby="rs-h-flag">
+            <h2 id="rs-h-flag" className="rs-h">Алкоголь и энергетики</h2>
+            <div className="rs-flag-top">
+              <b className="rs-flag-sum">{flagged.sum}</b>
+              <span className="rs-flag-share">{flagged.share}</span>
+            </div>
+            <ul className="rs-flag-list">
+              {flagged.lines.map(l => (
+                <li key={l.name}><span>{(l.kind === 'alcohol' ? 'Алкоголь' : 'Энергетик').toLowerCase().slice(0, 6) !== l.name.toLowerCase().slice(0, 6) ? `${l.kind === 'alcohol' ? 'Алкоголь' : 'Энергетик'} · ` : ''}{l.name}</span><b>{l.price}</b></li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <div className="rs-actions">
           <button className="rs-btn rs-btn-main" type="button" onClick={onScan}><Icon name="camera" /><span>Сканировать новый чек</span></button>

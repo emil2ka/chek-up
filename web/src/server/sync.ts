@@ -2,8 +2,9 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { HistorySync, ProfileSync, ShopSync, SyncRequest, SyncState } from '@/lib/syncSchema';
 import type { Db } from './db';
-import { history, profiles, shopItems, stats } from './db/schema';
+import { history, pricePoints, profiles, shopItems, stats } from './db/schema';
 import { diffState, EMPTY_STATE, mergeState } from './merge';
+import { recordPrices } from './prices';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -40,7 +41,9 @@ export async function syncUser(db: Db, userId: string, req: SyncRequest): Promis
     for (const h of d.history.upsert) {
       const row = historyRow(userId, h);
       await tx.insert(history).values(row).onConflictDoUpdate({ target: [history.userId, history.id], set: row });
+      await recordPrices(tx, userId, h); // цены чека для сравнения магазинов (удалённый чек — убирает свои цены)
     }
+    if (d.history.removed.length) await tx.delete(pricePoints).where(and(eq(pricePoints.userId, userId), inArray(pricePoints.entryId, d.history.removed.map(h => h.id))));
     if (d.history.removed.length) await tx.delete(history).where(and(eq(history.userId, userId), inArray(history.id, d.history.removed.map(h => h.id))));
 
     for (const s of d.shop.upsert) {

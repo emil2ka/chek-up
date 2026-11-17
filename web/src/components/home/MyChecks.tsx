@@ -43,7 +43,7 @@ export function MyChecks({ entries, onOpen }: { entries: HistoryEntry[]; onOpen(
                 </span>
                 <span className="grid justify-items-end leading-none">
                   <b className="font-display text-[22px] font-black tracking-[-.04em]">{rec.cubes}</b>
-                  <small className="mt-0.75 text-xs font-bold text-mute">{pl(rec.cubes, CUBES)}</small>
+                  <small className="mt-0.75 text-xs font-bold text-mute">{pl(rec.cubes, CUBES)} сахара</small>
                 </span>
                 <span className="inline-flex h-8 items-center gap-1.75 rounded-full bg-tint pr-2.75 pl-2.5">
                   <i className={`dot ${v.tone}`} />

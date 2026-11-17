@@ -12,9 +12,35 @@ import Matter from 'matter-js';
 
 const { Engine, Bodies, Body, Composite, Sleeping } = Matter;
 
+/** Цвета кубика: у каждого показателя свой материал. Тройки RGB — строкой «r, g, b» (для rgba(...)). */
+export type PilePalette = {
+  /** градиент тела: свет → середина → тень */
+  body: readonly [string, string, string];
+  /** цвет подложки под тенью */
+  base: string;
+  shade: string;
+  grainA: string;
+  grainC: string;
+  edge: string;
+  outline: string;
+};
+
+export const PALETTES: Record<'sugar' | 'salt' | 'fat' | 'kcal', PilePalette> = {
+  // сахар — белый, чуть голубоватый (как раньше)
+  sugar: { body: ['#FFFFFF', '#F3F6FF', '#C3CFF4'], base: '#C9D4F5', shade: '96, 120, 210', grainA: '128, 150, 220', grainC: '150, 170, 235', edge: '105, 130, 215', outline: '40, 70, 190' },
+  // соль — розовый кристалл
+  salt: { body: ['#FFFFFF', '#FFE9EF', '#F3A9C0'], base: '#F7C4D3', shade: '214, 96, 138', grainA: '222, 120, 150', grainC: '236, 150, 175', edge: '222, 105, 140', outline: '190, 60, 100' },
+  // жиры — сливочное масло
+  fat: { body: ['#FFFDF0', '#FFEFA8', '#EFBF3A'], base: '#F8DB7A', shade: '200, 140, 20', grainA: '210, 150, 30', grainC: '230, 175, 50', edge: '205, 140, 20', outline: '160, 100, 0' },
+  // калории — тёплый оранжевый
+  kcal: { body: ['#FFFAF2', '#FFD7AA', '#F28A3E'], base: '#FFC795', shade: '210, 100, 20', grainA: '220, 120, 40', grainC: '240, 150, 70', edge: '215, 105, 25', outline: '180, 80, 0' },
+};
+
 export type SugarPileOptions = {
   onCount?: (n: number) => void;
   floorRadius?: number;
+  /** цвета кубиков (по умолчанию — сахар). Список — кубики разных цветов вперемешку: у каждого «рисунка» свой цвет */
+  palette?: PilePalette | readonly PilePalette[];
 };
 
 type Cube = Matter.Body & { v: number };
@@ -81,7 +107,10 @@ export class SugarPile {
   private readonly mq: MediaQueryList;
   private readonly io: IntersectionObserver | null = null;
 
-  constructor(canvas: HTMLCanvasElement, { onCount, floorRadius = 0 }: SugarPileOptions = {}) {
+  private readonly pals: readonly PilePalette[];
+
+  constructor(canvas: HTMLCanvasElement, { onCount, floorRadius = 0, palette = PALETTES.sugar }: SugarPileOptions = {}) {
+    this.pals = Array.isArray(palette) ? palette : [palette as PilePalette];
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('SugarPile: canvas 2D недоступен');
     this.cv = canvas;
@@ -291,6 +320,7 @@ export class SugarPile {
     this.D = D;
     const sprites: HTMLCanvasElement[][] = [];
     for (let v = 0; v < VARIANTS; v++) {
+      const pal = this.pals[v % this.pals.length];
       const row: HTMLCanvasElement[] = [];
       const rand = seeded(7919 * (v + 3));
       const grains: Grain[] = [];
@@ -319,7 +349,7 @@ export class SugarPile {
         // мягкая тень + плотная контактная тень
         g.save();
         shape();
-        g.fillStyle = '#C9D4F5';
+        g.fillStyle = pal.base;
         g.shadowColor = 'rgba(4, 16, 105, .42)';
         g.shadowBlur = S * 0.34 * dpr; g.shadowOffsetY = S * 0.17 * dpr;
         g.fill();
@@ -331,9 +361,9 @@ export class SugarPile {
         // тело кубика
         shape();
         const lg = g.createLinearGradient(c - h, c - h * 1.15, c + h * 0.9, c + h * 1.1);
-        lg.addColorStop(0, '#FFFFFF');
-        lg.addColorStop(0.5, '#F3F6FF');
-        lg.addColorStop(1, '#C3CFF4');
+        lg.addColorStop(0, pal.body[0]);
+        lg.addColorStop(0.5, pal.body[1]);
+        lg.addColorStop(1, pal.body[2]);
         g.fillStyle = lg;
         g.fill();
 
@@ -347,15 +377,15 @@ export class SugarPile {
         g.fillRect(c - S, c - S, S * 2, S * 2);
         // притенение снизу-справа
         const sh = g.createRadialGradient(c + h * 0.9, c + h * 1.0, 0, c + h * 0.9, c + h * 1.0, S * 0.9);
-        sh.addColorStop(0, 'rgba(96, 120, 210, .32)');
-        sh.addColorStop(1, 'rgba(96, 120, 210, 0)');
+        sh.addColorStop(0, `rgba(${pal.shade}, .32)`);
+        sh.addColorStop(1, `rgba(${pal.shade}, 0)`);
         g.fillStyle = sh;
         g.fillRect(c - S, c - S, S * 2, S * 2);
 
         // крупинки сахара в координатах грани
         g.translate(c, c); g.rotate(th);
         for (const [x, y, s, t] of grains) {
-          g.fillStyle = t < 0.55 ? 'rgba(128, 150, 220, .30)' : t < 0.85 ? 'rgba(255, 255, 255, .95)' : 'rgba(150, 170, 235, .5)';
+          g.fillStyle = t < 0.55 ? `rgba(${pal.grainA}, .30)` : t < 0.85 ? 'rgba(255, 255, 255, .95)' : `rgba(${pal.grainC}, .5)`;
           g.fillRect(x, y, s, s);
         }
         // искорки-кристаллы
@@ -375,7 +405,7 @@ export class SugarPile {
         const eg = g.createLinearGradient(c - h, c - h, c + h, c + h);
         eg.addColorStop(0, 'rgba(255,255,255,1)');
         eg.addColorStop(0.45, 'rgba(255,255,255,.35)');
-        eg.addColorStop(1, 'rgba(105, 130, 215, .55)');
+        eg.addColorStop(1, `rgba(${pal.edge}, .55)`);
         g.strokeStyle = eg;
         g.stroke();
         g.restore();
@@ -396,7 +426,7 @@ export class SugarPile {
         // тонкий контур, чтобы кубик читался и на белой карточке
         shape();
         g.lineWidth = 1;
-        g.strokeStyle = 'rgba(40, 70, 190, .16)';
+        g.strokeStyle = `rgba(${pal.outline}, .16)`;
         g.stroke();
 
         row.push(cv);

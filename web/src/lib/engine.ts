@@ -100,6 +100,8 @@ export const capOf = (n: number, m: MetricId): string => `${pl(n, CUBES)} ${METR
 
 /** Число с одним знаком после запятой, без лишнего «,0»: 2,3 · 4 */
 export const num1 = (n: number): string => (Math.round(n * 10) / 10).toString().replace('.', ',');
+/** Что в одном кубике: «5 г сахара», «0,5 г соли», «2 г жиров», «200 ккал» */
+export const cubeLabel = (m: MetricId): string => (m === 'kcal' ? `${METRICS.kcal.cubeG} ккал` : `${num1(METRICS[m].cubeG)} г ${METRICS[m].of}`);
 /** Количество показателя с единицей: «106 г», «0,5 г», «460 ккал» */
 export const amountTxt = (v: number, m: MetricId): string => `${m === 'kcal' ? Math.round(v) : num1(v)} ${METRICS[m].unit}`;
 

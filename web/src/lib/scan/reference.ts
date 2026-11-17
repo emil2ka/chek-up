@@ -144,6 +144,14 @@ export function amountFromName(name: string): number | null {
   return null;
 }
 
+/** Единица измерения из названия: объём («л», «мл») или вес («кг», «г»). Нет единицы — null. */
+export function unitKind(name: string): 'л' | 'кг' | null {
+  const s = name.toLowerCase().replace(/ё/g, 'е');
+  if (/\d\s*(мл|ml|л|l|литр\w*)(?![a-zа-я])/.test(s)) return 'л';
+  if (/\d\s*(кг|kg|гр|г|g)(?![a-zа-я])/.test(s)) return 'кг';
+  return null;
+}
+
 /** Подставить объём в название замены: «Минералка{amount}» + 1000 → «Минералка, 1 л». */
 export function swapName(tpl: string, amount: number | null): string {
   if (!amount) return tpl.replace('{amount}', '');

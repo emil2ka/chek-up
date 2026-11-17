@@ -1,13 +1,14 @@
 'use client';
 // «Неделя»: гора сахара из всех чеков за 7 дней, сравнение с нормой семьи, дни, источники, деньги.
 // Верх переиспользует стили и кучу экрана результата (классы rs-…).
-import { useEffect, useMemo, useRef } from 'react';
-import { CUBES, CUBE_G, dateRu, money, pl, verdict, type Forms } from '@/lib/engine';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { capOf, cubeLabel, CUBES, cubesOfValue, dateRu, METRICS, money, pl, verdict, type Forms } from '@/lib/engine';
+import { PALETTES } from '@/lib/pile';
 import { weekStats } from '@/lib/insights';
 import type { Profile } from '@/lib/profile';
-import type { HistoryEntry, Tone } from '@/lib/types';
+import type { HistoryEntry, MetricId, Tone } from '@/lib/types';
 import { attachPile } from '@/components/result/attachPile';
-import { capOf } from '@/components/result/model';
+import { MetricTabs } from '@/components/ui/MetricTabs';
 import { IconCamera, IconChevron, IconTrash } from '@/components/icons';
 import '@/components/result/result.css';
 
@@ -33,10 +34,13 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
     () => weekStats(ready ? entries : [], profile),
     [ready, entries, profile],
   );
-  const { cubes, ratio, normCubes } = stats;
+  const [metric, setMetric] = useState<MetricId>('sugar');
+  const mdef = METRICS[metric];
+  const mw = stats.metrics[metric];
+  const { cubes, ratio, normCubes } = mw;
   const pct = Math.round(ratio * 100);
   const tone: Tone = ratio <= 0.7 ? 'good' : ratio <= 1 ? 'mid' : 'bad';
-  const maxDay = Math.max(1, ...stats.days.map(d => d.cubes));
+  const maxDay = Math.max(1, ...stats.days.map(d => d.by[metric]));
   const empty = ready && stats.receipts.length === 0;
 
   const heroRef = useRef<HTMLElement>(null);
@@ -56,15 +60,15 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
       // если кубиков больше, чем рисуем, цифра всё равно доходит до настоящего значения
       const real = shown ? Math.round(n * cubes / shown) : 0;
       num.textContent = String(real);
-      cap.textContent = `${capOf(real)} за 7 дней`;
+      cap.textContent = `${capOf(real, metric)} за 7 дней`;
       num.classList.toggle('is-3', real >= 100);
     };
     paint(0);
     if (!shown) return;
-    const pile = attachPile({ hero, head, sheet, canvas }, shown, paint);
+    const pile = attachPile({ hero, head, sheet, canvas }, shown, paint, PALETTES[metric]);
     pile.set(shown);
     return () => pile.destroy();
-  }, [ready, cubes]);
+  }, [ready, cubes, metric]);
 
   const family = `${profile.adults} ${pl(profile.adults, ADULTS)}${profile.kids ? ` и ${profile.kids} ${pl(profile.kids, KIDS)}` : ''}`;
   const over = cubes - normCubes;
@@ -86,11 +90,12 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
             <span className="rs-pill-t">{empty ? 'чеков пока нет' : `${pct}% нормы семьи`}</span>
           </div>
         </header>
+        <MetricTabs value={metric} onChange={setMetric} className="rs-tabs" />
         <div className="rs-head" ref={headRef}>
           <p className="rs-kick">В чеках за неделю</p>
           <b className="rs-num" aria-hidden="true" ref={numRef}>0</b>
-          <p className="rs-cap" aria-hidden="true" ref={capRef}>{capOf(0)} за 7 дней</p>
-          <p className="rs-sr">{cubes} {pl(cubes, CUBES)} сахара за 7 дней, {pct}% нормы семьи</p>
+          <p className="rs-cap" aria-hidden="true" ref={capRef}>{capOf(0, metric)} за 7 дней</p>
+          <p className="rs-sr">{cubes} {pl(cubes, CUBES)} {mdef.of} за 7 дней, {pct}% нормы семьи</p>
         </div>
         <canvas className="rs-pile" ref={canvasRef} role="img" aria-label="Гора сахара за неделю. Нажми, чтобы подбросить" />
       </section>
@@ -131,19 +136,19 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
           <ol className="grid grid-cols-7 items-end gap-1.5 rounded-3xl bg-tint px-2.5 pt-4 pb-3">
             {stats.days.map(d => (
               <li key={d.iso} className="grid justify-items-center gap-1.5">
-                <span className={`font-display text-[13px] leading-none font-extrabold tabular-nums ${d.cubes ? 'text-ink' : 'text-transparent'}`}>
-                  {d.cubes || 0}
+                <span className={`font-display text-[13px] leading-none font-extrabold tabular-nums ${d.by[metric] ? 'text-ink' : 'text-transparent'}`}>
+                  {d.by[metric] || 0}
                 </span>
                 <span className="flex h-24 w-full items-end justify-center" aria-hidden="true">
                   <i
                     className={`block w-full max-w-8 rounded-[9px] transition-[height] duration-700 ease-out ${
-                      d.cubes ? (d.today ? 'bg-blue-1' : 'bg-blue-3') : 'bg-line'
+                      d.by[metric] ? (d.today ? 'bg-blue-1' : 'bg-blue-3') : 'bg-line'
                     }`}
-                    style={{ height: d.cubes ? `${Math.max(10, d.cubes / maxDay * 100)}%` : '6px' }}
+                    style={{ height: d.by[metric] ? `${Math.max(10, d.by[metric] / maxDay * 100)}%` : '6px' }}
                   />
                 </span>
                 <span className={`text-xs leading-none font-extrabold uppercase ${d.today ? 'text-blue-1' : 'text-mute'}`}>{d.label}</span>
-                <span className="sr-only">{d.day}-е число: {d.cubes} {pl(d.cubes, CUBES)}</span>
+                <span className="sr-only">{d.day}-е число: {d.by[metric]} {pl(d.by[metric], CUBES)}</span>
               </li>
             ))}
           </ol>
@@ -169,12 +174,12 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
         ) : (
           <>
             {/* ── источники ── */}
-            {stats.sources.length > 0 && (
+            {mw.sources.length > 0 && (
               <section className="rs-sec" aria-labelledby="wk-h-src">
                 <h2 id="wk-h-src" className="rs-h">Главные источники</h2>
                 <ol className="grid gap-2">
-                  {stats.sources.map((s, i) => {
-                    const c = Math.round(s.grams / CUBE_G);
+                  {mw.sources.map((s, i) => {
+                    const c = cubesOfValue(s.value, metric);
                     return (
                       <li key={s.name} className="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-[20px] bg-tint py-2.5 pr-4 pl-2.5">
                         <span className="grid size-8.5 place-items-center rounded-xl bg-white font-display text-sm font-black text-blue-1">{i + 1}</span>
@@ -207,11 +212,23 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
                     {stats.saved >= 0 ? money(stats.saved) : `−${money(-stats.saved)}`}
                   </p>
                   <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">
-                    {stats.cubesSaved > 0 ? `и минус ${stats.cubesSaved} ${pl(stats.cubesSaved, CUBES)}` : 'включи замены в чеке'}
+                    {mw.cubesSaved > 0 ? `и минус ${mw.cubesSaved} ${pl(mw.cubesSaved, CUBES)} ${mdef.of}` : 'включи замены в чеке'}
                   </p>
                 </div>
               </div>
             </section>
+
+            {stats.flagged > 0 && (
+              <section className="rs-sec" aria-labelledby="wk-h-flag">
+                <h2 id="wk-h-flag" className="rs-h">Алкоголь и энергетики</h2>
+                <div className="rounded-3xl bg-[color-mix(in_srgb,var(--bad)_8%,var(--white))] p-4">
+                  <p className="font-display text-[26px] leading-none font-black tracking-[-.04em] tabular-nums">{money(stats.flagged)}</p>
+                  <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">
+                    {stats.total ? `${Math.round(stats.flagged / stats.total * 100)}% всех трат за неделю` : ''}
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* ── чеки недели ── */}
             <section className="rs-sec" aria-labelledby="wk-h-rc">
@@ -233,9 +250,9 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
                           <span className="truncate text-[13px] font-semibold text-mute">{dateRu(receipt.date)} · {receipt.title}</span>
                         </span>
                         <span className="inline-flex items-center gap-2">
-                          <b className="font-display text-xl font-black tracking-[-.04em] tabular-nums">{analysis.cubes}</b>
+                          <b className="font-display text-xl font-black tracking-[-.04em] tabular-nums">{analysis.cubesBy[metric]}</b>
                           <i className={`dot ${v.tone}`} />
-                          <span className="sr-only">{pl(analysis.cubes, CUBES)}, оценка {analysis.score}, {v.label}</span>
+                          <span className="sr-only">{pl(analysis.cubesBy[metric], CUBES)}, оценка {analysis.score}, {v.label}</span>
                         </span>
                       </button>
                       <button
@@ -255,8 +272,8 @@ export function Week({ ready, entries, profile, onOpen, onDelete, onScan, onProf
         )}
 
         <p className="rs-note">
-          Неделя считается по датам чеков. Это купленный сахар, а не съеденный: часть продуктов останется на потом.
-          1 кубик = {CUBE_G} г.
+          Неделя считается по датам чеков. Это купленное, а не съеденное: часть продуктов останется на потом.
+          1 кубик {mdef.of} = {cubeLabel(metric)}. Норма: {mdef.norm}.
         </p>
       </div>
     </div>

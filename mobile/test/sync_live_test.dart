@@ -79,4 +79,89 @@ void main() {
     skip: apiUrl.isEmpty ? 'нужен API_URL' : false,
     timeout: const Timeout(Duration(seconds: 60)),
   );
+
+  test(
+    'цены между магазинами: чек одного человека помогает другому',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final a = AppStore();
+      await a.load();
+      final today = isoOf(DateTime.now());
+      // отсканированный чек из «Small»: с солью, жирами, калориями и алкоголем
+      final scanned = Receipt(
+        id: 'scan-live-${a.newId()}',
+        title: 'Чек из Small',
+        store: 'Small',
+        date: today,
+        approx: true,
+        items: const [
+          Item(
+            n: 'Колбаса докторская 400 г',
+            p: 1200,
+            s: 0,
+            t: 8.8,
+            f: 36,
+            k: 1160,
+            junk: true,
+          ),
+          Item(
+            n: 'Пиво светлое 0,5 л',
+            p: 500,
+            s: 0,
+            t: 0.1,
+            k: 215,
+            junk: true,
+            x: 'alcohol',
+          ),
+        ],
+      );
+      a.saveEntry(
+        HistoryEntry(
+          id: 'live-${a.newId()}',
+          receiptId: scanned.id,
+          store: 'Small',
+          date: today,
+          cubes: 0,
+          score: 50,
+          swaps: const [],
+          savedAt: DateTime.now().millisecondsSinceEpoch,
+          receipt: scanned,
+        ),
+      );
+      await a.sync();
+      expect(a.syncStatus.value, SyncStatus.idle, reason: a.syncError);
+
+      // другой человек, другой магазин, дороже
+      SharedPreferences.setMockInitialValues({});
+      final b = AppStore();
+      await b.load();
+      final res = await b.priceOffers(
+        const Receipt(
+          id: 'x',
+          title: '',
+          store: 'Magnum',
+          date: '2026-11-17',
+          items: [Item(n: 'Колбаса докторская 400 г', p: 1480, s: 0)],
+        ),
+      );
+      expect(res, isNotNull);
+      expect(res!.offers, isNotEmpty);
+      expect(res.offers.first.store, 'Small');
+      expect(res.offers.first.saving, greaterThan(100));
+
+      // новые поля чека доехали на сервер и вернулись
+      final c = AppStore();
+      await c.load();
+      final code = await a.linkCode();
+      await c.redeemLinkCode(code);
+      final back = c.history
+          .firstWhere((e) => e.receipt?.id == scanned.id)
+          .receipt!;
+      expect(back.items[0].t, 8.8);
+      expect(back.items[1].x, 'alcohol');
+      expect(analyze(back).flaggedSum, 500);
+    },
+    skip: apiUrl.isEmpty ? 'нужен API_URL' : false,
+    timeout: const Timeout(Duration(seconds: 60)),
+  );
 }

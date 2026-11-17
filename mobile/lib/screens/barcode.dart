@@ -284,7 +284,7 @@ class _BarcodePageState extends State<BarcodePage> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'База — Open Food Facts. В ней сахар с этикетки целиком: и добавленный, и природный.',
+                    'База — Open Food Facts. Сахар в ней с этикетки целиком (и добавленный, и природный); соль, насыщенные жиры и калории тоже с этикетки.',
                     style: body(
                       12,
                       color: Colors.white.withValues(alpha: .75),
@@ -301,25 +301,41 @@ class _BarcodePageState extends State<BarcodePage> {
   }
 }
 
-class _ProductSheet extends StatelessWidget {
+class _ProductSheet extends StatefulWidget {
   final ShelfProduct p;
   const _ProductSheet(this.p);
+  @override
+  State<_ProductSheet> createState() => _ProductSheetState();
+}
+
+class _ProductSheetState extends State<_ProductSheet> {
+  late MetricId _metric = widget.p.valueOf(MetricId.sugar) != null
+      ? MetricId.sugar
+      : metricIds.firstWhere((m) => widget.p.valueOf(m) != null);
 
   @override
   Widget build(BuildContext context) {
-    final cubes = cubesOf(p.grams);
+    final p = widget.p, mdef = metrics[_metric]!;
+    final val = p.valueOf(_metric);
+    final cubes = val == null ? 0 : cubesOfValue(val, _metric);
     final shown = min(cubes, 80);
-    final tone = cubes <= 1
+    final share = val == null ? 0.0 : val / mdef.adult;
+    final tone = share <= .1
         ? Tone.good
-        : cubes <= 5
+        : share <= .5
         ? Tone.mid
         : Tone.bad;
-    final say = switch (tone) {
-      Tone.good => 'Можно брать',
-      Tone.mid => 'Терпимо, но не каждый день',
-      Tone.bad => 'Лучше оставить на полке',
-    };
-    final pct = (p.grams / dailyG * 100).round();
+    final say = _metric == MetricId.kcal
+        ? switch (tone) {
+            Tone.good => 'Лёгкий продукт',
+            Tone.mid => 'Заметная порция калорий',
+            Tone.bad => 'Очень калорийно',
+          }
+        : switch (tone) {
+            Tone.good => 'Можно брать',
+            Tone.mid => 'Терпимо, но не каждый день',
+            Tone.bad => 'Лучше оставить на полке',
+          };
     final sub = [p.brand, p.quantity].where((s) => s.isNotEmpty).join(' · ');
 
     return Sheet(
@@ -355,7 +371,13 @@ class _ProductSheet extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text(sub, style: body(14, color: mute)),
             ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+          MetricTabs(
+            value: _metric,
+            onChange: (m) => setState(() => _metric = m),
+            light: true,
+          ),
+          const SizedBox(height: 12),
           Container(
             height: 210,
             clipBehavior: Clip.antiAlias,
@@ -367,6 +389,8 @@ class _ProductSheet extends StatelessWidget {
               children: [
                 Positioned.fill(
                   child: SugarPile(
+                    key: ValueKey(_metric),
+                    palettes: [pilePalettes[_metric]!],
                     target: shown,
                     cubeSize: (s) =>
                         cubeSize(s.width, s.height - 60, max(1, shown)),
@@ -380,14 +404,14 @@ class _ProductSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '$cubes',
+                          val == null ? '—' : '$cubes',
                           style: disp(54, color: Colors.white, ls: -.06),
                         ),
                         const SizedBox(width: 8),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Text(
-                            '${capOf(cubes)}\n${p.basis}',
+                            '${capOf(cubes, _metric)}\n${p.basis}',
                             style: body(
                               13,
                               w: 700,
@@ -407,20 +431,30 @@ class _ProductSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             decoration: BoxDecoration(
-              color: toneColor(tone).withValues(alpha: .13),
+              color: (val == null ? mute : toneColor(tone)).withValues(
+                alpha: .13,
+              ),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Row(
               children: [
-                ToneDot(tone),
+                if (val == null)
+                  const Icon(Icons.help_outline_rounded, color: mute, size: 20)
+                else
+                  ToneDot(tone),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(say, style: body(16, w: 800)),
                       Text(
-                        '${p.grams.round()} г сахара ${p.basis} — $pct% дневной нормы взрослого',
+                        val == null ? 'На этикетке не указано' : say,
+                        style: body(16, w: 800),
+                      ),
+                      Text(
+                        val == null
+                            ? 'В базе нет данных про ${mdef.of} для этого товара'
+                            : '${amountTxt(val, _metric)} ${mdef.of} ${p.basis} — ${(share * 100).round()}% дневной нормы взрослого',
                         style: body(13, color: mute),
                       ),
                     ],

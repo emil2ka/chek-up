@@ -1,4 +1,5 @@
 // Неделя, достижения, экран результата: чистые расчёты поверх чеков (перенос web insights.ts и result/model.ts).
+// Все списки считаются для выбранного показателя: сахар, соль, жиры или калории.
 import 'dart:math';
 
 import 'data.dart';
@@ -19,9 +20,12 @@ const _dow = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 class DayStat {
   final String iso, label;
   final int day;
-  int cubes = 0;
+
+  /// кубиков по каждому показателю за день
+  final Map<MetricId, int> by = {for (final m in metricIds) m: 0};
   final bool today;
   DayStat(this.iso, this.label, this.day, this.today);
+  int get cubes => by[MetricId.sugar]!;
 }
 
 class WeekReceipt {
@@ -31,26 +35,46 @@ class WeekReceipt {
   const WeekReceipt(this.entry, this.receipt, this.analysis, this.base);
 }
 
-class WeekStats {
-  final List<DayStat> days;
-  final List<WeekReceipt> receipts;
-  final num sugar, junk, total, saved;
-  final int cubes, cubesSaved, normCubes;
+/// Неделя по одному показателю.
+class MetricWeek {
+  /// всего за неделю: г (сахар, соль, жиры) или ккал
+  final double total;
+  final int cubes, normCubes, cubesSaved;
   final double ratio;
+
+  /// главные источники: название и количество
   final List<(String, num)> sources;
-  const WeekStats({
-    required this.days,
-    required this.receipts,
-    required this.sugar,
-    required this.cubes,
-    required this.junk,
+  const MetricWeek({
     required this.total,
-    required this.saved,
-    required this.cubesSaved,
+    required this.cubes,
     required this.normCubes,
     required this.ratio,
     required this.sources,
+    required this.cubesSaved,
   });
+}
+
+class WeekStats {
+  final List<DayStat> days;
+  final List<WeekReceipt> receipts;
+  final num junk, total, saved, flagged;
+  final Map<MetricId, MetricWeek> metrics;
+  const WeekStats({
+    required this.days,
+    required this.receipts,
+    required this.junk,
+    required this.total,
+    required this.saved,
+    required this.flagged,
+    required this.metrics,
+  });
+
+  // как раньше: сахар
+  int get cubes => metrics[MetricId.sugar]!.cubes;
+  num get sugar => metrics[MetricId.sugar]!.total;
+  int get normCubes => metrics[MetricId.sugar]!.normCubes;
+  double get ratio => metrics[MetricId.sugar]!.ratio;
+  int get cubesSaved => metrics[MetricId.sugar]!.cubesSaved;
 }
 
 /// Последние 7 дней, включая сегодня; чек относится к дню своей даты.
@@ -63,9 +87,10 @@ WeekStats weekStats(List<HistoryEntry> entries, Profile p, [DateTime? now]) {
   }
   final byIso = {for (final d in days) d.iso: d};
   final receipts = <WeekReceipt>[];
-  final bySource = <String, num>{};
-  num sugar = 0, junk = 0, total = 0, saved = 0;
-  var cubesSaved = 0;
+  final bySource = {for (final m in metricIds) m: <String, num>{}};
+  final amount = {for (final m in metricIds) m: 0.0};
+  final saved = {for (final m in metricIds) m: 0};
+  num junk = 0, total = 0, money = 0, flagged = 0;
 
   for (final entry in entries) {
     final day = byIso[entry.date];
@@ -73,34 +98,45 @@ WeekStats weekStats(List<HistoryEntry> entries, Profile p, [DateTime? now]) {
     if (day == null || receipt == null) continue;
     final a = analyze(receipt, entry.swaps), base = analyze(receipt);
     receipts.add(WeekReceipt(entry, receipt, a, base));
-    day.cubes += a.cubes;
-    sugar += a.sugar;
     junk += a.junk;
     total += a.total;
-    saved += base.total - a.total;
-    cubesSaved += base.cubes - a.cubes;
-    for (final it in a.items) {
-      if (it.active.s > 0)
-        bySource[it.active.n] = (bySource[it.active.n] ?? 0) + it.active.s;
+    flagged += a.flaggedSum;
+    money += base.total - a.total;
+    for (final m in metricIds) {
+      amount[m] = amount[m]! + a.totals[m]!;
+      day.by[m] = day.by[m]! + a.cubesBy[m]!;
+      saved[m] = saved[m]! + base.cubesBy[m]! - a.cubesBy[m]!;
+      for (final it in a.items) {
+        final v = it.active.valueOf(m);
+        if (v > 0)
+          bySource[m]![it.active.n] = (bySource[m]![it.active.n] ?? 0) + v;
+      }
     }
   }
 
-  final normCubes = (familyDailyG(p) * 7 / cubeG).round();
-  final cubes = (sugar / cubeG).round();
-  final sources = [for (final e in bySource.entries) (e.key, e.value)]
-    ..sort((a, b) => b.$2.compareTo(a.$2));
+  final result = <MetricId, MetricWeek>{};
+  for (final m in metricIds) {
+    final normCubes = (familyDaily(p, m) * 7 / metrics[m]!.cubeG).round();
+    final cubes = cubesOfValue(amount[m]!, m);
+    final src = [for (final e in bySource[m]!.entries) (e.key, e.value)]
+      ..sort((a, b) => b.$2.compareTo(a.$2));
+    result[m] = MetricWeek(
+      total: (amount[m]! * 10).round() / 10,
+      cubes: cubes,
+      normCubes: normCubes,
+      ratio: normCubes > 0 ? cubes / normCubes : 0,
+      sources: src.take(4).toList(),
+      cubesSaved: saved[m]!,
+    );
+  }
   return WeekStats(
     days: days,
     receipts: receipts,
-    sugar: sugar,
-    cubes: cubes,
     junk: junk,
     total: total,
-    saved: saved,
-    cubesSaved: cubesSaved,
-    normCubes: normCubes,
-    ratio: normCubes > 0 ? cubes / normCubes : 0,
-    sources: sources.take(4).toList(),
+    saved: money,
+    flagged: flagged,
+    metrics: result,
   );
 }
 
@@ -165,13 +201,7 @@ List<Badge> badges(
       cap(n, 3),
     ),
     Badge('clean', 'leaf', 'Чистая корзина', 'Чек с оценкой 80 и выше', clean),
-    Badge(
-      'bomb',
-      'bomb',
-      'Сахарная бомба',
-      'Найди чек с оценкой ниже 40',
-      bomb,
-    ),
+    Badge('bomb', 'bomb', 'Корзина-бомба', 'Найди чек с оценкой ниже 40', bomb),
     Badge(
       'minus50',
       'minus',
@@ -230,6 +260,8 @@ String _signed(num n, String Function(num) f) =>
         ? '+'
         : '') +
     f(n.abs());
+String _of(MetricId m) =>
+    metrics[m]!.of[0].toUpperCase() + metrics[m]!.of.substring(1);
 
 class SwapRow {
   final int i;
@@ -237,30 +269,37 @@ class SwapRow {
   const SwapRow(this.i, this.from, this.to, this.cubes, this.price);
 }
 
-List<SwapRow> swapRows(Receipt r) => [
-  for (var i = 0; i < r.items.length; i++)
-    if (r.items[i].swap != null)
+/// Позиции с заменой, которые меняют выбранный показатель.
+List<SwapRow> swapRows(Receipt r, [MetricId m = MetricId.sugar]) {
+  final rows = <SwapRow>[];
+  for (var i = 0; i < r.items.length; i++) {
+    final it = r.items[i];
+    if (it.swap == null) continue;
+    final delta =
+        cubesOfValue(it.valueOf(m), m) - cubesOfValue(it.swap!.valueOf(m), m);
+    if (delta == 0) continue;
+    rows.add(
       SwapRow(
         i,
-        r.items[i].n,
-        r.items[i].swap!.n,
-        _signed(
-          cubesOf(r.items[i].s) - cubesOf(r.items[i].swap!.s),
-          (n) => cubesTxt(n.round()),
-        ),
-        _signed(r.items[i].p - r.items[i].swap!.p, money),
+        it.n,
+        it.swap!.n,
+        _signed(delta, (n) => cubesTxt(n.round())),
+        _signed(it.p - it.swap!.p, money),
       ),
-];
+    );
+  }
+  return rows;
+}
 
 class SourceRow {
   final int i, cells;
-  final String name, grams, cubes, swapTo;
+  final String name, amount, cubes, swapTo;
   final double width;
   final bool off;
   const SourceRow(
     this.i,
     this.name,
-    this.grams,
+    this.amount,
     this.cubes,
     this.width,
     this.cells,
@@ -269,7 +308,36 @@ class SourceRow {
   );
 }
 
-/// «Это как…»: понятные сравнения для количества сахара.
+/// «Цена вреда»: сколько денег ушло на продукты с этим показателем и во сколько обошёлся кубик.
+class HarmPrice {
+  final num spend;
+  final int cubes;
+  final double perCube;
+  final List<({String name, num price, int cubes})> top;
+  const HarmPrice(this.spend, this.cubes, this.perCube, this.top);
+}
+
+HarmPrice harmPrice(Analysis a, MetricId m) {
+  final rows = [
+    for (final it in a.items)
+      (
+        name: it.active.n,
+        price: it.active.p,
+        cubes: cubesOfValue(it.active.valueOf(m), m),
+      ),
+  ].where((r) => r.cubes >= 1).toList();
+  final spend = rows.fold<num>(0, (s, r) => s + r.price);
+  final cubes = rows.fold<int>(0, (s, r) => s + r.cubes);
+  rows.sort((x, y) => y.price.compareTo(x.price));
+  return HarmPrice(
+    spend,
+    cubes,
+    cubes > 0 ? spend / cubes : 0,
+    rows.take(3).toList(),
+  );
+}
+
+/// «Это как…»: понятные сравнения для количества выбранного показателя.
 class Equivalent {
   final String icon, value, label;
   const Equivalent(this.icon, this.value, this.label);
@@ -277,44 +345,106 @@ class Equivalent {
 
 String _fix1(double v) => v >= 10
     ? v.round().toString()
-    : v.toStringAsFixed(1).replaceAll('.', ',').replaceAll(',0', '');
+    : v.toStringAsFixed(1).replaceAll('.', ',').replaceAll(RegExp(r',0$'), '');
 
-List<Equivalent> equivalents(num sugarG) {
-  if (sugarG < 5) return const [];
-  final cans = sugarG / 35; // банка колы 0,33 л ≈ 35 г сахара
-  final walkMin =
-      sugarG *
-      4 /
-      4.5; // 4 ккал в грамме сахара, быстрая ходьба ≈ 4,5 ккал в минуту
-  final spoons = sugarG / 25; // столовая ложка с горкой ≈ 25 г
-  return [
-    Equivalent('can', _fix1(cans), 'банок колы по 0,33 л'),
-    Equivalent(
-      'walk',
-      walkMin >= 90 ? '${_fix1(walkMin / 60)} ч' : '${walkMin.round()} мин',
-      'быстрой ходьбы, чтобы сжечь',
-    ),
-    Equivalent('spoon', _fix1(spoons), 'столовых ложек сахара с горкой'),
-  ];
+List<Equivalent> equivalents(double v, MetricId m) {
+  if (cubesOfValue(v, m) < 1) return const [];
+  switch (m) {
+    case MetricId.sugar:
+      return [
+        Equivalent(
+          'can',
+          _fix1(v / 35),
+          'банок колы по 0,33 л',
+        ), // банка колы ≈ 35 г сахара
+        Equivalent(
+          'walk',
+          v * 4 / 4.5 >= 90
+              ? '${_fix1(v * 4 / 4.5 / 60)} ч'
+              : '${(v * 4 / 4.5).round()} мин',
+          'быстрой ходьбы, чтобы сжечь',
+        ), // 4 ккал/г, ходьба ≈ 4,5 ккал/мин
+        Equivalent('spoon', _fix1(v / 25), 'столовых ложек сахара с горкой'),
+      ];
+    case MetricId.salt:
+      return [
+        Equivalent(
+          'spoon',
+          _fix1(v / 6),
+          'чайных ложек соли',
+        ), // чайная ложка ≈ 6 г
+        Equivalent(
+          'day',
+          _fix1(v / metrics[m]!.adult),
+          'дневных норм соли для взрослого',
+        ),
+        Equivalent('chips', _fix1(v / 2.3), 'пачек чипсов по 150 г'),
+      ];
+    case MetricId.fat:
+      return [
+        Equivalent(
+          'butter',
+          _fix1(v / 90),
+          'пачек сливочного масла по 180 г',
+        ), // сливочное масло: 50 г насыщенных жиров на 100 г
+        Equivalent(
+          'day',
+          _fix1(v / metrics[m]!.adult),
+          'дневных норм жиров для взрослого',
+        ),
+        Equivalent('burger', _fix1(v / 6), 'чизбургеров по сумме жиров'),
+      ];
+    case MetricId.kcal:
+      return [
+        Equivalent(
+          'day',
+          _fix1(v / metrics[m]!.adult),
+          'дней питания для взрослого',
+        ),
+        Equivalent(
+          'run',
+          v / 600 >= 1 ? '${_fix1(v / 600)} ч' : '${(v / 10).round()} мин',
+          'бега, чтобы сжечь',
+        ), // бег ≈ 600 ккал/ч
+        Equivalent(
+          'choc',
+          _fix1(v / 540),
+          'плиток молочного шоколада по 100 г',
+        ),
+      ];
+  }
+}
+
+class FlaggedLine {
+  final String name;
+  final num price;
+  final String kind;
+  const FlaggedLine(this.name, this.price, this.kind);
 }
 
 class ResultModel {
   final Analysis analysis, base;
   final List<int> swaps;
+  final MetricId metric;
   final int maxCubes;
   final Tone tone, junkTone;
   final String pill, junkSum, junkShare, junkOf, junkDays, shareText;
   final ({String points, String label, String money})? summary;
   final List<SourceRow> sources;
+  final HarmPrice harm;
+  final List<FlaggedLine> flagged;
   const ResultModel({
     required this.analysis,
     required this.base,
     required this.swaps,
+    required this.metric,
     required this.maxCubes,
     required this.tone,
     required this.pill,
     required this.summary,
     required this.sources,
+    required this.harm,
+    required this.flagged,
     required this.junkTone,
     required this.junkSum,
     required this.junkShare,
@@ -324,50 +454,67 @@ class ResultModel {
   });
 }
 
-ResultModel resultModel(Receipt receipt, Iterable<int> swaps) {
+ResultModel resultModel(
+  Receipt receipt,
+  Iterable<int> swaps, [
+  MetricId metric = MetricId.sugar,
+]) {
   final on = swaps.toSet();
   final base = analyze(receipt), a = analyze(receipt, on);
   final v = verdict(a.score);
   final low = v.label.toLowerCase();
   final save = base.total - a.total;
 
-  final src = [
-    for (var i = 0; i < receipt.items.length; i++)
-      if (receipt.items[i].s > 0) i,
-  ]..sort((x, y) => receipt.items[y].s.compareTo(receipt.items[x].s));
-  final maxS = src.isEmpty ? 1 : receipt.items[src.first].s;
+  final src =
+      [
+        for (var i = 0; i < receipt.items.length; i++)
+          if (receipt.items[i].valueOf(metric) > 0) i,
+      ]..sort(
+        (x, y) => receipt.items[y]
+            .valueOf(metric)
+            .compareTo(receipt.items[x].valueOf(metric)),
+      );
+  final top = src.take(8).toList();
+  final maxV = top.isEmpty ? 1 : receipt.items[top.first].valueOf(metric);
   final sources = [
-    for (final i in src)
+    for (final i in top)
       () {
         final it = receipt.items[i];
-        final c = cubesOf(it.s);
+        final val = it.valueOf(metric), c = cubesOfValue(val, metric);
         return SourceRow(
           i,
           it.n,
-          '${it.s} г',
+          amountTxt(val, metric),
           c > 0 ? cubesTxt(c) : 'меньше кубика',
-          max(4.0, it.s / maxS * 100),
+          max(4.0, val / maxV * 100),
           max(1, c),
           a.items[i].swapped,
-          it.swap != null ? '${it.swap!.n} — ${it.swap!.s} г' : '',
+          it.swap != null
+              ? '${it.swap!.n} — ${amountTxt(it.swap!.valueOf(metric), metric)}'
+              : '',
         );
       }(),
   ];
 
-  final d = a.days.round();
+  final d = (a.totals[metric]! / metrics[metric]!.adult).round();
+  final parts = [
+    for (final k in [MetricId.sugar, MetricId.salt, MetricId.fat])
+      '${a.cubesBy[k]} ${pl(a.cubesBy[k]!, cubesF)} ${metrics[k]!.of}',
+  ];
   var share =
-      'Мой чек в «Чек-ап»: ${a.cubes} ${pl(a.cubes, cubesF)} сахара, оценка ${a.score} из 100 — $low.';
-  if (on.isNotEmpty && base.cubes > a.cubes) {
+      'Мой чек в «Чек-ап»: ${parts.join(', ')}, оценка ${a.score} из 100 — $low.';
+  if (on.isNotEmpty && base.score < a.score) {
     share +=
-        ' С заменами минус ${cubesTxt(base.cubes - a.cubes)}${save > 0 ? ' и ${money(save)} экономии' : ''}.';
+        ' С заменами оценка ${a.score}${save > 0 ? ' и ${money(save)} экономии' : ''}.';
   }
-  share += ' А сколько сахара в твоей корзине?';
+  share += ' А что в твоей корзине?';
 
   return ResultModel(
     analysis: a,
     base: base,
     swaps: on.toList()..sort(),
-    maxCubes: max(1, max(base.cubes, a.cubes)),
+    metric: metric,
+    maxCubes: max(1, max(base.cubesBy[metric]!, a.cubesBy[metric]!)),
     tone: v.tone,
     pill: '${a.score} из 100 · $low',
     summary: on.isEmpty
@@ -382,6 +529,12 @@ ResultModel resultModel(Receipt receipt, Iterable<int> swaps) {
             money: save != 0 ? money(save.abs()) : '',
           ),
     sources: sources,
+    harm: harmPrice(a, metric),
+    flagged: [
+      for (final it in a.items)
+        if (!it.swapped && it.item.x != null)
+          FlaggedLine(it.item.n, it.item.p, it.item.x!),
+    ],
     junkTone: a.share > 0.3
         ? Tone.bad
         : a.share > 0.1
@@ -393,8 +546,8 @@ ResultModel resultModel(Receipt receipt, Iterable<int> swaps) {
         ? '${a.junkCount} ${pl(a.junkCount, junkF)} из ${money(a.total)} всего'
         : 'Вредных товаров нет — весь чек ${money(a.total)} на нормальную еду',
     junkDays: d >= 1
-        ? 'Сахара в чеке — на $d ${pl(d, daysF)} для одного взрослого'
-        : 'Сахара в чеке меньше дневной нормы взрослого',
+        ? '${_of(metric)} в чеке — на $d ${pl(d, daysF)} для одного взрослого'
+        : '${_of(metric)} в чеке меньше дневной нормы взрослого',
     shareText: share,
   );
 }

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
 import 'shell.dart';
@@ -38,7 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final p = store.profile;
     final list = store.badgeList;
     final done = list.where((b) => b.done).length;
-    final normCubes = familyDailyCubes(p), normG = familyDailyG(p);
+    final normCubes = familyDailyCubes(p);
     final picked = list.where((b) => b.id == _picked).firstOrNull;
     final n = store.history.length;
 
@@ -108,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Норма твоей семьи',
+                                    'Норма твоей семьи, кубиков в день',
                                     style: body(
                                       15,
                                       color: Colors.white.withValues(
@@ -116,32 +117,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$normCubes',
-                                    style: disp(
-                                      84,
-                                      color: Colors.white,
-                                      h: .95,
-                                      ls: -.06,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${pl(normCubes, cubesF)} в день',
-                                    style: disp(
-                                      17,
-                                      w: 500,
-                                      color: Colors.white,
-                                      ls: -.01,
-                                    ),
+                                  const SizedBox(height: 12),
+                                  Wrap(
+                                    spacing: 20,
+                                    runSpacing: 10,
+                                    children: [
+                                      for (final m in metricIds)
+                                        SizedBox(
+                                          width: 110,
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.baseline,
+                                            textBaseline:
+                                                TextBaseline.alphabetic,
+                                            children: [
+                                              Container(
+                                                width: 10,
+                                                height: 10,
+                                                decoration: BoxDecoration(
+                                                  color: Color(
+                                                    metrics[m]!.color,
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.white
+                                                        .withValues(alpha: .85),
+                                                    width: 1.5,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${familyDailyCubesOf(p, m)}',
+                                                style: disp(
+                                                  34,
+                                                  color: Colors.white,
+                                                  h: 1,
+                                                  ls: -.05,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  metrics[m]!.label,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: body(
+                                                    13,
+                                                    w: 700,
+                                                    color: Colors.white
+                                                        .withValues(alpha: .88),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
                             const Padding(
                               padding: EdgeInsets.only(bottom: 8),
-                              child: CubeIcon(96, angle: 12),
+                              child: CubeIcon(64, angle: 12),
                             ),
                           ],
                         ),
@@ -161,7 +201,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SecTitle('Кто ест из корзины'),
                 StepperRow(
                   label: 'Взрослые',
-                  hint: 'до $adultG г сахара в день',
+                  hint:
+                      'до ${metrics[MetricId.sugar]!.adult.round()} г сахара, ${metrics[MetricId.salt]!.adult.round()} г соли, ${metrics[MetricId.fat]!.adult.round()} г жиров в день',
                   value: p.adults,
                   min: 1,
                   max: maxAdults,
@@ -170,7 +211,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 8),
                 StepperRow(
                   label: 'Дети',
-                  hint: 'до $kidG г в день',
+                  hint:
+                      'до ${metrics[MetricId.sugar]!.kid.round()} г сахара, ${metrics[MetricId.salt]!.kid.round()} г соли, ${metrics[MetricId.fat]!.kid.round()} г жиров в день',
                   value: p.kids,
                   min: 0,
                   max: maxKids,
@@ -179,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
                   child: Text(
-                    'На всю семью выходит до $normG г добавленного сахара в день, или ${normCubes * 7} ${pl(normCubes * 7, cubesF)} в неделю. С этой нормой сравнивается раздел «Неделя».',
+                    'На всю семью в день выходит до ${amountTxt(familyDaily(p, MetricId.sugar), MetricId.sugar)} сахара, ${amountTxt(familyDaily(p, MetricId.salt), MetricId.salt)} соли, ${amountTxt(familyDaily(p, MetricId.fat), MetricId.fat)} насыщенных жиров и около ${familyDaily(p, MetricId.kcal)} ккал. Это ${normCubes * 7} ${pl(normCubes * 7, cubesF)} сахара в неделю; с нормами сравнивается раздел «Неделя».',
                     style: body(14, color: mute),
                   ),
                 ),
@@ -346,12 +388,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Оценка корзины — от 0 до 100. Её снижают две вещи: доля вредных товаров в сумме чека и количество добавленного сахара.',
+                                'Оценка корзины — от 0 до 100. Её снижают доля вредных товаров в сумме чека, количество добавленного сахара, соли и насыщенных жиров, а ещё траты на алкоголь и энергетики. Калории в оценку не входят: еда должна быть калорийной, важно, откуда они.',
                                 style: body(15),
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Сахар показываем кубиками: 1 кубик = $cubeG г. Считается только добавленный сахар; сахар в целых фруктах, овощах и молоке не учитывается.',
+                                'Всё показываем кубиками, у каждого показателя свой: ${metricIds.map(cubeLabel).join(', ')}. Сахар — только добавленный: в целых фруктах, овощах и молоке он не считается. Норма взрослого — около 10 кубиков каждого в день (ориентир ВОЗ).',
                                 style: body(15),
                               ),
                               const SizedBox(height: 6),

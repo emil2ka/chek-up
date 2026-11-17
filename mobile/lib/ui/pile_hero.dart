@@ -6,7 +6,8 @@ import '../core/models.dart';
 import 'kit.dart';
 import 'pile.dart';
 
-const heroHeadH = 236.0; // место под шапку, подпись и цифру
+const heroHeadH =
+    296.0; // место под шапку, вкладки показателей, подпись и цифру
 
 class PileHero extends StatefulWidget {
   final double height;
@@ -22,6 +23,12 @@ class PileHero extends StatefulWidget {
   /// настоящее число для показа, если кубиков рисуется меньше (неделя)
   final int Function(int shown)? real;
   final String capSuffix;
+
+  /// выбранный показатель: от него цвет кубиков и подпись под цифрой
+  final MetricId metric;
+
+  /// переключатель показателей под шапкой (null — без него)
+  final ValueChanged<MetricId>? onMetric;
   const PileHero({
     super.key,
     required this.height,
@@ -31,6 +38,8 @@ class PileHero extends StatefulWidget {
     required this.maxCubes,
     this.real,
     this.capSuffix = '',
+    this.metric = MetricId.sugar,
+    this.onMetric,
   });
 
   @override
@@ -57,10 +66,12 @@ class _PileHeroState extends State<PileHero> {
           const Glow(),
           Positioned.fill(
             child: Semantics(
-              label: 'Гора кубиков сахара. Нажми, чтобы подбросить',
+              label:
+                  'Гора кубиков ${metrics[widget.metric]!.of}. Нажми, чтобы подбросить',
               child: SugarPile(
-                // новая куча, когда меняется размер кубика
-                key: ValueKey(widget.maxCubes),
+                // новая куча, когда меняется размер кубика или показатель
+                key: ValueKey('${widget.maxCubes}-${widget.metric.name}'),
+                palettes: [pilePalettes[widget.metric]!],
                 target: widget.target,
                 cubeSize: (s) => cubeSize(
                   s.width,
@@ -74,7 +85,7 @@ class _PileHeroState extends State<PileHero> {
           Positioned(
             left: 0,
             right: 0,
-            top: top + 62,
+            top: top + 62 + (widget.onMetric != null ? 56 : 0),
             child: IgnorePointer(
               child: ValueListenableBuilder(
                 valueListenable: _n,
@@ -116,7 +127,7 @@ class _PileHeroState extends State<PileHero> {
                         ),
                       ),
                       Text(
-                        '${capOf(shown)}${widget.capSuffix}',
+                        '${capOf(shown, widget.metric)}${widget.capSuffix}',
                         style: disp(
                           17,
                           w: 500,
@@ -137,6 +148,16 @@ class _PileHeroState extends State<PileHero> {
             top: top + 8,
             child: SizedBox(height: 48, child: widget.bar),
           ),
+          if (widget.onMetric != null)
+            Positioned(
+              left: 14,
+              right: 14,
+              top: top + 62,
+              child: MetricTabs(
+                value: widget.metric,
+                onChange: widget.onMetric!,
+              ),
+            ),
         ],
       ),
     );

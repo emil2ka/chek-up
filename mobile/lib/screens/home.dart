@@ -62,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
           h: .98,
           ls: -.045,
         );
-        final norm = dailyG ~/ cubeG;
 
         Widget headBtn(
           IconData icon,
@@ -123,6 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Positioned.fill(
                   child: SugarPile(
                     key: _pile,
+                    // кубики четырёх цветов вперемешку: сахар, соль, жиры, калории
+                    palettes: const [pileSugar, pileSalt, pileFat, pileKcal],
                     target: _homeCubes,
                     cubeSize: (_) => cube,
                     interactive: false,
@@ -164,15 +165,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       SizedBox(height: short ? 10 : 22),
-                      Rise(child: Text('Сколько', style: h1)),
-                      Rise(delay: 60, child: Hl('сахара', h1)),
+                      Rise(child: Text('Что', style: h1)),
+                      Rise(delay: 60, child: Hl('прячется', h1)),
                       Rise(delay: 120, child: Text('в твоём', style: h1)),
                       Rise(delay: 180, child: Text('чеке?', style: h1)),
                       SizedBox(height: short ? 12 : 18),
                       Rise(
                         delay: 220,
                         child: Text(
-                          'Сфоткай чек из магазина. Покажем сахар кубиками и подскажем, что заменить.',
+                          'Сфоткай чек из магазина. Покажем сахар, соль, жиры и калории кубиками, во сколько тебе обошлось вредное, и подскажем, чем заменить.',
                           style: body(
                             short ? 16 : 17,
                             color: Colors.white.withValues(alpha: .9),
@@ -199,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  'Норма ВОЗ — до $norm ${pl(norm, cubesF)} в день',
+                                  'Норма — около 10 кубиков в день по каждому показателю',
                                   style: body(
                                     13,
                                     color: Colors.white.withValues(alpha: .92),

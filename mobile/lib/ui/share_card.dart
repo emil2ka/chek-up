@@ -8,15 +8,19 @@ import 'package:share_plus/share_plus.dart';
 import '../core/engine.dart';
 import '../core/models.dart';
 import 'kit.dart';
+import 'pile.dart';
 
 Future<Uint8List> _render({
-  required int cubes,
+  required MetricId metric,
+  required Map<MetricId, int> cubesBy,
   required int score,
   required String verdictLow,
   required Tone tone,
   required String where,
 }) async {
   const w = 1080.0, h = 1350.0;
+  final cubes = cubesBy[metric]!;
+  final pal = pilePalettes[metric]!;
   final rec = ui.PictureRecorder();
   final c = Canvas(rec, const Rect.fromLTWH(0, 0, w, h));
   c.drawRect(
@@ -41,10 +45,12 @@ Future<Uint8List> _render({
     double y, {
     double x = 80,
     double maxW = w - 160,
+    TextAlign align = TextAlign.left,
   }) {
     final tp = TextPainter(
       text: TextSpan(text: s, style: st),
       textDirection: TextDirection.ltr,
+      textAlign: align,
     )..layout(maxWidth: maxW);
     tp.paint(c, Offset(x, y));
     return tp.height;
@@ -54,54 +60,83 @@ Future<Uint8List> _render({
   text(
     'В моём чеке',
     body(46, w: 700, color: Colors.white.withValues(alpha: .88)),
-    250,
+    220,
   );
   final nh = text(
     '$cubes',
     disp(cubes >= 100 ? 330 : 400, color: Colors.white, ls: -.07),
-    300,
+    270,
   );
-  text(capOf(cubes), disp(64, w: 500, color: Colors.white, ls: -.01), 310 + nh);
+  text(
+    capOf(cubes, metric),
+    disp(64, w: 500, color: Colors.white, ls: -.01),
+    280 + nh,
+  );
 
-  // кубики по низу
-  final n = cubes.clamp(0, 44);
+  // кубики своего цвета по низу
+  final n = cubes.clamp(0, 33);
   const s = 78.0;
   for (var i = 0; i < n; i++) {
     final col = i % 11, row = i ~/ 11;
     final x = 80 + col * (s + 8.5) + (row.isOdd ? 20 : 0),
-        y = h - 330 - row * (s + 8);
+        y = h - 410 - row * (s + 8);
     final rr = RRect.fromRectAndRadius(
       Rect.fromLTWH(x, y, s, s),
       const Radius.circular(13),
     );
-    c.drawRRect(
-      rr.shift(const Offset(0, 10)),
-      Paint()..color = const Color(0xFFB4C4F6),
-    );
-    c.drawRRect(rr, Paint()..color = Colors.white);
+    c.drawRRect(rr.shift(const Offset(0, 10)), Paint()..color = pal.side);
+    c.drawRRect(rr, Paint()..color = pal.top);
   }
 
-  final pill = RRect.fromRectAndRadius(
-    const Rect.fromLTWH(80, h - 210, w - 160, 130),
-    const Radius.circular(65),
+  // белая карточка: оценка и четыре показателя
+  final sheet = RRect.fromRectAndRadius(
+    const Rect.fromLTWH(0, h - 300, w, 420),
+    const Radius.circular(70),
   );
-  c.drawRRect(pill, Paint()..color = Colors.white);
+  c.drawRRect(sheet, Paint()..color = Colors.white);
   c.drawCircle(
-    const Offset(150, h - 145),
-    20,
+    const Offset(110, h - 232),
+    16,
     Paint()..color = toneColor(tone),
   );
   text(
     '$score из 100 · $verdictLow',
-    body(46, w: 800),
-    h - 177,
-    x: 195,
-    maxW: w - 300,
+    body(44, w: 800),
+    h - 258,
+    x: 144,
+    maxW: w - 224,
   );
+  final colW = (w - 120) / metricIds.length;
+  for (final (i, m) in metricIds.indexed) {
+    final cx = 60 + colW * (i + .5);
+    c.drawCircle(
+      Offset(cx - 62, h - 150),
+      10,
+      Paint()..color = Color(metrics[m]!.color),
+    );
+    text(
+      '${cubesBy[m]}',
+      disp(50, w: 900, ls: -.04),
+      h - 178,
+      x: cx - 40,
+      maxW: colW,
+    );
+    text(
+      metrics[m]!.label,
+      body(30, w: 700, color: mute),
+      h - 112,
+      x: cx - colW / 2,
+      maxW: colW,
+      align: TextAlign.center,
+    );
+  }
   text(
     where,
-    body(34, w: 700, color: Colors.white.withValues(alpha: .85)),
+    body(32, w: 700, color: mute),
     h - 62,
+    x: 0,
+    maxW: w,
+    align: TextAlign.center,
   );
 
   final img = await rec.endRecording().toImage(w.toInt(), h.toInt());
@@ -111,7 +146,8 @@ Future<Uint8List> _render({
 
 /// Поделиться результатом: картинка + текст; если картинка не получилась — только текст.
 Future<void> shareResult({
-  required int cubes,
+  required MetricId metric,
+  required Map<MetricId, int> cubesBy,
   required int score,
   required String where,
   required String text,
@@ -119,7 +155,8 @@ Future<void> shareResult({
   final v = verdict(score);
   try {
     final png = await _render(
-      cubes: cubes,
+      metric: metric,
+      cubesBy: cubesBy,
       score: score,
       verdictLow: v.label.toLowerCase(),
       tone: v.tone,

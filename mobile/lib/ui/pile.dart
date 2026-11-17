@@ -11,6 +11,8 @@ import 'package:flutter/services.dart';
 import 'package:forge2d/forge2d.dart' as f;
 import 'package:sensors_plus/sensors_plus.dart';
 
+import '../core/models.dart';
+
 const _pourMs = 2400.0; // за сколько высыпается вся порция
 const _popMs = 340.0;
 const _unit = 0.6; // сторона кубика в единицах физики
@@ -28,9 +30,55 @@ class _Spark {
   _Spark(this.x, this.y, this.vx, this.vy, this.life, this.s);
 }
 
+/// Цвета кубика: у каждого показателя свой материал.
+class PilePalette {
+  final Color top, side, edge, grain;
+  const PilePalette({
+    required this.top,
+    required this.side,
+    required this.edge,
+    required this.grain,
+  });
+}
+
+/// Сахар — белый (как раньше), соль — розовый кристалл, жиры — сливочное масло, калории — тёплый оранжевый.
+const pileSugar = PilePalette(
+  top: Colors.white,
+  side: Color(0xFFB4C4F6),
+  edge: Color(0xFFD9E2FC),
+  grain: Color(0x5590A4E6),
+);
+const pileSalt = PilePalette(
+  top: Color(0xFFFFF1F5),
+  side: Color(0xFFF2A6BE),
+  edge: Color(0xFFFAD2DE),
+  grain: Color(0x66D9709A),
+);
+const pileFat = PilePalette(
+  top: Color(0xFFFFF6C9),
+  side: Color(0xFFEBBB3A),
+  edge: Color(0xFFFCE79A),
+  grain: Color(0x66D29A14),
+);
+const pileKcal = PilePalette(
+  top: Color(0xFFFFE9D1),
+  side: Color(0xFFF08A3E),
+  edge: Color(0xFFFFCDA0),
+  grain: Color(0x66D86A14),
+);
+const pilePalettes = <MetricId, PilePalette>{
+  MetricId.sugar: pileSugar,
+  MetricId.salt: pileSalt,
+  MetricId.fat: pileFat,
+  MetricId.kcal: pileKcal,
+};
+
 class SugarPile extends StatefulWidget {
   /// сколько кубиков должно лежать
   final int target;
+
+  /// цвета кубиков; несколько — вперемешку (у каждого «рисунка» свой цвет)
+  final List<PilePalette> palettes;
 
   /// сторона кубика в пикселях для данного размера области
   final double Function(Size size) cubeSize;
@@ -44,6 +92,7 @@ class SugarPile extends StatefulWidget {
   /// сам ловит тапы (иначе их передают через tossAt)
   final bool interactive;
   const SugarPile({
+    this.palettes = const [pileSugar],
     super.key,
     required this.target,
     required this.cubeSize,
@@ -401,12 +450,10 @@ class _PilePainter extends CustomPainter {
   _PilePainter(this.st) : super(repaint: st._repaint);
 
   static final _shadow = Paint()..color = const Color(0x38041069);
-  static final _side = Paint()..color = const Color(0xFFB4C4F6);
-  static final _top = Paint()..color = Colors.white;
-  static final _edge = Paint()
-    ..color = const Color(0xFFD9E2FC)
-    ..style = PaintingStyle.stroke;
-  static final _grain = Paint()..color = const Color(0x5590A4E6);
+  static final _side = Paint();
+  static final _top = Paint();
+  static final _edge = Paint()..style = PaintingStyle.stroke;
+  static final _grain = Paint();
   // рисунки крупинок: (x, y, размер) в долях стороны
   static const _grains = [
     [(-.22, -.2, .07), (.18, .1, .06), (-.05, .24, .05), (.24, -.24, .05)],
@@ -437,10 +484,18 @@ class _PilePainter extends CustomPainter {
     }
 
     each(s * .26, (_) => canvas.drawRRect(rr, _shadow));
-    each(s * .12, (_) => canvas.drawRRect(rr, _side));
+    final pals = st.widget.palettes;
+    PilePalette palOf(f.Body b) =>
+        pals[((b.userData as int?) ?? 0) % pals.length];
+    each(s * .12, (b) => canvas.drawRRect(rr, _side..color = palOf(b).side));
     each(0, (b) {
-      canvas.drawRRect(rr, _top);
-      canvas.drawRRect(rr.deflate(_edge.strokeWidth / 2), _edge);
+      final pal = palOf(b);
+      canvas.drawRRect(rr, _top..color = pal.top);
+      canvas.drawRRect(
+        rr.deflate(_edge.strokeWidth / 2),
+        _edge..color = pal.edge,
+      );
+      _grain.color = pal.grain;
       if (s >= 16) {
         for (final (x, y, d) in _grains[(b.userData as int?) ?? 0]) {
           canvas.drawRRect(

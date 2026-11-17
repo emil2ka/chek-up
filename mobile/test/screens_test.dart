@@ -63,15 +63,68 @@ void main() {
 
   test('расчёты совпадают с веб-версией', () {
     final a = analyze(demoReceipts[0]);
-    expect((a.cubes, a.score, a.total, a.junk), (62, 54, 9870, 3490));
+    expect((a.cubes, a.score, a.total, a.junk), (73, 45, 12590, 6210));
     expect(verdict(a.score).label, 'Так себе');
+    expect(a.cubesBy, {
+      MetricId.sugar: 73,
+      MetricId.salt: 41,
+      MetricId.fat: 50,
+      MetricId.kcal: 54,
+    });
+    expect(
+      (a.flaggedCount, a.flaggedSum, a.alcoholSum, a.energySum),
+      (2, 1240, 650, 590),
+    );
+    expect([for (final r in demoReceipts) analyze(r).score], [45, 34, 92]);
+    expect(verdict(34).label, 'Корзина-бомба');
     expect(money(3490), '3 490 ₸');
     expect(dateRu('2026-11-16'), '16 ноября');
     expect(
       [pl(1, cubesF), pl(3, cubesF), pl(11, cubesF), pl(21, cubesF)],
       ['кубик', 'кубика', 'кубиков', 'кубик'],
     );
-    expect(resultModel(demoReceipts[0], [1]).pill, '65 из 100 · неплохо');
+    expect(resultModel(demoReceipts[0], [1]).pill, '51 из 100 · так себе');
+    // сверка с веб-версией (web/src/lib/engine.test.ts): те же чеки — те же числа
+    const sheet = {
+      'week': (
+        45,
+        {
+          MetricId.sugar: 73,
+          MetricId.salt: 41,
+          MetricId.fat: 50,
+          MetricId.kcal: 54,
+        },
+      ),
+      'party': (
+        34,
+        {
+          MetricId.sugar: 192,
+          MetricId.salt: 53,
+          MetricId.fat: 129,
+          MetricId.kcal: 76,
+        },
+      ),
+      'fit': (
+        92,
+        {
+          MetricId.sugar: 8,
+          MetricId.salt: 8,
+          MetricId.fat: 35,
+          MetricId.kcal: 48,
+        },
+      ),
+    };
+    for (final r in demoReceipts) {
+      final a = analyze(r);
+      expect(a.score, sheet[r.id]!.$1, reason: r.id);
+      expect(a.cubesBy, sheet[r.id]!.$2, reason: r.id);
+    }
+    final h = harmPrice(analyze(demoReceipts[0]), MetricId.salt);
+    expect((h.spend, h.cubes, h.perCube.round()), (6980, 39, 179));
+    expect(
+      [for (final t in h.top) t.name],
+      ['Филе куриное, 1 кг', 'Колбаса варёная, 400 г', 'Чипсы, 150 г'],
+    );
     expect(
       Receipt.fromJson(demoReceipts[1].toJson()).items.length,
       demoReceipts[1].items.length,

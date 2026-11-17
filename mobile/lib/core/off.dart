@@ -5,11 +5,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'models.dart';
+
 class ShelfProduct {
   final String code, name, brand, quantity;
 
   /// сахара на 100 г/мл
-  final double per100;
+  /// сахар, соль, насыщенные жиры (г) и калории (ккал) на 100 г/мл; null — на этикетке не указано
+  final Map<MetricId, double?> per100;
 
   /// вес или объём упаковки, г/мл (null — неизвестен)
   final double? amount;
@@ -23,7 +26,11 @@ class ShelfProduct {
   });
 
   /// сахара на всю упаковку, а если её размер неизвестен — на 100 г
-  double get grams => amount == null ? per100 : per100 * amount! / 100;
+  double? valueOf(MetricId m) {
+    final v = per100[m];
+    return v == null ? null : (amount == null ? v : v * amount! / 100);
+  }
+
   String get basis => amount == null ? 'в 100 г' : 'в упаковке';
 }
 
@@ -65,11 +72,18 @@ Future<ShelfProduct> lookupBarcode(String code) async {
       'Этого товара пока нет в базе. Поищи похожий в справочнике',
     );
 
-  final sugars = p['nutriments'] is Map
-      ? _num(p['nutriments']['sugars_100g'])
-      : null;
-  if (sugars == null)
-    throw const ShelfError('Товар в базе есть, но сахар на этикетке не указан');
+  final nu = p['nutriments'] is Map ? p['nutriments'] as Map : const {};
+  final per100 = <MetricId, double?>{
+    MetricId.sugar: _num(nu['sugars_100g']),
+    MetricId.salt: _num(nu['salt_100g']),
+    MetricId.fat: _num(nu['saturated-fat_100g']),
+    MetricId.kcal: _num(nu['energy-kcal_100g']),
+  };
+  if (per100.values.every((v) => v == null)) {
+    throw const ShelfError(
+      'Товар в базе есть, но состав на этикетке не указан',
+    );
+  }
   String s(String k) => p![k] is String ? (p[k] as String).trim() : '';
   final name = s('product_name_ru').isNotEmpty
       ? s('product_name_ru')
@@ -80,7 +94,7 @@ Future<ShelfProduct> lookupBarcode(String code) async {
     name: name.isEmpty ? 'Товар $code' : name,
     brand: s('brands').split(',').first.trim(),
     quantity: s('quantity'),
-    per100: sugars,
+    per100: per100,
     amount: amount != null && amount > 0 && amount <= 20000 ? amount : null,
   );
 }

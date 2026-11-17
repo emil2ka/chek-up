@@ -14,33 +14,44 @@ import 'shell.dart';
 /// больше кубиков на экране не рисуем — счётчик всё равно показывает настоящее число
 const _pileCap = 220;
 
-class WeekScreen extends StatelessWidget {
+class WeekScreen extends StatefulWidget {
   final VoidCallback onProfile;
   const WeekScreen({super.key, required this.onProfile});
 
   @override
+  State<WeekScreen> createState() => _WeekScreenState();
+}
+
+class _WeekScreenState extends State<WeekScreen> {
+  MetricId _metric = MetricId.sugar;
+
+  @override
   Widget build(BuildContext context) {
+    final onProfile = widget.onProfile;
     final p = store.profile;
     final st = weekStats(store.history, p);
-    final cubes = st.cubes, norm = st.normCubes;
-    final pct = (st.ratio * 100).round();
-    final tone = st.ratio <= .7
+    final mdef = metrics[_metric]!;
+    final mw = st.metrics[_metric]!;
+    final cubes = mw.cubes, norm = mw.normCubes;
+    final ratio = mw.ratio;
+    final pct = (ratio * 100).round();
+    final tone = ratio <= .7
         ? Tone.good
-        : st.ratio <= 1
+        : ratio <= 1
         ? Tone.mid
         : Tone.bad;
-    final maxDay = st.days.map((d) => d.cubes).fold(1, max);
+    final maxDay = st.days.map((d) => d.by[_metric]!).fold(1, max);
     final empty = st.receipts.isEmpty;
     final shown = min(cubes, _pileCap);
     final over = cubes - norm;
     final family =
         '${p.adults} ${pl(p.adults, adultsF)}${p.kids > 0 ? ' и ${p.kids} ${pl(p.kids, kidsF)}' : ''}';
     final normLine = empty
-        ? 'Отсканируй чек — и здесь появится гора сахара за неделю.'
+        ? 'Отсканируй чек — и здесь появится гора за неделю.'
         : over > 0
         ? 'Это на $over ${pl(over, cubesF)} больше недельной нормы семьи.'
-        : st.ratio <= .7
-        ? 'Отличная неделя: сахара заметно меньше нормы.'
+        : ratio <= .7
+        ? 'Отличная неделя: ${mdef.of} заметно меньше нормы.'
         : 'В пределах недельной нормы семьи.';
 
     Widget card({
@@ -67,6 +78,8 @@ class WeekScreen extends StatelessWidget {
               maxCubes: max(1, shown),
               real: (n) => shown > 0 ? (n * cubes / shown).round() : 0,
               capSuffix: ' за 7 дней',
+              metric: _metric,
+              onMetric: (m) => setState(() => _metric = m),
               bar: Row(
                 children: [
                   const SizedBox(width: 6),
@@ -190,12 +203,14 @@ class WeekScreen extends StatelessWidget {
                           Expanded(
                             child: Semantics(
                               label:
-                                  '${d.day}-е число: ${d.cubes} ${pl(d.cubes, cubesF)}',
+                                  '${d.day}-е число: ${d.by[_metric]!} ${pl(d.by[_metric]!, cubesF)}',
                               excludeSemantics: true,
                               child: Column(
                                 children: [
                                   Text(
-                                    d.cubes > 0 ? '${d.cubes}' : '',
+                                    d.by[_metric]! > 0
+                                        ? '${d.by[_metric]!}'
+                                        : '',
                                     style: disp(13, w: 800, ls: 0),
                                   ),
                                   const SizedBox(height: 6),
@@ -206,8 +221,11 @@ class WeekScreen extends StatelessWidget {
                                       child: TweenAnimationBuilder<double>(
                                         tween: Tween(
                                           begin: 6,
-                                          end: d.cubes > 0
-                                              ? max(10.0, d.cubes / maxDay * 96)
+                                          end: d.by[_metric]! > 0
+                                              ? max(
+                                                  10.0,
+                                                  d.by[_metric]! / maxDay * 96,
+                                                )
                                               : 6,
                                         ),
                                         duration: const Duration(
@@ -223,7 +241,7 @@ class WeekScreen extends StatelessWidget {
                                             maxWidth: 32,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: d.cubes > 0
+                                            color: d.by[_metric]! > 0
                                                 ? (d.today ? blue1 : blue3)
                                                 : line,
                                             borderRadius: BorderRadius.circular(
@@ -304,9 +322,9 @@ class WeekScreen extends StatelessWidget {
                                   fit: BoxFit.scaleDown,
                                   alignment: Alignment.centerLeft,
                                   child: Text(
-                                    (st.sugar * 52 / 1000)
+                                    (mw.total * 52 / 1000)
                                         .toStringAsFixed(
-                                          st.sugar * 52 >= 10000 ? 0 : 1,
+                                          mw.total * 52 >= 10000 ? 0 : 1,
                                         )
                                         .replaceAll('.', ','),
                                     style: disp(
@@ -321,7 +339,9 @@ class WeekScreen extends StatelessWidget {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 7),
                                 child: Text(
-                                  'кг сахара',
+                                  _metric == MetricId.kcal
+                                      ? 'тыс. ккал'
+                                      : 'кг ${mdef.of}',
                                   style: disp(
                                     17,
                                     w: 500,
@@ -334,7 +354,7 @@ class WeekScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Столько добавленного сахара семья купит за год, если каждая неделя будет как эта. Это ${group((st.sugar * 52 / cubeG).round())} кубиков.',
+                            'Столько ${_metric == MetricId.sugar ? 'добавленного сахара' : mdef.of} семья купит за год, если каждая неделя будет как эта. Это ${group((mw.total * 52 / mdef.cubeG).round())} кубиков.',
                             style: body(
                               14,
                               color: Colors.white.withValues(alpha: .82),
@@ -387,10 +407,10 @@ class WeekScreen extends StatelessWidget {
                       ),
                     ),
                     // ── источники ──
-                    if (st.sources.isNotEmpty) ...[
+                    if (mw.sources.isNotEmpty) ...[
                       const SizedBox(height: 28),
                       const SecTitle('Главные источники'),
-                      for (final (i, s) in st.sources.indexed)
+                      for (final (i, s) in mw.sources.indexed)
                         Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
@@ -423,12 +443,12 @@ class WeekScreen extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                '${cubesOf(s.$2)}',
+                                '${cubesOfValue(s.$2, _metric)}',
                                 style: disp(17, ls: -.03),
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                pl(cubesOf(s.$2), cubesF),
+                                pl(cubesOfValue(s.$2, _metric), cubesF),
                                 style: body(12, w: 700, color: mute),
                               ),
                             ],
@@ -460,8 +480,8 @@ class WeekScreen extends StatelessWidget {
                               child: _money(
                                 'Замены экономят',
                                 money(st.saved),
-                                st.cubesSaved > 0
-                                    ? 'и минус ${st.cubesSaved} ${pl(st.cubesSaved, cubesF)}'
+                                mw.cubesSaved > 0
+                                    ? 'и минус ${mw.cubesSaved} ${pl(mw.cubesSaved, cubesF)} ${mdef.of}'
                                     : 'включи замены в чеке',
                               ),
                             ),
@@ -522,7 +542,7 @@ class WeekScreen extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 10),
                                       Text(
-                                        '${r.analysis.cubes}',
+                                        '${r.analysis.cubesBy[_metric]}',
                                         style: disp(20),
                                       ),
                                       const SizedBox(width: 9),
@@ -556,7 +576,7 @@ class WeekScreen extends StatelessWidget {
                   ],
                   const SizedBox(height: 14),
                   Text(
-                    'Неделя считается по датам чеков. Это купленный сахар, а не съеденный: часть продуктов останется на потом. 1 кубик = $cubeG г.',
+                    'Неделя считается по датам чеков. Это купленное, а не съеденное: часть продуктов останется на потом. 1 кубик ${mdef.of} = ${cubeLabel(_metric)}. Норма: ${mdef.norm}.',
                     style: body(12, color: mute, h: 1.5),
                   ),
                 ],

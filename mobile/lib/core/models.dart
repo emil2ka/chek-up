@@ -1,25 +1,47 @@
 // Общие типы «Чек-апа» (перенос web/src/lib/types.ts).
 
-/// Позиция чека или замена: n — название, p — цена ₸, s — добавленный сахар, г на всю позицию.
+/// Показатели, которые считает «Чек-ап»: сахар, соль, насыщенные жиры, калории.
+enum MetricId { sugar, salt, fat, kcal }
+
+/// Позиция чека или замена. На всю позицию (с учётом количества): p — цена ₸, s — добавленный сахар, г,
+/// t — соль, г, f — насыщенные жиры, г, k — калории, ккал (у старых чеков t, f, k нет — считаем 0).
 class Item {
   final String n;
-  final num p;
-  final num s;
+  final num p, s, t, f, k;
   final bool junk;
+
+  /// алкоголь или энергетик: считаются отдельной строкой ('alcohol' | 'energy')
+  final String? x;
   final Item? swap;
   const Item({
     required this.n,
     required this.p,
     required this.s,
+    this.t = 0,
+    this.f = 0,
+    this.k = 0,
     this.junk = false,
+    this.x,
     this.swap,
   });
+
+  /// Значение показателя у позиции.
+  num valueOf(MetricId m) => switch (m) {
+    MetricId.sugar => s,
+    MetricId.salt => t,
+    MetricId.fat => f,
+    MetricId.kcal => k,
+  };
 
   Map<String, dynamic> toJson() => {
     'n': n,
     'p': p,
     's': s,
+    if (t != 0) 't': t,
+    if (f != 0) 'f': f,
+    if (k != 0) 'k': k,
     if (junk) 'junk': 1,
+    if (x != null) 'x': x,
     if (swap != null) 'swap': swap!.toJson(),
   };
 
@@ -27,13 +49,19 @@ class Item {
   factory Item.fromJson(Object? j) {
     if (j is! Map) throw const FormatException('item');
     final n = j['n'], p = j['p'], s = j['s'];
-    if (n is! String || n.isEmpty || p is! num || s is! num || p < 0 || s < 0)
+    if (n is! String || n.isEmpty || p is! num || s is! num || p < 0 || s < 0) {
       throw const FormatException('item');
+    }
+    num opt(Object? v) => v is num && v >= 0 ? v : 0;
     return Item(
       n: n,
       p: p,
       s: s,
+      t: opt(j['t']),
+      f: opt(j['f']),
+      k: opt(j['k']),
       junk: j['junk'] == 1 || j['junk'] == true,
+      x: j['x'] == 'alcohol' || j['x'] == 'energy' ? j['x'] as String : null,
       swap: j['swap'] == null ? null : Item.fromJson(j['swap']),
     );
   }
@@ -109,6 +137,16 @@ class Analysis {
   final num total, sugar, junk;
   final int cubes, junkCount, score;
   final double share, days;
+
+  /// всего по каждому показателю: сахар, соль, жиры — г, калории — ккал
+  final Map<MetricId, double> totals;
+
+  /// кубиков по каждому показателю (размер кубика у каждого свой)
+  final Map<MetricId, int> cubesBy;
+
+  /// алкоголь и энергетики: сколько позиций и на какую сумму, ₸
+  final int flaggedCount;
+  final num flaggedSum, alcoholSum, energySum;
   const Analysis({
     required this.items,
     required this.total,
@@ -119,6 +157,12 @@ class Analysis {
     required this.share,
     required this.score,
     required this.days,
+    required this.totals,
+    required this.cubesBy,
+    required this.flaggedCount,
+    required this.flaggedSum,
+    required this.alcoholSum,
+    required this.energySum,
   });
 }
 

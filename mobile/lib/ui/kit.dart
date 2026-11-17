@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/engine.dart';
 import '../core/models.dart';
 
 // ── Токены (те же, что в web/src/app/globals.css) ──
@@ -697,5 +698,101 @@ class _ToastHostState extends State<ToastHost> {
         },
       ),
     ],
+  );
+}
+
+/// Переключатель показателей: Сахар · Соль · Жиры · Калории. [light] — для белой карточки.
+class MetricTabs extends StatelessWidget {
+  final MetricId value;
+  final ValueChanged<MetricId> onChange;
+  final bool light;
+  const MetricTabs({
+    super.key,
+    required this.value,
+    required this.onChange,
+    this.light = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: light ? tint : Colors.white.withValues(alpha: .16),
+      borderRadius: BorderRadius.circular(28),
+      border: light
+          ? null
+          : Border.all(color: Colors.white.withValues(alpha: .22)),
+    ),
+    child: Row(
+      children: [
+        for (final m in metricIds)
+          Expanded(
+            child: Semantics(
+              selected: m == value,
+              button: true,
+              label: metrics[m]!.label,
+              child: Press(
+                scale: .95,
+                onTap: () => onChange(m),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: m == value ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: m == value
+                        ? [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF06126E,
+                              ).withValues(alpha: .35),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                              spreadRadius: -6,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Color(metrics[m]!.color),
+                          shape: BoxShape.circle,
+                          border: m == value
+                              ? null
+                              : Border.all(
+                                  color: Colors.white.withValues(alpha: .85),
+                                  width: 1.5,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          metrics[m]!.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: body(
+                            13,
+                            w: 800,
+                            color: m == value
+                                ? ink
+                                : (light ? mute : Colors.white),
+                            h: 1.1,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
   );
 }

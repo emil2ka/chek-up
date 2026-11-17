@@ -10,6 +10,7 @@ import '../core/store.dart';
 import '../ui/kit.dart';
 import '../ui/pile_hero.dart';
 import '../ui/share_card.dart';
+import 'prices_card.dart';
 import 'shell.dart';
 
 class ResultPage extends StatefulWidget {
@@ -28,9 +29,10 @@ class ResultPage extends StatefulWidget {
 
 class _ResultPageState extends State<ResultPage> {
   late Set<int> _on = widget.swaps.toSet();
-  late ResultModel _m = resultModel(widget.receipt, _on);
-  late final _rows = swapRows(widget.receipt);
-  late final _maxCubes = resultModel(widget.receipt, const []).maxCubes;
+  MetricId _metric = MetricId.sugar;
+  late ResultModel _m = resultModel(widget.receipt, _on, _metric);
+  List<SwapRow> get _rows => swapRows(widget.receipt, _metric);
+  int get _maxCubes => resultModel(widget.receipt, const [], _metric).maxCubes;
   bool _srcReady = false;
 
   @override
@@ -64,15 +66,21 @@ class _ResultPageState extends State<ResultPage> {
     setState(() {
       _on = {..._on};
       _on.contains(i) ? _on.remove(i) : _on.add(i);
-      _m = resultModel(widget.receipt, _on);
+      _m = resultModel(widget.receipt, _on, _metric);
     });
     _saveEntry();
   }
 
+  void _setMetric(MetricId m) => setState(() {
+    _metric = m;
+    _m = resultModel(widget.receipt, _on, m);
+  });
+
   void _share() {
     final a = _m.analysis;
     shareResult(
-      cubes: a.cubes,
+      metric: _metric,
+      cubesBy: a.cubesBy,
       score: a.score,
       where: '${widget.receipt.store} · ${dateRu(widget.receipt.date)}',
       text: _m.shareText,
@@ -80,9 +88,14 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   void _toList() {
+    // в список уходят все включённые замены, а не только видимые на этой вкладке
     final items = [
-      for (final r in _rows)
-        if (_on.contains(r.i)) ShopItem(name: r.to, instead: r.from),
+      for (final i in _on.toList()..sort())
+        if (widget.receipt.items[i].swap != null)
+          ShopItem(
+            name: widget.receipt.items[i].swap!.n,
+            instead: widget.receipt.items[i].n,
+          ),
     ];
     final n = store.addToShop(items);
     showToast(
@@ -94,7 +107,8 @@ class _ResultPageState extends State<ResultPage> {
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
     final a = _m.analysis;
-    final eq = equivalents(a.sugar);
+    final eq = equivalents(a.totals[_metric]!, _metric);
+    final mdef = metrics[_metric]!;
 
     return Scaffold(
       body: DecoratedBox(
@@ -106,8 +120,10 @@ class _ResultPageState extends State<ResultPage> {
                 PileHero(
                   height: max(440.0, box.maxHeight * .62),
                   kick: 'В твоём чеке',
-                  target: a.cubes,
+                  target: a.cubesBy[_metric]!,
                   maxCubes: _maxCubes,
+                  metric: _metric,
+                  onMetric: _setMetric,
                   bar: Row(
                     children: [
                       BarButton(
@@ -157,7 +173,7 @@ class _ResultPageState extends State<ResultPage> {
                       const SecTitle('Замени — и кубики исчезнут'),
                       if (_rows.isEmpty)
                         _empty(
-                          'Заменять нечего — в этом чеке нет сладких позиций с понятной заменой.',
+                          'На этой вкладке заменять нечего: в чеке нет позиций с ${mdef.of} и понятной заменой.',
                         )
                       else
                         for (final r in _rows)
@@ -268,7 +284,9 @@ class _ResultPageState extends State<ResultPage> {
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 220),
                           child: Row(
-                            key: ValueKey(a.sugar),
+                            key: ValueKey(
+                              '${_metric.name}${a.totals[_metric]}',
+                            ),
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               for (final (i, e) in eq.indexed) ...[
@@ -281,12 +299,21 @@ class _ResultPageState extends State<ResultPage> {
                       ],
                       // ── источники ──
                       const SizedBox(height: 30),
-                      const SecTitle('Откуда сахар'),
+                      SecTitle('Откуда ${mdef.label.toLowerCase()}'),
                       if (_m.sources.isEmpty)
-                        _empty('Добавленного сахара в чеке нет.')
+                        _empty('${mdef.label} в чеке не нашлись.')
                       else
                         for (final s in _m.sources) _source(s),
                       // ── вредное ──
+                      // ── цена вреда ──
+                      const SizedBox(height: 22),
+                      const SecTitle('Цена вреда'),
+                      if (_m.harm.cubes == 0)
+                        _empty(
+                          'Продуктов с заметным количеством ${mdef.of} в чеке нет — платить за вред не пришлось.',
+                        )
+                      else
+                        _harm(_m.harm, mdef),
                       const SizedBox(height: 22),
                       const SecTitle('На вредное'),
                       Container(
@@ -349,6 +376,15 @@ class _ResultPageState extends State<ResultPage> {
                           ],
                         ),
                       ),
+                      if (_m.flagged.isNotEmpty) ...[
+                        const SizedBox(height: 22),
+                        const SecTitle('Алкоголь и энергетики'),
+                        _flagged(_m, a),
+                      ],
+                      // ── где дешевле ──
+                      const SizedBox(height: 22),
+                      const SecTitle('Где дешевле'),
+                      PricesCard(receipt: widget.receipt),
                       const SizedBox(height: 26),
                       Press(
                         onTap: () => openCamera(context),
@@ -412,7 +448,7 @@ class _ResultPageState extends State<ResultPage> {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        '1 кубик = $cubeG г сахара. Норма ВОЗ — до $dailyG г добавленного сахара в день. Оценка примерная и не заменяет консультацию врача.',
+                        'Кубик у каждого показателя свой: ${metricIds.map(cubeLabel).join(', ')}. Норма взрослого — около 10 кубиков в день по каждому (ориентир ВОЗ; сахар — до $dailyG г). Оценка примерная и не заменяет консультацию врача.',
                         style: body(12, color: mute, h: 1.5),
                       ),
                     ],
@@ -422,6 +458,93 @@ class _ResultPageState extends State<ResultPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _harm(HarmPrice h, MetricDef mdef) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(money(h.perCube), style: disp(34, ls: -.04)),
+            Text('за кубик ${mdef.of}', style: body(15, color: mute)),
+            const SizedBox(height: 8),
+            Text(
+              'На эти покупки ушло ${money(h.spend)}, в них ${h.cubes} ${pl(h.cubes, cubesF)} ${mdef.of}.',
+              style: body(14, color: mute, h: 1.4),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      for (final t in h.top)
+        Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: tint,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(child: Text(t.name, style: body(14, h: 1.3))),
+              const SizedBox(width: 12),
+              Text(money(t.price), style: disp(14, w: 800, ls: -.02)),
+              const SizedBox(width: 6),
+              Text('${t.cubes} куб.', style: body(13, w: 700, color: mute)),
+            ],
+          ),
+        ),
+    ],
+  );
+
+  Widget _flagged(ResultModel m, Analysis a) {
+    final share = a.total > 0 ? (a.flaggedSum / a.total * 100).round() : 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bad.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(money(a.flaggedSum), style: disp(30, ls: -.04)),
+              ),
+              Text('$share% чека', style: disp(15, w: 800, color: bad, ls: 0)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final l in m.flagged)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${l.kind == 'alcohol' ? 'Алкоголь' : 'Энергетик'} · ${l.name}'
+                          .replaceFirst(
+                            RegExp(r'^Энергетик · (?=Энергетик)'),
+                            '',
+                          ),
+                      style: body(14, h: 1.35),
+                    ),
+                  ),
+                  Text(money(l.price), style: disp(14, w: 800, ls: -.02)),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -562,6 +685,12 @@ class _ResultPageState extends State<ResultPage> {
           child: Icon(
             switch (e.icon) {
               'can' => Icons.local_drink_rounded,
+              'day' => Icons.calendar_month_rounded,
+              'chips' => Icons.fastfood_rounded,
+              'butter' => Icons.bakery_dining_rounded,
+              'burger' => Icons.lunch_dining_rounded,
+              'run' => Icons.directions_run_rounded,
+              'choc' => Icons.cookie_rounded,
               'walk' => Icons.directions_walk_rounded,
               _ => Icons.soup_kitchen_rounded,
             },
@@ -601,7 +730,7 @@ class _ResultPageState extends State<ResultPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(s.grams, style: disp(14, w: 800, ls: -.02)),
+              Text(s.amount, style: disp(14, w: 800, ls: -.02)),
               const SizedBox(width: 6),
               Text(s.cubes, style: body(13, w: 700, color: mute)),
             ],

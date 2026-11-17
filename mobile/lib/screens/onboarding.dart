@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
 
@@ -21,7 +22,10 @@ class _OnboardingState extends State<Onboarding> {
     final mq = MediaQuery.of(context);
     final p = store.profile;
     final last = _step == _steps - 1;
-    final norm = dailyG ~/ cubeG, cola = (106 / cubeG).round();
+    const norm =
+        10; // норма взрослого у каждого показателя — около 10 кубиков в день
+    final cola = (106 / cubeG).round(),
+        sausage = (8.8 / metrics[MetricId.salt]!.cubeG).round();
     final h1 = disp(
       (mq.size.width.clamp(0, 430) * .104).clamp(32.0, 44.0),
       color: Colors.white,
@@ -66,7 +70,7 @@ class _OnboardingState extends State<Onboarding> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Сфоткай чек из магазина — покажем, сколько в корзине добавленного сахара, и подскажем, что заменить.',
+            'Сфоткай чек из магазина — покажем, сколько в корзине сахара, соли, насыщенных жиров и калорий и сколько на это ушло денег. И подскажем, что заменить.',
             style: sub,
           ),
         ],
@@ -95,14 +99,13 @@ class _OnboardingState extends State<Onboarding> {
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('1 кубик — это ', style: h1),
-              Hl('$cubeG г', h1),
-              Text(' сахара', style: h1),
+              Text('Всё считаем ', style: h1),
+              Hl('кубиками', h1),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'Норма взрослого — до $norm ${pl(norm, cubesF)} в день. В одном литре колы их $cola.',
+            'Кубик у каждого показателя свой: 5 г сахара, 0,5 г соли, 2 г жиров или 200 ккал. Норма взрослого — около $norm ${pl(norm, cubesF)} каждого в день. В литре колы $cola кубиков сахара, в докторской колбасе на 400 г — $sausage кубиков соли.',
             style: sub,
           ),
         ],
@@ -128,7 +131,8 @@ class _OnboardingState extends State<Onboarding> {
           StepperRow(
             glass: true,
             label: 'Взрослые',
-            hint: 'до $adultG г в день',
+            hint:
+                'до ${metrics[MetricId.sugar]!.adult.round()} г сахара и ${metrics[MetricId.salt]!.adult.round()} г соли в день',
             value: p.adults,
             min: 1,
             max: maxAdults,
@@ -138,7 +142,8 @@ class _OnboardingState extends State<Onboarding> {
           StepperRow(
             glass: true,
             label: 'Дети',
-            hint: 'до $kidG г в день',
+            hint:
+                'до ${metrics[MetricId.sugar]!.kid.round()} г сахара и ${metrics[MetricId.salt]!.kid.round()} г соли в день',
             value: p.kids,
             min: 0,
             max: maxKids,
@@ -153,7 +158,9 @@ class _OnboardingState extends State<Onboarding> {
                   text: '${familyDailyCubes(p)}',
                   style: disp(20, color: Colors.white, h: 1.3),
                 ),
-                TextSpan(text: ' ${pl(familyDailyCubes(p), cubesF)} в день'),
+                TextSpan(
+                  text: ' ${pl(familyDailyCubes(p), cubesF)} сахара в день',
+                ),
               ],
             ),
             style: body(16, color: Colors.white.withValues(alpha: .92)),

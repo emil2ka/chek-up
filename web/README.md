@@ -18,6 +18,7 @@ pnpm dev                           # http://localhost:3000
 | `POST /api/auth/anonymous` | новый анонимный аккаунт и токен устройства |
 | `POST /api/auth/link` · `POST /api/auth/link/redeem` | код на 10 минут, чтобы войти в тот же аккаунт с другого устройства |
 | `GET/POST /api/sync` | чеки, профиль, список покупок: слияние «последний записал — прав», удаления «надгробиями» |
+| `POST /api/prices/compare` | где позиции чека дешевле в других магазинах (медианы по чекам пользователей за 90 дней) |
 | `GET /api/health` | жив ли сервер и БД |
 
 Контракт обмена — `src/lib/syncSchema.ts` (зеркало на Dart — `mobile/lib/core/store.dart`).
@@ -33,7 +34,7 @@ pnpm dev                           # http://localhost:3000
 ## Проверки
 
 ```bash
-pnpm test          # расчёты, распознавание, слияние и интеграционный тест на настоящем Postgres (PGlite в памяти)
+pnpm test          # расчёты, распознавание, слияние, сравнение цен и интеграционные тесты на настоящем Postgres (PGlite в памяти)
 pnpm exec next typegen && npx tsc --noEmit   # типы маршрутов Next генерирует typegen
 pnpm lint
 ```

@@ -17,10 +17,10 @@ import 'shell.dart';
 const _duration =
     2600; // мс — минимум; настоящее распознавание может идти дольше
 const _wait = [
-  'Ищу сладкие позиции',
+  'Ищу сладкое, солёное и жирное',
   'Разбираю сокращения кассы',
   'Сверяю со справочником',
-  'Считаю сахар по позициям',
+  'Считаю сахар, соль и жиры',
 ];
 const _lines = [.92, .64, .80, .48, .86, .70, .58, .90, .44, .76, .66, .84];
 
@@ -74,7 +74,22 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       if (!mounted) return;
       setState(() => _found = r);
       final a = analyze(r);
-      final sweet = a.items.where((it) => it.active.s > 0).toList();
+      // позиции, где чего-то хотя бы кубик; для каждой показываем самый выраженный показатель
+      const scanned = [MetricId.sugar, MetricId.salt, MetricId.fat];
+      ({MetricId m, num v, int c}) worst(AnalyzedItem it) {
+        final list = [
+          for (final m in scanned)
+            (
+              m: m,
+              v: it.active.valueOf(m),
+              c: cubesOfValue(it.active.valueOf(m), m),
+            ),
+        ]..sort((x, y) => y.c.compareTo(x.c));
+        return list.first;
+      }
+
+      final sweet = a.items.where((it) => worst(it).c >= 1).toList();
+      final all = scanned.fold<int>(0, (sum, m) => sum + a.cubesBy[m]!);
       final startAt = max(150, since());
       // если ответ пришёл поздно, всё равно даём позициям время, чтобы их успели прочитать
       final span = max(
@@ -86,8 +101,13 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
         _later(startAt - since() + (k * step).round(), () {
           tick();
           setState(() {
-            _tick = (k, it.active.n, '${it.active.s} г сахара');
-            _count = (a.cubes * (k + 1) / sweet.length).round();
+            final w = worst(it);
+            _tick = (
+              k,
+              it.active.n,
+              '${amountTxt(w.v, w.m)} ${metrics[w.m]!.of}',
+            );
+            _count = (all * (k + 1) / sweet.length).round();
           });
         });
       }
@@ -476,7 +496,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 6),
               Text(
-                '${pl(_count, cubesF)} сахара найдено',
+                '${pl(_count, cubesF)} сахара, соли и жиров найдено',
                 style: body(
                   14,
                   w: 700,

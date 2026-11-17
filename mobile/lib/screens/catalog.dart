@@ -1,4 +1,4 @@
-// «Продукты»: справочник «Сколько сахара в…» с поиском, разделами и проверкой по штрихкоду.
+// «Продукты»: справочник «Что внутри» с поиском, разделами, выбором показателя и проверкой по штрихкоду.
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -21,6 +21,7 @@ class CatalogScreen extends StatefulWidget {
 class _CatalogScreenState extends State<CatalogScreen> {
   final _q = TextEditingController();
   String _cat = 'all';
+  MetricId _metric = MetricId.sugar;
   String? _open;
 
   @override
@@ -32,7 +33,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    final items = searchCatalog(_q.text, _cat);
+    final items = searchCatalog(_q.text, _cat, _metric);
+    final mdef = metrics[_metric]!;
     final h1 = disp(
       (mq.size.width.clamp(0, 430) * .094).clamp(30.0, 38.0),
       color: Colors.white,
@@ -53,18 +55,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Rise(child: Text('Сколько сахара', style: h1)),
+                      Rise(child: Text('Что внутри', style: h1)),
                       Rise(
                         delay: 60,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Row(
-                            children: [
-                              Text('в ', style: h1),
-                              Hl('продуктах', h1),
-                            ],
-                          ),
+                          child: Row(children: [Hl('продуктов', h1)]),
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -211,6 +208,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: MetricTabs(
+                    value: _metric,
+                    onChange: (m) => setState(() {
+                      _metric = m;
+                      _open = null;
+                    }),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 ConstrainedBox(
                   constraints: BoxConstraints(
@@ -229,7 +237,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
                           child: Text(
-                            '${items.length} ${pl(items.length, productsF)} · сначала самые сладкие',
+                            '${items.length} ${pl(items.length, productsF)} · ${const {MetricId.sugar: 'сначала самые сладкие', MetricId.salt: 'сначала самые солёные', MetricId.fat: 'сначала самые жирные', MetricId.kcal: 'сначала самые калорийные'}[_metric]}',
                             style: body(13, w: 700, color: mute),
                           ),
                         ),
@@ -261,7 +269,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            'Значения примерные, по типичным товарам в магазинах. 1 кубик = $cubeG г сахара, норма взрослого — до $dailyG г в день.',
+                            'Значения примерные, по типичным товарам в магазинах. 1 кубик ${mdef.of} = ${cubeLabel(_metric)}. Норма: ${mdef.norm}.',
                             style: body(12, color: mute, h: 1.5),
                           ),
                         ),
@@ -278,7 +286,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   Widget _row(CatalogItem it) {
-    final cubes = cubesOf(it.g), open = _open == it.id;
+    final val = it.valueOf(_metric), mdef = metrics[_metric]!;
+    final cubes = cubesOfValue(val, _metric), open = _open == it.id;
     final cells = min(cubes, _strip);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -338,7 +347,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                             const ToneDot(Tone.good),
                             const SizedBox(width: 8),
                             Text(
-                              it.g > 0 ? 'почти нет' : 'без сахара',
+                              val > 0 ? 'почти нет' : 'без ${mdef.of}',
                               style: body(13, w: 800, color: good),
                             ),
                           ],
@@ -358,7 +367,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           width: 11,
                           height: 11,
                           decoration: BoxDecoration(
-                            color: blue1,
+                            color: Color(mdef.color),
                             borderRadius: BorderRadius.circular(3),
                             border: const Border(
                               right: BorderSide(
@@ -386,9 +395,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 if (open) ...[
                   const SizedBox(height: 12),
                   Text(
-                    it.g > 0
-                        ? 'Около ${it.g} г добавленного сахара — это ${(it.g / dailyG * 100).round()}% дневной нормы взрослого.'
-                        : 'Добавленного сахара нет. Можно не считать.',
+                    val > 0
+                        ? 'В порции около ${amountTxt(val, _metric)} ${_metric == MetricId.sugar ? 'добавленного сахара' : mdef.of} — это ${(val / mdef.adult * 100).round()}% дневной нормы взрослого.'
+                        : '${_metric == MetricId.sugar ? 'Добавленного сахара' : mdef.label} здесь нет. Можно не считать.',
                     style: body(15),
                   ),
                   if (it.swap != null)

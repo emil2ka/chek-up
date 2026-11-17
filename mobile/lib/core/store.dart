@@ -432,6 +432,40 @@ class AppStore extends ChangeNotifier {
     _checkBadges();
   }
 
+  // ── сравнение цен ──
+  /// Где позиции этого чека дешевле в других магазинах (по чекам пользователей «Чек-апа»); null — сервер недоступен.
+  Future<PriceCompare?> priceOffers(Receipt r) async {
+    if (!syncEnabled) return null;
+    try {
+      var auth = _auth ?? await _register();
+      final body = {
+        'store': r.store,
+        'items': [
+          for (final i in r.items) {'n': i.n, 'p': i.p},
+        ],
+      };
+      Map<String, dynamic> res;
+      try {
+        res = await Api.post(
+          '/api/prices/compare',
+          token: auth.token,
+          body: body,
+        );
+      } on ApiException catch (e) {
+        if (e.status != 401) rethrow;
+        auth = await _register();
+        res = await Api.post(
+          '/api/prices/compare',
+          token: auth.token,
+          body: body,
+        );
+      }
+      return PriceCompare.fromJson(res);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── связывание устройств ──
   /// Короткий код для входа в этот аккаунт с другого устройства (живёт 10 минут).
   Future<String> linkCode() async {
@@ -453,3 +487,42 @@ class AppStore extends ChangeNotifier {
 }
 
 final store = AppStore();
+
+/// Одно предложение «где дешевле»: позиция из чека и цена за кг/л здесь и в другом магазине.
+class PriceOffer {
+  final String name, unit, store;
+  final int yourPrice, bestPrice, n, saving;
+  const PriceOffer(
+    this.name,
+    this.unit,
+    this.store,
+    this.yourPrice,
+    this.bestPrice,
+    this.n,
+    this.saving,
+  );
+}
+
+class PriceCompare {
+  final List<PriceOffer> offers;
+  final int total, compared;
+  const PriceCompare(this.offers, this.total, this.compared);
+
+  factory PriceCompare.fromJson(Map<String, dynamic> j) => PriceCompare(
+    [
+      for (final o in (j['offers'] as List? ?? const []))
+        if (o is Map)
+          PriceOffer(
+            '${o['name']}',
+            '${o['unit']}',
+            '${o['store']}',
+            (o['yourPrice'] as num).round(),
+            (o['bestPrice'] as num).round(),
+            (o['n'] as num).round(),
+            (o['saving'] as num).round(),
+          ),
+    ],
+    (j['total'] as num? ?? 0).round(),
+    (j['compared'] as num? ?? 0).round(),
+  );
+}

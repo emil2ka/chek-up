@@ -23,6 +23,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # LayoutProps и другие глобальные типы Next генерирует он сам; на чистом чекауте их ещё нет
+      - run: pnpm exec next typegen
       - run: npx tsc --noEmit
       - run: pnpm lint
       - run: pnpm test

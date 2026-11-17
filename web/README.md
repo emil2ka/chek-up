@@ -34,6 +34,6 @@ pnpm dev                           # http://localhost:3000
 
 ```bash
 pnpm test          # расчёты, распознавание, слияние и интеграционный тест на настоящем Postgres (PGlite в памяти)
-npx tsc --noEmit
+pnpm exec next typegen && npx tsc --noEmit   # типы маршрутов Next генерирует typegen
 pnpm lint
 ```

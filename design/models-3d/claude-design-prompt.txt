@@ -1,0 +1,27 @@
+Project: "Чек-ап: сахар 3D" — a batch of small, juicy 3D models of sugar and sweets for a mobile web app. In the app, a pile of 8–192 of these objects falls with real physics onto a white card under a big number on a saturated blue gradient background (#1238F5 → #3F6BFF → #86A8FF). Each object is drawn SMALL on screen (30–50 px), so silhouettes must read instantly and surfaces must look sugary and appetizing, not plastic.
+
+Make ALL of these models in this one request (one GLB per model), in one consistent style:
+1. sugar_cube — classic white refined sugar cube, slightly rounded edges/corners (small bevel), granular crystalline surface.
+2. sugar_cube_chipped — same white cube with one corner chipped off (irregular fracture facet), a few loose crystals on the chip.
+3. cane_cube — brown cane sugar cube (warm amber-brown, #B9773A-ish), a little rougher, slightly irregular.
+4. sugar_lump — irregular hand-broken lump of white sugar (chunky, faceted, like a piece of a sugar loaf).
+5. nabat_crystal — nabat / navat (Central Asian crystal sugar): a cluster of large translucent golden-white crystals with sharp facets, like rock candy.
+6. crystal_cluster — small cluster of tiny white sugar crystals on a little base, sparkly.
+7. sugar_tablet — pressed sugar "tablet": a rounded square/rect tablet with a soft pillow shape and a subtle embossed line.
+8. sugar_loaf — sugar loaf: a white cone with a rounded tip and flat base.
+9. lollipop — round swirl lollipop (white + blue swirl, short white stick).
+10. wrapped_candy — classic candy in a twisted wrapper (glossy blue/white wrapper with two twisted ends).
+11. marshmallow — soft white/pink cylinder marshmallow (zefir-like), matte, powdered.
+12. chocolate_piece — one piece of a chocolate bar (square segment with bevel), milk chocolate brown, slightly glossy.
+You may add 1–3 more if they look great in this style (e.g. sugar cube with a bite, cube dusted with powdered sugar) — name them clearly.
+
+Hard technical requirements for EVERY model (they will be loaded with three.js GLTFLoader and drawn with InstancedMesh, ~192 instances on a phone):
+- Format: binary glTF 2.0 (.glb), ONE mesh per file if possible (merge parts; separate primitives per material are OK), no animations, no cameras/lights, no skins.
+- Pivot/center at the origin (center of the bounding box), Y axis up, size ≈ 1 unit (longest side of the bounding box = 1.0).
+- Budget: ≤ 1500 triangles per model, file ≤ 150 KB.
+- Materials: PBR metallic-roughness, NO external texture files. Prefer vertex colors + material factors; if a texture is essential, embed a tiny one (≤ 128×128) inside the GLB. Give sugar a slightly translucent-looking feel via color (very light blue-white shading), roughness ~0.6–0.8; candies glossier (roughness ~0.25–0.35).
+- Granular sugar look: bake it into vertex colors / small geometric bevels, not into heavy geometry.
+- Normals included, smooth-shaded where rounded, flat on crisp facets.
+
+Deliverable: ONE showcase page "Sugar Models.html" that shows all models in a grid (each with a slowly rotating three.js preview on a blue background, the model name, triangle count and file size in KB). For EACH model put a button "COPY GLB · BASE64" that copies the raw GLB as base64 text to the clipboard using a hidden <textarea> + document.execCommand('copy') (downloads do not work for me, copying does). Also add one button at the top "COPY ALL · JSON" that copies a JSON object { "<name>": "<base64 glb>", ... } with every model.
+Build the GLBs procedurally in the page's JavaScript (three.js geometry + GLTFExporter with binary: true) so the exported bytes match what is shown, and make sure each export obeys the budget above. Please write the file in parts if it is long.

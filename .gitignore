@@ -1,0 +1,19 @@
+# зависимости и сборка
+node_modules/
+.next/
+build/
+.dart_tool/
+.pub-cache/
+coverage/
+
+# локальная БД и секреты (шаблоны *.example остаются)
+.data/
+.env*
+!.env*.example
+
+# мусор системы и редакторов
+.DS_Store
+*.log
+*.iml
+.idea/
+.vscode/

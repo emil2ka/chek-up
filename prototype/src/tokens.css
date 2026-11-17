@@ -1,0 +1,20 @@
+/* Общие токены стиля «Гора сахара». Файл общий: его не меняют, только используют. */
+:root {
+  --blue-1: #1238F5;
+  --blue-2: #3F6BFF;
+  --blue-3: #86A8FF;
+  --sky: linear-gradient(180deg, #1238F5, #3F6BFF 55%, #86A8FF);
+  --ink: #0D1440;
+  --mute: #6B76A8;
+  --line: #E3E8F8;
+  --tint: #EEF2FF;
+  --white: #fff;
+  --good: #19B36B;
+  --mid: #F2A20C;
+  --bad: #F0433A;
+  --r-sheet: 30px;
+  --r-btn: 18px;
+  --shadow-sheet: 0 -14px 40px rgba(8, 20, 90, .35);
+  --font-d: 'Unbounded Variable', 'Unbounded', system-ui, sans-serif; /* цифры и заголовки */
+  --font-t: 'Manrope Variable', 'Manrope', system-ui, sans-serif;     /* текст и подписи */
+}

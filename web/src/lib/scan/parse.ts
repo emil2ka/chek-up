@@ -1,0 +1,90 @@
+// Разбор и проверка ответов модели. Модели иногда присылают JSON в ```-блоке, строками вместо чисел,
+// служебные строки чека и отрицательные суммы — всё это чистим здесь, а не в провайдерах.
+import { ScanError } from './errors';
+import { EnrichmentSchema, ExtractionSchema } from './model';
+
+export type Line = { name: string; qty: number; price: number };
+export type Extracted = { store: string; date: string; lines: Line[] };
+export type Estimate = { sugar: number; junk: boolean; swap: { n: string; p: number; s: number } | null };
+
+const MAX_LINES = 80;
+const MAX_PRICE = 10_000_000; // ₸ за строку — больше на кассе не бывает
+
+/** Служебные строки, которые модель иногда принимает за товар. */
+const SERVICE = /^(итог|итого|всего|сумма|ндс|ққс|сдача|наличные|наличными|оплата|оплачено|карта|картой|безналичн\p{L}*|скидка|скидки|бонус\p{L}*|округление|к оплате|получено|фискальн\p{L}*|кассир|смена|рнм|знм|бин|инн)(?![\p{L}\p{N}])/iu;
+
+/** Достать JSON из ответа: объект, строка с JSON или JSON внутри ```json … ```. */
+export function extractJson(raw: unknown): unknown {
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw !== 'string') throw new ScanError('unreadable', 'ответ модели не строка и не объект');
+  let t = raw.trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) throw new ScanError('unreadable', 'в ответе модели нет JSON');
+  try {
+    return JSON.parse(t.slice(a, b + 1));
+  } catch {
+    throw new ScanError('unreadable', 'ответ модели — битый JSON');
+  }
+}
+
+const cleanName = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 120);
+
+/** Шаг 1: ответ модели → позиции. Бросает ScanError: not_receipt, empty, unreadable. */
+export function parseExtraction(raw: unknown): Extracted {
+  const parsed = ExtractionSchema.safeParse(extractJson(raw));
+  if (!parsed.success) throw new ScanError('unreadable', 'ответ модели не по схеме');
+  const x = parsed.data;
+  if (!x.is_receipt) throw new ScanError('not_receipt');
+
+  const lines: Line[] = [];
+  for (const it of x.items) {
+    const name = cleanName(it.name);
+    const price = Math.round(it.price);
+    if (!name || SERVICE.test(name)) continue;
+    if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) continue; // скидки, возвраты, мусор
+    const qty = Number.isFinite(it.qty) && it.qty > 0 && it.qty < 1000 ? it.qty : 1;
+    lines.push({ name, qty, price });
+    if (lines.length >= MAX_LINES) break;
+  }
+  if (!lines.length) throw new ScanError('empty');
+
+  return { store: cleanName(x.store).slice(0, 60), date: normalizeDate(x.date), lines };
+}
+
+/** Шаг 2: ответ модели → оценки по номерам позиций. Мусор не валит чек — вернётся пустая карта. */
+export function parseEnrichment(raw: unknown, count: number): Map<number, Estimate> {
+  const out = new Map<number, Estimate>();
+  let data: unknown;
+  try { data = extractJson(raw); } catch { return out; }
+  const parsed = EnrichmentSchema.safeParse(data);
+  if (!parsed.success) return out;
+  for (const it of parsed.data.items) {
+    if (it.i < 0 || it.i >= count || out.has(it.i)) continue;
+    if (!Number.isFinite(it.sugar_g) || it.sugar_g < 0) continue;
+    const swapName = cleanName(it.swap_name);
+    const swapOk = swapName && Number.isFinite(it.swap_price) && it.swap_price > 0 && Number.isFinite(it.swap_sugar_g) && it.swap_sugar_g >= 0;
+    out.set(it.i, {
+      sugar: it.sugar_g,
+      junk: it.junk,
+      swap: swapOk ? { n: swapName, p: Math.round(it.swap_price), s: it.swap_sugar_g } : null,
+    });
+  }
+  return out;
+}
+
+/** «2026-11-16», «16.11.2026», «16.11.26» → YYYY-MM-DD; неизвестную или будущую дату — пустая строка. */
+export function normalizeDate(s: string, now = new Date()): string {
+  const t = s.trim();
+  let y: number, m: number, d: number;
+  let r = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (r) { y = +r[1]; m = +r[2]; d = +r[3]; }
+  else if ((r = t.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/))) {
+    d = +r[1]; m = +r[2]; y = +r[3]; if (y < 100) y += 2000;
+  } else return '';
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  if (dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d || y < 2015) return '';
+  if (dt.getTime() > now.getTime() + 36e5 * 36) return '';
+  return dt.toISOString().slice(0, 10);
+}

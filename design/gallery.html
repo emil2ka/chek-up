@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Чек-ап — 8 стилей</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Dela+Gothic+One&family=Manrope:wght@400;600;700;800&family=Neucha&family=Press+Start+2P&family=Unbounded:wght@300;500;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{background:#0E0E11}
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;border:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+ul{list-style:none;margin:0;padding:0} p,h2,h3{margin:0}
+.wrap{max-width:430px;margin:0 auto;padding-top:52px}
+#nav{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:50;width:100%;max-width:430px;height:52px;display:flex;gap:6px;align-items:center;padding:0 10px;overflow-x:auto;background:#0E0E11;scrollbar-width:none}
+#nav::-webkit-scrollbar{display:none}
+#nav button{flex:none;height:36px;padding:0 13px;border-radius:99px;background:#22222A;color:#C9C9D2;font-weight:700;font-size:13px;white-space:nowrap}
+#nav button[aria-current="true"]{background:#fff;color:#0E0E11}
+.v{display:none;position:relative;overflow:hidden;min-height:calc(100dvh - 52px)}
+.v.on{display:block}
+.fix{height:calc(100dvh - 52px);min-height:700px}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+@keyframes pop{from{transform:scale(.4);opacity:0}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═════ 1 · ПЛАКАТ ═════ */
+.v1{background:#F3EDE0;color:#2A50D8;padding:0 16px 30px}
+.v1::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:multiply;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E")}
+.v1 header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid;padding:12px 0 8px;font-weight:800;font-size:11.5px;letter-spacing:.06em}
+.v1 header b{font:400 17px 'Dela Gothic One'}
+.v1-hero{position:relative;height:262px}
+.v1-dots{position:absolute;right:-56px;top:8px;width:250px;height:250px;border-radius:50%;background:radial-gradient(#FF4A5A 33%,transparent 36%) 0 0/9px 9px;animation:pop .7s both cubic-bezier(.2,1.3,.4,1)}
+.v1-num i{position:absolute;left:-8px;top:24px;font:400 196px/.9 'Dela Gothic One';letter-spacing:-.05em;animation:up .6s both cubic-bezier(.2,.9,.3,1)}
+.v1-num i:first-child{color:#FF4A5A;transform:translate(8px,6px);animation-delay:.08s}
+.v1-of{position:absolute;left:2px;bottom:0;font-weight:800;font-size:14px;letter-spacing:.1em}
+.v1-stamp{position:absolute;right:2px;bottom:2px;width:132px;height:132px;border-radius:50%;border:4px solid #FF4A5A;outline:2px solid #FF4A5A;outline-offset:3px;color:#FF4A5A;background:rgba(243,237,224,.72);display:grid;place-content:center;text-align:center;font-weight:800;font-size:12px;line-height:1.2;letter-spacing:.1em;transform:rotate(12deg);animation:v1st .45s .75s both cubic-bezier(.2,1.5,.4,1)}
+.v1-stamp span{display:block;font:400 48px/1 'Dela Gothic One';letter-spacing:0}
+@keyframes v1st{from{transform:rotate(-10deg) scale(2.4);opacity:0}}
+.v1 h2{font:400 21px/1.3 'Dela Gothic One';margin:20px 0 16px}
+.v1 mark{background:linear-gradient(transparent 10%,#FFE14A 10% 90%,transparent 90%);color:inherit;padding:0 7px;display:inline-block;transform:rotate(-1.5deg)}
+.v1-blue{position:relative;background:#2A50D8;color:#F3EDE0;padding:14px 16px 16px;box-shadow:7px 7px 0 #FF4A5A}
+.v1-blue b{display:block;font:400 46px/1.1 'Dela Gothic One'}
+.v1-blue small{font-weight:700;font-size:13px}
+.v1-bar{height:16px;margin:9px 0;border:2px solid #F3EDE0;background:repeating-linear-gradient(-45deg,transparent 0 5px,rgba(243,237,224,.4) 5px 7px)}
+.v1-bar i{display:block;height:100%;width:35%;background:#FFE14A;transform-origin:left;animation:grow .9s .5s both ease-out}
+.v1-sw{margin-top:26px;border-top:3px solid}
+.v1-sw li{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:2px dashed;font-weight:800;font-size:16px}
+.v1-sw b{font:400 16px 'Dela Gothic One';color:#FF4A5A}
+.v1-note{font:700 36px/1 'Caveat';color:#FF4A5A;transform:rotate(-5deg);text-align:right;margin:10px 4px 6px 0}
+.v1-cta{position:relative;width:100%;height:60px;background:#FF4A5A;color:#F3EDE0;font:400 17px 'Dela Gothic One';box-shadow:7px 7px 0 #2A50D8;transition:transform .1s,box-shadow .1s}
+.v1-cta:active{transform:translate(7px,7px);box-shadow:0 0 0 #2A50D8}
+
+/* ═════ 2 · СТОРИС ═════ */
+.v2{font-family:'Unbounded';cursor:pointer;user-select:none}
+.v2-prog{position:absolute;z-index:5;top:12px;left:12px;right:12px;display:flex;gap:5px}
+.v2-prog i{flex:1;height:4px;border-radius:9px;background:rgba(255,255,255,.35);overflow:hidden}
+.v2-prog i::after{content:"";display:block;height:100%;background:#fff;transform:scaleX(0);transform-origin:left}
+.v2-prog i.done::after{transform:none}
+.v2-prog i.cur::after{animation:grow 4s linear both}
+.v2-s{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;padding:60px 22px 64px;overflow:hidden}
+.v2-s.cur{display:flex}
+.v2-s>*{position:relative}
+.v2-s.cur>p,.v2-s.cur>ul,.v2-s.cur>button{animation:up .7s both cubic-bezier(.16,.9,.2,1)}
+.v2-s.cur>:nth-child(n+3){animation-delay:.12s}.v2-s.cur>:nth-child(n+4){animation-delay:.26s}.v2-s.cur>:nth-child(n+5){animation-delay:.4s}
+.v2 .k{font-weight:700;font-size:25px;line-height:1.15;letter-spacing:-.02em}
+.v2 .n{font-weight:900;font-size:212px;line-height:.86;letter-spacing:-.07em;margin:10px 0 10px -10px}
+.v2 .k2{font-weight:500;font-size:19px;line-height:1.3}
+.v2 .sh{position:absolute;pointer-events:none}
+.s1{background:#FF3D8B;color:#0D0D0D}
+.s1 .a{right:-70px;top:40px;width:240px;height:240px;background:#C6FF3D;animation:spin 18s linear infinite}
+.s1 .b{left:-60px;bottom:-60px;width:210px;height:210px;border-radius:50%;background:#2B2BFF}
+.s2{background:#2B2BFF;color:#fff}.s2 .n{color:#FFE600}
+.s2 .a{right:-90px;top:-90px;width:300px;height:300px;border-radius:50%;border:44px solid #FF3D8B}
+.v2-cubes{display:grid;grid-template-columns:repeat(13,1fr);gap:5px;margin-top:22px}
+.v2-cubes i{aspect-ratio:1;background:#fff;border-radius:4px;animation:pop .35s both cubic-bezier(.2,1.6,.4,1)}
+.s3{background:#C6FF3D;color:#0D0D0D}.s3 .n{font-size:86px;line-height:1;letter-spacing:-.05em;margin-left:-4px}
+.s3 .a{right:-50px;bottom:60px;width:230px;height:230px;border-radius:50%;background:conic-gradient(#0D0D0D 0 35%,#FF3D8B 35%);animation:pop .8s .2s both cubic-bezier(.2,1.3,.4,1)}
+.s3 .b{left:-40px;top:-40px;width:150px;height:150px;background:#2B2BFF;animation:spin 14s linear infinite reverse}
+.s4{background:#0D0D0D;color:#fff}
+.s4 .n{background:linear-gradient(100deg,#FF3D8B,#FFE600 60%,#C6FF3D);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:14px}
+.s4 ul{font:700 16px/1.3 'Manrope';margin-top:6px}
+.s4 li{display:flex;justify-content:space-between;padding:11px 0;border-top:1px solid #33333a}
+.s4 li b{color:#C6FF3D}
+.s4 button{margin-top:18px;height:58px;border-radius:99px;background:#fff;color:#0D0D0D;font-weight:700;font-size:16px}
+.v2-foot{position:absolute;z-index:5;left:0;right:0;bottom:18px;text-align:center;font:700 12px 'Manrope';letter-spacing:.08em;text-transform:uppercase;mix-blend-mode:difference;color:#fff;opacity:.8}
+
+/* ═════ 3 · АРКАДА ═════ */
+.v3{background:#0B0620;color:#fff;font:10px/1.9 'Press Start 2P',monospace;padding:20px 16px 28px;text-align:center}
+.v3>*{position:relative;z-index:2}
+.v3-floor{position:absolute!important;z-index:0!important;left:-50%;right:-50%;bottom:0;height:46%;transform:perspective(260px) rotateX(62deg);transform-origin:bottom;background:linear-gradient(#FF2BD6 2px,transparent 2px) 0 0/40px 40px,linear-gradient(90deg,#FF2BD6 2px,transparent 2px) 0 0/40px 40px;opacity:.5;animation:v3f 1s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 70%);mask-image:linear-gradient(transparent,#000 70%)}
+@keyframes v3f{to{background-position:0 40px,0 40px}}
+.v3::after{content:"";position:absolute;inset:0;z-index:9;pointer-events:none;background:repeating-linear-gradient(transparent 0 2px,rgba(0,0,0,.28) 2px 4px)}
+@keyframes blink{50%{opacity:.25}}
+.v3-top{color:#2BF0FF;font-size:13px;text-shadow:0 0 12px #2BF0FF;animation:blink 1.1s steps(2) infinite}
+.v3-sub{color:#9C8FD0;margin-top:4px}
+.v3-rank{margin:14px 0 8px}
+.v3-rank small{display:block;color:#FF2BD6;font-size:11px}
+.v3-rank b{display:block;font-weight:400;font-size:132px;line-height:1.08;color:#FFE600;text-shadow:7px 7px 0 #FF2BD6,0 0 40px rgba(255,230,0,.7);animation:pop .5s .2s both cubic-bezier(.2,1.6,.4,1)}
+.v3-rank span{font-size:16px}
+.v3-box{border:3px solid #fff;padding:10px 10px 8px;text-align:left;margin-top:14px;background:rgba(11,6,32,.82)}
+.v3-box .r{display:flex;justify-content:space-between}
+.v3-hp{height:18px;border:3px solid #fff;margin:6px 0;padding:2px}
+.v3-hp i{display:block;height:100%;background:repeating-linear-gradient(90deg,#FF3B3B 0 10px,transparent 10px 12px);transform-origin:left;animation:grow 1.2s .5s both steps(14)}
+.v3-box small{color:#FF3B3B;font-size:9px}
+.v3-st li,.v3-qs li{display:flex;justify-content:space-between;gap:8px}
+.v3-st b{font-weight:400;color:#FFE600}
+.v3-qt{color:#39FF88;margin-bottom:4px}
+.v3-qs li{align-items:center;justify-content:flex-start}
+.v3-qs i{flex:none;width:12px;height:12px;border:3px solid #fff}
+.v3-qs b{font-weight:400;color:#39FF88;margin-left:auto}
+.v3-xp{height:14px;border:3px solid #2BF0FF;margin-top:6px}
+.v3-xp i{display:block;height:100%;width:69%;background:#2BF0FF;transform-origin:left;animation:grow 1.4s 1s both steps(10)}
+.v3-cta{margin-top:18px;width:100%;height:60px;background:#39FF88;color:#0B0620;font-size:14px;box-shadow:0 7px 0 #0D8F47;transition:transform .08s,box-shadow .08s}
+.v3-cta:active{transform:translateY(7px);box-shadow:0 0 0 #0D8F47}
+
+/* ═════ 4 · ГОРА САХАРА ═════ */
+.v4{background:linear-gradient(180deg,#1238F5,#3F6BFF 55%,#86A8FF);color:#fff;font-family:'Unbounded';touch-action:none}
+.v4 canvas{position:absolute;inset:0}
+.v4-t{position:relative;z-index:0;text-align:center;padding-top:34px;pointer-events:none}
+.v4-t p{font-weight:500;font-size:18px}
+.v4-t b{display:block;font-weight:900;font-size:176px;line-height:.92;letter-spacing:-.06em}
+.v4-card{position:absolute;z-index:3;left:0;right:0;bottom:0;background:#fff;color:#0D1440;border-radius:30px 30px 0 0;padding:18px 18px 22px;display:grid;grid-template-columns:auto 1fr;gap:12px 16px;align-items:center;box-shadow:0 -14px 40px rgba(8,20,90,.35)}
+.v4-card small{display:block;font:700 12px 'Manrope';letter-spacing:.06em;text-transform:uppercase;color:#6B76A8}
+.v4-card b{font-weight:900;font-size:44px;line-height:1;letter-spacing:-.04em}.v4-card b span{font-size:16px;font-weight:500;color:#6B76A8;letter-spacing:0}
+.v4-card button{height:58px;border-radius:18px;background:#1238F5;color:#fff;font-weight:700;font-size:15px}
+.v4-card p{grid-column:1/-1;font:600 13px 'Manrope';color:#6B76A8;text-align:center}
+
+/* ═════ 5 · СТЕКЛО ═════ */
+.v5{background:#06060B;color:#fff;padding:18px 16px 28px}
+.v5>*{position:relative}
+.v5-a{position:absolute!important;width:330px;height:330px;border-radius:50%;filter:blur(64px);opacity:.85}
+.v5-a.a{background:#7B3DFF;left:-120px;top:-60px;animation:v5m 13s ease-in-out infinite alternate}
+.v5-a.b{background:#00D4B8;right:-150px;top:210px;animation:v5m 17s ease-in-out infinite alternate-reverse}
+.v5-a.c{background:#FF6A3D;left:-60px;bottom:-90px;animation:v5m 15s 1s ease-in-out infinite alternate}
+@keyframes v5m{to{transform:translate(90px,70px) scale(1.25)}}
+.v5 header{display:flex;justify-content:space-between;font-weight:600;font-size:14px;color:rgba(255,255,255,.75)}
+.gl{background:linear-gradient(135deg,rgba(255,255,255,.17),rgba(255,255,255,.04));-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 24px 40px -22px rgba(0,0,0,.7)}
+.v5-ring{width:236px;height:236px;margin:26px auto 14px;display:grid;place-items:center;filter:drop-shadow(0 0 22px rgba(255,211,110,.5));animation:pop .8s both cubic-bezier(.2,1.2,.4,1)}
+.v5-ring::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(#FFD36E 0 54%,rgba(255,255,255,.16) 54%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 15px),#000 calc(100% - 14px));mask:radial-gradient(farthest-side,transparent calc(100% - 15px),#000 calc(100% - 14px))}
+.v5-ring div{width:190px;height:190px;border-radius:50%;display:grid;place-content:center;text-align:center}
+.v5-ring b{font:300 88px/1 'Unbounded';letter-spacing:-.05em;background:linear-gradient(180deg,#fff 30%,#FFD36E);-webkit-background-clip:text;background-clip:text;color:transparent}
+.v5-ring small{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+.v5-v{text-align:center;font-weight:600;font-size:16px;margin-bottom:20px}
+.v5-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.v5-row .gl{border-radius:26px;padding:16px}
+.v5-row b{display:block;font:500 40px/1.05 'Unbounded';letter-spacing:-.04em}
+.v5-row small{font-size:13px;color:rgba(255,255,255,.75)}
+.v5-sw{border-radius:28px;padding:16px 16px 6px;margin-top:10px}
+.v5-sw h3{font:500 17px 'Unbounded';letter-spacing:-.02em;margin-bottom:6px}
+.v5-sw li{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid rgba(255,255,255,.14);font-weight:600;font-size:15px}
+.v5-sw li b{color:#7CF5C8;white-space:nowrap}
+.v5-cta{width:100%;height:60px;margin-top:14px;border-radius:99px;font-weight:700;font-size:16px;background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(255,255,255,.8));color:#0B0B14;box-shadow:0 0 44px rgba(255,255,255,.3)}
+
+/* ═════ 6 · ЛЕНТА ═════ */
+.v6{background:#E8FF00;color:#0A0A0A;font-family:'Unbounded';font-weight:900;text-transform:uppercase;padding-bottom:26px}
+.v6 header{padding:14px 16px 0;font-size:11px;letter-spacing:.04em}
+.v6-tape{position:relative;z-index:3;width:150%;margin-left:-25%;background:#0A0A0A;color:#E8FF00;font-size:15px;line-height:38px;white-space:nowrap;overflow:hidden;transform:rotate(var(--r))}
+.v6-tape div{display:inline-block;animation:v6m 14s linear infinite}
+.v6-tape.rev div{animation-direction:reverse}
+@keyframes v6m{to{transform:translateX(-50%)}}
+.v6-n{position:relative;font-size:min(61vw,262px);line-height:.82;letter-spacing:-.09em;margin:6px 0 0 4px;transform:scaleY(1.18);transform-origin:top;animation:up .6s both cubic-bezier(.16,.9,.2,1)}
+.v6-st{position:absolute;z-index:4;right:14px;top:210px;background:#fff;border:4px solid #0A0A0A;padding:8px 12px;font-size:20px;transform:rotate(9deg);box-shadow:6px 6px 0 #0A0A0A;animation:pop .4s .5s both cubic-bezier(.2,1.6,.4,1)}
+.v6-blk{margin:70px 16px 0;border-top:5px solid}
+.v6-blk p{display:flex;justify-content:space-between;align-items:baseline;border-bottom:5px solid;padding:9px 0;font-size:27px;line-height:1.1;letter-spacing:-.04em}
+.v6-blk small{font-size:11px;letter-spacing:.02em}
+.v6-sw{background:#0A0A0A;color:#E8FF00;margin-top:26px;padding:14px 16px 8px}
+.v6-sw h3{font-size:22px;letter-spacing:-.03em;margin-bottom:6px}
+.v6-sw li{display:flex;justify-content:space-between;gap:8px;border-top:2px solid #E8FF00;padding:10px 0;font-size:13px}
+.v6-cta{margin:16px 16px 0;width:calc(100% - 32px);height:66px;background:#0A0A0A;color:#E8FF00;font-weight:900;font-size:17px;text-transform:uppercase;transition:background .1s,color .1s}
+.v6-cta:active{background:#fff;color:#0A0A0A}
+
+/* ═════ 7 · МАНГА ═════ */
+.v7{background:#fff;color:#000;padding:12px 12px 24px;font-family:'Neucha',cursive}
+.v7-p{position:relative;border:4px solid #000;overflow:hidden;background:#fff;animation:pop .45s both cubic-bezier(.2,1.3,.4,1)}
+.cap{position:absolute;z-index:4;left:0;top:0;background:#FFE14A;border-right:3px solid #000;border-bottom:3px solid #000;padding:3px 10px;font-size:16px;line-height:22px}
+.p1{height:300px}
+.rays{position:absolute;inset:-60%;background:repeating-conic-gradient(#000 0 2.2deg,transparent 2.2deg 9deg);-webkit-mask:radial-gradient(circle,transparent 21%,#000 46%);mask:radial-gradient(circle,transparent 21%,#000 46%);animation:spin 60s linear infinite}
+.burst{position:absolute;left:50%;top:50%;width:236px;height:236px;margin:-118px 0 0 -118px;background:#000;display:grid;place-items:center;animation:pop .5s .35s both cubic-bezier(.2,1.7,.4,1)}
+.burst div{width:222px;height:222px;background:#fff;display:grid;place-content:center;text-align:center}
+.burst b{display:block;font:400 80px/.95 'Dela Gothic One';color:#E2001A;text-shadow:4px 4px 0 #000}
+.burst i{display:block;font-style:normal;font-size:21px;line-height:1.05;margin-top:4px}
+.bub{position:absolute;z-index:5;background:#fff;border:3px solid #000;border-radius:50%;padding:13px 16px;font-size:18px;line-height:1.1;text-align:center;animation:pop .4s .75s both cubic-bezier(.2,1.6,.4,1)}
+.bub::after{content:"";position:absolute;width:18px;height:18px;background:#fff;border:solid #000;border-width:0 3px 3px 0;transform:rotate(60deg) skewX(20deg)}
+.p1 .bub{right:8px;bottom:10px;width:150px}.p1 .bub::after{left:20px;top:-10px;transform:rotate(-130deg) skewX(20deg)}
+.v7-row{display:grid;grid-template-columns:1fr 1.15fr;gap:8px;margin:8px 0}
+.p2{height:186px;display:grid;place-content:end center;padding-bottom:14px;text-align:center;background:#000;color:#fff;animation-delay:.15s}
+.p2 b{font:400 84px/1 'Dela Gothic One'}.p2 small{font-size:18px}
+.sfx{position:absolute;right:-2px;top:2px;font:400 25px 'Dela Gothic One';color:#E2001A;-webkit-text-stroke:5px #fff;paint-order:stroke fill;transform:rotate(14deg)}
+.p3{height:186px;padding:38px 10px 0;animation-delay:.3s}
+.p3 b{display:block;font:400 26px/1.2 'Dela Gothic One';white-space:nowrap}.p3 small{font-size:19px}
+.p3 .ht{position:absolute;inset:auto 0 0 0;height:90px;background:radial-gradient(#000 30%,transparent 33%) 0 0/8px 8px;-webkit-mask:linear-gradient(transparent,#000);mask:linear-gradient(transparent,#000)}
+.p4{padding:38px 12px 14px;animation-delay:.45s}
+.p4 li{display:flex;justify-content:space-between;gap:8px;font-size:20px;line-height:1.2;padding:7px 0;border-bottom:2px dashed #000}
+.p4 li b{font:400 15px 'Dela Gothic One';color:#E2001A;white-space:nowrap}
+.p4 .bub{position:relative;display:inline-block;margin:14px 0 0 40%;animation-delay:1.1s;font-size:21px}.p4 .bub::after{left:-9px;top:14px;transform:rotate(130deg) skewX(20deg)}
+.v7-cta{width:100%;height:62px;margin-top:10px;background:#E2001A;color:#fff;border:4px solid #000;box-shadow:6px 6px 0 #000;font:400 18px 'Dela Gothic One';transition:transform .1s,box-shadow .1s}
+.v7-cta:active{transform:translate(6px,6px);box-shadow:0 0 0 #000}
+
+/* ═════ 8 · САХАРОК ═════ */
+.v8{background:#6C3BFF;color:#fff;padding:16px 16px 28px}
+.v8 header{display:flex;justify-content:space-between;font-weight:700;font-size:14px;opacity:.85}
+.v8-stage{position:relative;height:318px;margin-top:6px}
+.v8-sun{position:absolute;left:50%;top:54%;width:280px;height:280px;margin:-140px 0 0 -140px;border-radius:50%;background:#FFD23F;animation:pop .6s both cubic-bezier(.2,1.3,.4,1)}
+.v8-fl{position:absolute;width:22px;height:22px;border-radius:5px;background:#fff;box-shadow:inset -3px -3px 0 #D8D2F5;animation:v8f 3.4s ease-in-out infinite alternate;transition:opacity .4s,transform .4s}
+@keyframes v8f{to{translate:0 -16px;rotate:24deg}}
+.v8-fl.gone{opacity:0;transform:scale(0)}
+#mon{position:absolute;left:50%;bottom:10px;width:230px;height:230px;margin-left:-115px;overflow:visible;transform:scale(var(--s,1.18));transform-origin:50% 96%;transition:transform .6s cubic-bezier(.3,1.7,.4,1)}
+#mon .body{animation:v8w 2.6s ease-in-out infinite;transform-origin:100px 190px}
+@keyframes v8w{50%{transform:scale(1.035,.965)}}
+#mon .eye{animation:v8b 4.2s infinite;transform-box:fill-box;transform-origin:center}
+@keyframes v8b{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+.v8-say{position:absolute;left:0;right:0;top:0;margin:0 auto;width:fit-content;max-width:300px;background:#fff;color:#1B1147;border-radius:20px;padding:10px 16px;font-weight:800;font-size:15px;line-height:1.3;text-align:center;z-index:3}
+.v8-say::after{content:"";position:absolute;left:50%;bottom:-7px;width:16px;height:16px;margin-left:-8px;background:#fff;transform:rotate(45deg);border-radius:3px}
+.v8-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.v8-stats div{background:#5527E0;border-radius:20px;padding:12px 6px;text-align:center}
+.v8-stats b{display:block;font:900 26px/1.1 'Unbounded';letter-spacing:-.04em}
+.v8-stats small{font-weight:700;font-size:12px;opacity:.8}
+.v8-h{font:700 18px 'Unbounded';letter-spacing:-.02em;margin:22px 0 10px}
+.v8-sw{display:grid;gap:8px}
+.v8-sw button{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:58px;padding:0 16px 0 14px;border-radius:20px;background:#fff;color:#1B1147;font-weight:800;font-size:15px;text-align:left;transition:background .2s,transform .12s}
+.v8-sw button:active{transform:scale(.97)}
+.v8-sw button span{display:flex;align-items:center;gap:10px}
+.v8-sw button span::before{content:"";flex:none;width:24px;height:24px;border-radius:50%;border:3px solid #1B1147}
+.v8-sw button[aria-pressed="true"]{background:#B8FF5C}
+.v8-sw button[aria-pressed="true"] span::before{background:#1B1147 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.500l3.200 3.200L13 4.500' fill='none' stroke='%23B8FF5C' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat}
+.v8-sw b{font:700 12px 'Unbounded';white-space:nowrap}
+.v8-cta{width:100%;height:60px;margin-top:14px;border-radius:20px;background:#FFD23F;color:#1B1147;font:700 16px 'Unbounded';box-shadow:0 6px 0 #C99A00;transition:transform .08s,box-shadow .08s}
+.v8-cta:active{transform:translateY(6px);box-shadow:0 0 0 #C99A00}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<nav id="nav" aria-label="Стили"></nav>
+<main class="wrap">
+
+<!-- 1 -->
+<section class="v v1" data-n="Плакат">
+  <header><b>ЧЕК-АП</b><span>MAGNUM · 16.11.26 · 9 870 ₸</span></header>
+  <div class="v1-hero">
+    <div class="v1-dots"></div>
+    <div class="v1-num" aria-label="54 из 100"><i>54</i><i>54</i></div>
+    <div class="v1-of">ИЗ 100</div>
+    <div class="v1-stamp"><span>62</span>КУБИКА<br>САХАРА</div>
+  </div>
+  <h2>ОЦЕНКА КОРЗИНЫ: <mark>ТАК СЕБЕ</mark></h2>
+  <div class="v1-blue"><small>НА ВРЕДНОЕ УШЛО</small><b>3 490 ТГ</b><div class="v1-bar"><i></i></div><small>35% чека: кола, сок, чипсы, шоколад, сырки</small></div>
+  <ul class="v1-sw">
+    <li><span>Кола → минералка с лимоном</span><b>−340</b></li>
+    <li><span>Сок → килограмм яблок</span><b>−140</b></li>
+    <li><span>Йогурт → кефир 1%</span><b>−60</b></li>
+  </ul>
+  <p class="v1-note">и будет 78!</p>
+  <button class="v1-cta">СКАНИРОВАТЬ ЧЕК</button>
+</section>
+
+<!-- 2 -->
+<section class="v v2 fix" data-n="Сторис">
+  <div class="v2-prog"><i></i><i></i><i></i><i></i></div>
+  <div class="v2-s s1"><span class="sh a star"></span><span class="sh b"></span><p class="k">Твой чек из Magnum набрал</p><p class="n">54</p><p class="k2">из 100. Так себе, честно.</p></div>
+  <div class="v2-s s2"><span class="sh a"></span><p class="k">В нём спряталось</p><p class="n">62</p><p class="k2">кубика сахара. Это норма взрослого на шесть дней.</p><p class="v2-cubes" id="v2c"></p></div>
+  <div class="v2-s s3"><span class="sh a"></span><span class="sh b star"></span><p class="k">На вредное улетело</p><p class="n">3 490 ₸</p><p class="k2">Это 35% всего чека</p></div>
+  <div class="v2-s s4"><p class="k">Замени три товара — и будет</p><p class="n">78</p>
+    <ul><li><span>Кола → минералка</span><b>−340 ₸</b></li><li><span>Сок → яблоки</span><b>−140 ₸</b></li><li><span>Йогурт → кефир</span><b>−60 ₸</b></li></ul>
+    <button>Поделиться итогом</button></div>
+  <div class="v2-foot">чек-ап · тапни, чтобы листать</div>
+</section>
+
+<!-- 3 -->
+<section class="v v3" data-n="Аркада">
+  <div class="v3-floor"></div>
+  <p class="v3-top">* ЧЕК ПРОЙДЕН *</p>
+  <p class="v3-sub">MAGNUM 16.11 · 9870 ТГ</p>
+  <div class="v3-rank"><small>РАНГ</small><b>C</b><span><i id="v3n" style="font-style:normal">0</i>/100</span></div>
+  <div class="v3-box"><div class="r"><span>БОСС: САХАР</span><span>312 Г</span></div><div class="v3-hp"><i></i></div><small>УРОН x6.2 · 62 КУБИКА</small></div>
+  <ul class="v3-box v3-st"><li><span>ВРЕДНОЕ</span><b>-3490 ТГ</b></li><li><span>ВРАГОВ В ЧЕКЕ</span><b>5/13</b></li><li><span>КОМБО</span><b>КОЛА+СОК</b></li></ul>
+  <div class="v3-box"><p class="v3-qt">КВЕСТЫ НА СЛЕД. ЧЕК</p>
+    <ul class="v3-qs"><li><i></i><span>КОЛА &gt; МИНЕРАЛКА</span><b>+8</b></li><li><i></i><span>СОК &gt; ЯБЛОКИ</span><b>+8</b></li><li><i></i><span>ЙОГУРТ &gt; КЕФИР</span><b>+8</b></li></ul>
+    <div class="r" style="margin-top:8px"><span>ДО РАНГА B</span><span>54/78</span></div><div class="v3-xp"><i></i></div></div>
+  <button class="v3-cta">&gt; НОВЫЙ ЧЕК</button>
+</section>
+
+<!-- 4 -->
+<section class="v v4 fix" data-n="Гора сахара">
+  <div class="v4-t"><p>В твоём чеке</p><b id="v4n">0</b><p>кубика сахара</p></div>
+  <canvas id="v4c" aria-hidden="true"></canvas>
+  <div class="v4-card"><div><small>Оценка</small><b>54<span>/100</span></b></div><button>Сканировать чек</button><p>Тапни по кубикам или наклони телефон</p></div>
+</section>
+
+<!-- 5 -->
+<section class="v v5" data-n="Стекло">
+  <span class="v5-a a"></span><span class="v5-a b"></span><span class="v5-a c"></span>
+  <header><span>Magnum · 16 ноября</span><span>9 870 ₸</span></header>
+  <div class="v5-ring"><div class="gl"><b>54</b><small>из 100</small></div></div>
+  <p class="v5-v">Так себе — сахара на шесть дней</p>
+  <div class="v5-row"><div class="gl"><b>62</b><small>кубика сахара</small></div><div class="gl"><b>35%</b><small>чека на вредное</small></div></div>
+  <div class="gl v5-sw"><h3>Замени — будет 78</h3>
+    <ul><li><span>Кола → минералка с лимоном</span><b>−340 ₸</b></li><li><span>Сок → килограмм яблок</span><b>−140 ₸</b></li><li><span>Йогурт → кефир 1%</span><b>−60 ₸</b></li></ul></div>
+  <button class="v5-cta">Сканировать чек</button>
+</section>
+
+<!-- 6 -->
+<section class="v v6" data-n="Лента">
+  <header>Чек №0042 / Magnum / 16.11</header>
+  <div class="v6-n">54</div>
+  <div class="v6-st">Так себе</div>
+  <div class="v6-tape" style="--r:-5deg;margin-top:-34px"><div>САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · САХАР · 62 КУБИКА · </div></div>
+  <div class="v6-tape rev" style="--r:3deg;margin-top:6px"><div>НОРМА НА 6 ДНЕЙ · 312 ГРАММ · НОРМА НА 6 ДНЕЙ · 312 ГРАММ · НОРМА НА 6 ДНЕЙ · 312 ГРАММ · НОРМА НА 6 ДНЕЙ · 312 ГРАММ · НОРМА НА 6 ДНЕЙ · 312 ГРАММ · НОРМА НА 6 ДНЕЙ · 312 ГРАММ · </div></div>
+  <div class="v6-blk"><p><span>3 490 ₸</span><small>на вредное</small></p><p><span>35%</span><small>всего чека</small></p><p><span>5 из 13</span><small>товаров — мусор</small></p></div>
+  <div class="v6-sw"><h3>Замени → 78</h3><ul><li><span>Кола → минералка</span><span>−340 ₸</span></li><li><span>Сок → яблоки</span><span>−140 ₸</span></li><li><span>Йогурт → кефир</span><span>−60 ₸</span></li></ul></div>
+  <button class="v6-cta">Сканировать чек →</button>
+</section>
+
+<!-- 7 -->
+<section class="v v7" data-n="Манга">
+  <div class="v7-p p1"><span class="cap">Тем временем в чеке из Magnum…</span><div class="rays"></div>
+    <div class="burst star"><div class="star"><span><b>62</b><i>кубика<br>сахара!!</i></span></div></div>
+    <div class="bub">Это же норма на шесть дней?!</div></div>
+  <div class="v7-row">
+    <div class="v7-p p2"><span class="sfx">БАМ!</span><small>оценка</small><b>54</b><small>из 100</small></div>
+    <div class="v7-p p3"><span class="cap">На вредное</span><b>3 490 тг</b><small>треть всего чека!</small><div class="ht"></div></div>
+  </div>
+  <div class="v7-p p4"><span class="cap">План спасения</span>
+    <ul><li><span>Кола → минералка с лимоном</span><b>−340</b></li><li><span>Сок → килограмм яблок</span><b>−140</b></li><li><span>Йогурт → кефир</span><b>−60</b></li></ul>
+    <div class="bub">Тогда будет 78!</div></div>
+  <button class="v7-cta">СКАНИРОВАТЬ ЧЕК!</button>
+</section>
+
+<!-- 8 -->
+<section class="v v8" data-n="Сахарок">
+  <header><span>Magnum · 16 ноября</span><span>9 870 ₸</span></header>
+  <div class="v8-stage">
+    <div class="v8-sun"></div>
+    <i class="v8-fl" style="left:6%;top:38%"></i><i class="v8-fl" style="left:84%;top:30%;animation-delay:-1s"></i><i class="v8-fl" style="left:14%;top:74%;animation-delay:-2s"></i><i class="v8-fl" style="left:80%;top:70%;animation-delay:-.5s"></i><i class="v8-fl" style="left:2%;top:58%;animation-delay:-1.6s"></i><i class="v8-fl" style="left:90%;top:52%;animation-delay:-2.4s"></i>
+    <svg id="mon" viewBox="0 0 200 200" role="img" aria-label="Сахарок — монстр из сахара">
+      <ellipse cx="100" cy="193" rx="62" ry="7" fill="#1B1147" opacity=".25"/>
+      <g class="body">
+        <rect x="52" y="168" width="26" height="24" rx="10" fill="#EDE8FF"/><rect x="122" y="168" width="26" height="24" rx="10" fill="#EDE8FF"/>
+        <rect x="14" y="98" width="30" height="20" rx="10" fill="#EDE8FF" transform="rotate(24 30 108)"/><rect x="156" y="98" width="30" height="20" rx="10" fill="#EDE8FF" transform="rotate(-24 170 108)"/>
+        <rect x="30" y="36" width="140" height="144" rx="30" fill="#fff"/>
+        <path d="M150 36h-10c17 0 30 13 30 30v84c0 17-13 30-30 30h10c11 0 20-9 20-20V56c0-11-9-20-20-20z" fill="#DDD6FA"/>
+        <g fill="#C9C0F2"><circle cx="52" cy="60" r="2.500"/><circle cx="72" cy="150" r="2"/><circle cx="140" cy="62" r="2"/><circle cx="118" cy="162" r="2.500"/><circle cx="46" cy="126" r="2"/></g>
+        <circle cx="58" cy="118" r="11" fill="#FF8FB8" opacity=".7"/><circle cx="142" cy="118" r="11" fill="#FF8FB8" opacity=".7"/>
+        <g class="eye"><circle cx="72" cy="92" r="14" fill="#1B1147"/><circle cx="77" cy="87" r="5" fill="#fff"/></g>
+        <g class="eye"><circle cx="128" cy="92" r="14" fill="#1B1147"/><circle cx="133" cy="87" r="5" fill="#fff"/></g>
+        <path id="mouth" d="M76 122c6 26 42 26 48 0z" fill="#1B1147"/><path id="tongue" d="M88 138c6-7 18-7 24 0-6 6-18 6-24 0z" fill="#FF5C8A"/>
+      </g>
+    </svg>
+    <div class="v8-say" id="v8say" aria-live="polite">Ням! Я съел 62 кубика из твоего чека</div>
+  </div>
+  <div class="v8-stats"><div><b id="v8c">62</b><small>кубика</small></div><div><b id="v8s">54</b><small>оценка</small></div><div><b id="v8m">0 ₸</b><small>экономия</small></div></div>
+  <p class="v8-h">Посади Сахарка на диету</p>
+  <div class="v8-sw">
+    <button aria-pressed="false" data-c="21" data-t="340"><span>Кола → минералка</span><b>−21 кубик</b></button>
+    <button aria-pressed="false" data-c="20" data-t="140"><span>Сок → яблоки</span><b>−20 кубиков</b></button>
+    <button aria-pressed="false" data-c="6" data-t="60"><span>Йогурт → кефир</span><b>−6 кубиков</b></button>
+  </div>
+  <button class="v8-cta">Сканировать чек</button>
+</section>
+
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const vs=$$('.v'), nav=$('#nav'), hooks={};
+let cur=-1;
+
+/* звёзды */
+$$('.star').forEach(el=>{const n=el.classList.contains('sh')?12:18,p=[];for(let i=0;i<n*2;i++){const a=Math.PI*i/n,r=i%2?50:(el.classList.contains('sh')?36:41);p.push((50+r*Math.sin(a)).toFixed(1)+'% '+(50-r*Math.cos(a)).toFixed(1)+'%')}el.style.clipPath='polygon('+p.join(',')+')'});
+for(let i=0;i<62;i++){const c=document.createElement('i');c.style.animationDelay=(.5+i*.022)+'s';$('#v2c').appendChild(c)}
+
+/* 2 · сторис */
+(()=>{const sec=vs[1],ss=$$('.v2-s',sec),pr=$$('.v2-prog i',sec);let i=0,tm;
+  const go=k=>{i=(k+ss.length)%ss.length;ss.forEach((s,j)=>s.classList.toggle('cur',j===i));pr.forEach((p,j)=>{p.className='';void p.offsetWidth;p.className=j<i?'done':j===i?'cur':''});clearTimeout(tm);tm=setTimeout(()=>go(i+1),4000)};
+  sec.addEventListener('click',e=>{if(e.target.closest('button'))return;const r=sec.getBoundingClientRect();go(e.clientX-r.left<r.width*.3?i-1:i+1)});
+  hooks[1]={on:()=>go(0),off:()=>clearTimeout(tm)};
+})();
+
+/* 3 · аркада */
+hooks[2]={on(){const el=$('#v3n');let n=0;clearInterval(this.iv);el.textContent=0;this.iv=setInterval(()=>{n+=2;el.textContent=Math.min(n,54);if(n>=54)clearInterval(this.iv)},32)},off(){clearInterval(this.iv)}};
+
+/* 4 · гора сахара */
+hooks[3]={on(){
+  const sec=vs[3],cv=$('#v4c'),num=$('#v4n'),dpr=Math.min(devicePixelRatio||1,2),W=sec.clientWidth,H=sec.clientHeight,floor=H-$('.v4-card',sec).offsetHeight,S=Math.round(W/10.5),ctx=cv.getContext('2d');
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
+  const cube=(x,y,a,sp)=>{ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.shadowColor='rgba(6,16,90,.4)';ctx.shadowBlur=12;ctx.shadowOffsetY=6;
+    const g=ctx.createLinearGradient(-S/2,-S/2,S/2,S/2);g.addColorStop(0,'#fff');g.addColorStop(1,'#D5DEF8');ctx.fillStyle=g;ctx.beginPath();ctx.roundRect?ctx.roundRect(-S/2,-S/2,S,S,S*.17):ctx.rect(-S/2,-S/2,S,S);ctx.fill();
+    ctx.shadowColor='transparent';ctx.fillStyle='rgba(120,140,210,.45)';for(const[px,py]of sp){ctx.fillRect(px*S,py*S,1.6,1.6)}
+    ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-S*.3,-S*.38);ctx.lineTo(S*.2,-S*.38);ctx.stroke();ctx.restore()};
+  const specks=()=>Array.from({length:5},()=>[Math.random()*.7-.35,Math.random()*.7-.35]);
+  if(!window.Matter){num.textContent=62;for(let i=0;i<62;i++)cube(S*.7+(i%9)*(S+3),floor-S*.6-Math.floor(i/9)*(S+3),0,specks());return}
+  const{Engine,Bodies,Composite,Body}=Matter,eng=Engine.create();eng.gravity.y=1.15;
+  Composite.add(eng.world,[Bodies.rectangle(W/2,floor+40,W*3,80,{isStatic:true}),Bodies.rectangle(-40,H/2,80,H*4,{isStatic:true}),Bodies.rectangle(W+40,H/2,80,H*4,{isStatic:true})]);
+  const cubes=[];let n=0;num.textContent=0;
+  this.iv=setInterval(()=>{if(n>=62){clearInterval(this.iv);return}
+    const b=Bodies.rectangle(S+Math.random()*(W-2*S),-S-Math.random()*60,S,S,{chamfer:{radius:S*.17},restitution:.18,friction:.8,angle:Math.random()*6});b.sp=specks();Composite.add(eng.world,b);cubes.push(b);num.textContent=++n},60);
+  let last=performance.now();
+  const frame=now=>{this.raf=requestAnimationFrame(frame);Engine.update(eng,Math.min(now-last,32));last=now;ctx.clearRect(0,0,W,H);for(const b of cubes)cube(b.position.x,b.position.y,b.angle,b.sp)};
+  this.raf=requestAnimationFrame(frame);
+  this.tap=e=>{if(e.target.closest('.v4-card'))return;const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;for(const b of cubes){const dx=b.position.x-x,dy=b.position.y-y,d=Math.hypot(dx,dy)||1;if(d<130){const k=1-d/130;Body.setVelocity(b,{x:b.velocity.x+dx/d*9*k,y:b.velocity.y-15*k});Body.setAngularVelocity(b,(Math.random()-.5)*.5*k)}}};
+  sec.addEventListener('pointerdown',this.tap);
+  this.ori=e=>{eng.gravity.x=Math.max(-1,Math.min(1,(e.gamma||0)/30))};addEventListener('deviceorientation',this.ori);
+},off(){cancelAnimationFrame(this.raf);clearInterval(this.iv);vs[3].removeEventListener('pointerdown',this.tap);removeEventListener('deviceorientation',this.ori)}};
+
+/* 8 · сахарок */
+(()=>{const sec=vs[7],bs=$$('.v8-sw button',sec),fl=$$('.v8-fl',sec),mon=$('#mon');
+  const say=['Ням! Я съел 62 кубика из твоего чека','Эй! Куда делась моя газировка?','Я худею… верни сладкое!','Ладно, так даже лучше. Твёрдая четвёрка!'];
+  const mouths=['M76 122c6 26 42 26 48 0z','M80 124c6 18 34 18 40 0z','M84 126c5 10 27 10 32 0','M82 124c6 12 30 12 36 0'];
+  const upd=()=>{const on=bs.filter(b=>b.getAttribute('aria-pressed')==='true'),k=on.length,c=62-on.reduce((a,b)=>a+ +b.dataset.c,0),t=on.reduce((a,b)=>a+ +b.dataset.t,0);
+    $('#v8c').textContent=c;$('#v8s').textContent=54+k*8;$('#v8m').textContent=t+' ₸';$('#v8say').textContent=say[k];
+    mon.style.setProperty('--s',[1.18,1.02,.88,.76][k]);
+    const m=$('#mouth');m.setAttribute('d',mouths[k]);m.setAttribute('fill',k===2?'none':'#1B1147');m.setAttribute('stroke',k===2?'#1B1147':'none');m.setAttribute('stroke-width',k===2?5:0);m.setAttribute('stroke-linecap','round');
+    if(k===2)m.setAttribute('transform','rotate(180 100 130)');else m.removeAttribute('transform');
+    $('#tongue').style.display=k?'none':'';fl.forEach((f,i)=>f.classList.toggle('gone',i<k*2))};
+  bs.forEach(b=>b.addEventListener('click',()=>{b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true');upd()}));
+  hooks[7]={on(){bs.forEach(b=>b.setAttribute('aria-pressed','false'));upd()}};
+})();
+
+/* галерея */
+vs.forEach((v,i)=>{const b=document.createElement('button');b.textContent=(i+1)+' · '+v.dataset.n;b.onclick=()=>show(i);nav.appendChild(b)});
+function show(i){
+  if(cur>=0){vs[cur].classList.remove('on');hooks[cur]?.off?.()}
+  cur=i;vs[i].classList.add('on');
+  [...nav.children].forEach((b,j)=>b.setAttribute('aria-current',j===i));
+  nav.children[i].scrollIntoView({inline:'center',block:'nearest'});
+  scrollTo(0,0);hooks[i]?.on?.();history.replaceState(null,'','#'+(i+1));
+}
+addEventListener('keydown',e=>{if(e.key==='ArrowRight')show((cur+1)%vs.length);if(e.key==='ArrowLeft')show((cur+vs.length-1)%vs.length)});
+show(Math.min(vs.length,Math.max(1,+location.hash.slice(1)||1))-1);
+</script>
+</body>
+</html>

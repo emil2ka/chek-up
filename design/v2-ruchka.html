@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Чек-ап — «Красная ручка»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Golos+Text:wght@400;500;600&family=PT+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#FAFAF5;--grid:#C9D9EA;--margin:#E8A0A0;--red:#D12B1F;--blue:#27408B;--ink:#1B1B1F;--print:#2B2B31;--mute:#56606E}
+  *,*::before,*::after{box-sizing:border-box}
+  html{background:#D9D6CE}
+  body{margin:0;font-family:'Golos Text',system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+  .page{position:relative;max-width:430px;margin:0 auto;min-height:100dvh;padding-bottom:124px;overflow:hidden;
+    background-color:var(--paper);
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:20px 20px;background-position:-1px 7px}
+  .page::before{content:"";position:absolute;top:0;bottom:0;right:104px;width:1.5px;background:var(--margin)}
+
+  .bar{position:relative;display:flex;justify-content:space-between;align-items:center;padding:6px 6px 0}
+  .bar button{width:44px;height:44px;background:none;border:0;display:grid;place-items:center;border-radius:12px}
+  .bar button:active{background:rgba(0,0,0,.06)}
+  .bar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+  .hw{font-family:'Caveat',cursive;font-weight:500;margin:0}
+  .blue{color:var(--blue)} .red{color:var(--red)}
+  .col{margin-right:104px}
+  .date{font-size:27px;line-height:40px;text-align:center;margin-top:-3px}
+
+  .rw{position:relative;width:228px;margin:20px 0 0 14px;transform:rotate(-1.4deg);
+    filter:drop-shadow(0 1px 1px rgba(30,30,50,.2)) drop-shadow(0 12px 14px rgba(30,30,50,.15))}
+  .tape{position:absolute;top:-12px;left:74px;width:80px;height:25px;z-index:2;transform:rotate(-4deg);
+    background:linear-gradient(180deg,rgba(255,255,255,.25),transparent 40%),rgba(244,224,150,.6);box-shadow:0 1px 1px rgba(0,0,0,.08)}
+  .receipt{padding:20px 14px 22px;font-family:'PT Mono',ui-monospace,monospace;font-size:11.5px;line-height:21px;color:var(--print);
+    background:
+      linear-gradient(180deg,transparent 53.7%,rgba(0,0,0,.055) 53.9%,rgba(255,255,255,.8) 54.2%,transparent 54.6%),
+      linear-gradient(90deg,rgba(0,0,0,.045),transparent 9%,transparent 87%,rgba(0,0,0,.055)),
+      #FEFDFB}
+  .receipt>*{opacity:.87}
+  .c{text-align:center}
+  .r{display:flex;justify-content:space-between;white-space:nowrap}
+  .sep{border:0;border-top:1px dashed var(--print);margin:7px 0;opacity:.55}
+  .tot{font-size:16px;line-height:26px}
+  .qr{display:flex;justify-content:center;margin:10px 0 6px}
+
+  #ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;mix-blend-mode:multiply}
+  #ink path{fill:none;stroke:var(--red);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+  #ink text{font-family:'Caveat',cursive;font-weight:700;fill:var(--red);font-size:21px}
+
+  .sum{margin:34px 14px 0 16px}
+  .sum p{font-size:28px;line-height:40px}
+  .sum .big{font-size:42px;font-weight:700;line-height:40px;margin-top:8px}
+  #tally{height:66px;margin-top:10px}
+
+  .fix{margin-top:14px}
+  .fix h2{font:500 31px/40px 'Caveat',cursive;color:var(--blue);text-align:center;margin:0 0 2px}
+  .swap{display:grid;grid-template-columns:30px 1fr;gap:0 10px;width:100%;text-align:left;background:none;border:0;padding:8px 14px 8px 16px;min-height:62px}
+  .swap:active{background:rgba(39,64,139,.05)}
+  .swap:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+  .swap svg{width:30px;height:30px;overflow:visible}
+  .swap .bx{fill:none;stroke:var(--blue);stroke-width:1.7;stroke-linecap:round}
+  .swap .tk{fill:none;stroke:var(--red);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:44;stroke-dashoffset:44;transition:stroke-dashoffset .26s ease-out}
+  .swap[aria-pressed="true"] .tk{stroke-dashoffset:0}
+  .swap .t{font:500 25px/29px 'Caveat',cursive;color:var(--blue)}
+  .swap .t s{opacity:.7}
+  .swap .d{grid-column:2;font-size:12.5px;line-height:18px;color:var(--mute);font-variant-numeric:tabular-nums}
+
+  .regrade{display:flex;align-items:center;justify-content:space-between;margin:8px 22px 0 16px}
+  .regrade .l{font:500 26px/30px 'Caveat',cursive;color:var(--blue)}
+  .regrade .g{position:relative;width:92px;height:80px;display:grid;place-items:center;font:700 58px/1 'Caveat',cursive;color:var(--red)}
+  .regrade .g svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .regrade .g path{fill:none;stroke:var(--red);stroke-width:2.1;stroke-linecap:round}
+  .save{margin:2px 16px 0;font-size:13px;line-height:19px;color:var(--mute);font-variant-numeric:tabular-nums}
+
+  .cta{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:430px;pointer-events:none;
+    padding:30px 14px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(250,250,245,0),var(--paper) 46%)}
+  .cta button{pointer-events:auto;width:100%;height:56px;border:0;border-radius:16px;background:#17171A;color:#fff;font-weight:600;font-size:16px;
+    display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .12s ease-out}
+  .cta button:active{transform:scale(.98)}
+  .cta svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  @media (prefers-reduced-motion:reduce){.swap .tk,.cta button{transition:none}}
+</style>
+</head>
+<body>
+<main class="page" id="page">
+  <div class="bar">
+    <button aria-label="Назад к чекам"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button aria-label="Поделиться"><svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></button>
+  </div>
+
+  <div class="col">
+    <p class="hw blue date">Шестнадцатое ноября</p>
+    <p class="hw blue date">Домашняя покупка</p>
+  </div>
+
+  <div class="rw" id="rw">
+    <div class="tape"></div>
+    <article class="receipt" id="receipt" aria-label="Чек из магазина">
+      <div class="c">ТОО «MAGNUM CASH&amp;CARRY»</div>
+      <div class="c">г. Алматы, пр. Абая, 109</div>
+      <div class="c">КАССА 03 · СМЕНА 214</div>
+      <div class="c">ЧЕК №0042 16.11.26 18:42</div>
+      <hr class="sep">
+      <div id="rows"></div>
+      <hr class="sep">
+      <div class="r tot" id="total"><span>ИТОГО</span><span class="v">9 870,00</span></div>
+      <div class="r"><span>Kaspi QR</span><span>9 870,00</span></div>
+      <div class="r"><span>в т.ч. НДС 16%</span><span>1 361,38</span></div>
+      <hr class="sep">
+      <div class="qr" id="qr" aria-hidden="true"></div>
+      <div class="c">ФП 4071226630</div>
+      <div class="c">СПАСИБО ЗА ПОКУПКУ!</div>
+    </article>
+  </div>
+
+  <section class="sum" aria-label="Итог проверки">
+    <p class="hw red">Сахара в чеке — 312 г.</p>
+    <p class="hw red big" id="cubes">Это 62 кубика!</p>
+    <div id="tally" aria-hidden="true"></div>
+  </section>
+
+  <section class="fix">
+    <h2>Работа над ошибками</h2>
+    <button class="swap" aria-pressed="false" data-pts="8" data-g="106" data-t="340">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path class="bx" d="M5 6.500C11 5.800 19 5.600 25.500 5.200C26 12 26.200 19 26.500 25.800C19.500 26.500 12 26.600 5.600 27C5.200 20 5 13 4.800 6"/><path class="tk" d="M8 15C10 18 11.500 20.500 13.500 23.500C17 15 22 8 30 1"/></svg>
+      <span class="t"><s>Кола</s> → минералка с лимоном</span>
+      <span class="d">−106 г сахара · −340 ₸</span>
+    </button>
+    <button class="swap" aria-pressed="false" data-pts="8" data-g="100" data-t="140">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path class="bx" d="M4.600 5.800C12 5.400 19 5.800 25.800 5.600C26.300 12 25.800 19 26 26.200C19 26.400 12 26.800 5.200 26.400C5 20 4.800 13 5 5.400"/><path class="tk" d="M8 15C10 18 11.500 20.500 13.500 23.500C17 15 22 8 30 1"/></svg>
+      <span class="t"><s>Сок</s> → ещё килограмм яблок</span>
+      <span class="d">−100 г сахара · −140 ₸</span>
+    </button>
+    <button class="swap" aria-pressed="false" data-pts="8" data-g="30" data-t="60">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path class="bx" d="M5.200 6C12 6.200 19 5.400 25.600 5.800C25.800 12 26.400 19 26.200 26C19 26.200 12 26 5 26.600C5.400 20 5 13 5.400 5.600"/><path class="tk" d="M8 15C10 18 11.500 20.500 13.500 23.500C17 15 22 8 30 1"/></svg>
+      <span class="t"><s>Питьевой йогурт</s> → кефир 1%</span>
+      <span class="d">−30 г сахара · −60 ₸</span>
+    </button>
+
+    <div class="regrade">
+      <span class="l">Оценка после<br>исправления:</span>
+      <span class="g" aria-live="polite"><svg viewBox="0 0 92 80" aria-hidden="true"><path id="gloop"/></svg><span id="grade">3</span></span>
+    </div>
+    <p class="save" id="save">Отметь замены, на которые согласен, — оценка пересчитается.</p>
+  </section>
+
+  <svg id="ink" aria-hidden="true"></svg>
+</main>
+
+<div class="cta"><button><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>Сканировать чек</button></div>
+
+<script>
+const NS='http://www.w3.org/2000/svg', $=s=>document.querySelector(s);
+const page=$('#page'), ink=$('#ink');
+const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── чек ── */
+const items=[['file','Филе куриное 1кг','2 450,00'],['kola','Кола 1л','620,00'],['grech','Гречка 800г','690,00'],['sok','Сок яблочный 1л','790,00'],['yabl','Яблоки 1кг','650,00'],['chips','Чипсы 150г','890,00'],['mol','Молоко 2,5% 1л','560,00'],['choco','Шоколад молочн. 90г','750,00'],['syrok','Сырок глазир. 2шт','440,00'],['ogur','Огурцы 0,5кг','430,00'],['yog','Йогурт питьевой','480,00'],['hleb','Хлеб ржаной','320,00'],['egg','Яйцо С1 10шт','800,00']];
+$('#rows').innerHTML=items.map(([k,n,p])=>`<div class="r" data-k="${k}"><span class="n">${n}</span><span>${p}</span></div>`).join('');
+
+let seed=11;
+const rnd=()=>(seed=seed*16807%2147483647)/2147483647, j=a=>(rnd()-.5)*2*a;
+
+(function qr(){
+  const n=21,s=3;let d='';
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const cx=x<8?x:x>12?x-14:-9, cy=y<8?y:y>12?y-14:-9, corner=cx>-9&&cy>-9&&!(x>12&&y>12);
+    let on;
+    if(corner) on=cx>=0&&cx<=6&&cy>=0&&cy<=6&&(cx===0||cx===6||cy===0||cy===6||(cx>=2&&cx<=4&&cy>=2&&cy<=4));
+    else on=rnd()>.52;
+    if(on)d+=`M${x*s},${y*s}h${s}v${s}h-${s}z`;
+  }
+  $('#qr').innerHTML=`<svg width="66" height="66" viewBox="-1.5 -1.5 66 66"><path d="${d}" fill="#2B2B31"/></svg>`;
+})();
+
+function teeth(){
+  const el=$('#receipt'),w=el.offsetWidth,h=el.offsetHeight,p=[];
+  for(let x=0,i=0;x<=w;x+=5,i++)p.push(`${x}px ${i%2?3:0}px`);
+  for(let x=w,i=0;x>=0;x-=5,i++)p.push(`${x}px ${h-(i%2?3:0)}px`);
+  el.style.clipPath=`polygon(${p.join(',')})`;
+}
+
+/* ── ручка ── */
+function spline(pts){
+  const f=v=>v.toFixed(1);let d=`M${f(pts[0][0])},${f(pts[0][1])}`;
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i-1]||pts[i],b=pts[i],c=pts[i+1],e=pts[i+2]||c;
+    d+=`C${f(b[0]+(c[0]-a[0])/6)},${f(b[1]+(c[1]-a[1])/6)} ${f(c[0]-(e[0]-b[0])/6)},${f(c[1]-(e[1]-b[1])/6)} ${f(c[0])},${f(c[1])}`;
+  }
+  return d;
+}
+const loop=(cx,cy,rx,ry,wob=1.1)=>{const pts=[],n=16,a0=-2.5+j(.25),tot=Math.PI*2+.6;
+  for(let i=0;i<=n;i++){const t=i/n,a=a0+tot*t,k=.95+t*.1;pts.push([cx+Math.cos(a)*rx*k+j(wob),cy+Math.sin(a)*ry*k+j(wob*.8)])}
+  return spline(pts)};
+const stroke=(x1,y1,x2,y2,bow=1.5)=>spline([[x1,y1],[(x1+x2)/2+j(bow),(y1+y2)/2+j(bow)],[x2,y2]]);
+const wavy=(x1,x2,y)=>{const n=Math.max(4,Math.round((x2-x1)/7)),pts=[];for(let i=0;i<=n;i++)pts.push([x1+(x2-x1)*i/n,y+(i%2?-2.2:2.2)+j(.5)]);return spline(pts)};
+const tick=(x,y,s=1)=>spline([[x,y],[x+4*s+j(.8),y+6*s+j(.8)],[x+13*s+j(1),y-9*s+j(1.2)]]);
+
+let G,t=0,held=[],anim=true;
+function rel(el){const r=el.getBoundingClientRect(),p=page.getBoundingClientRect();
+  return {x:r.left-p.left,y:r.top-p.top,w:r.width,h:r.height,r:r.right-p.left,b:r.bottom-p.top,cx:r.left-p.left+r.width/2,cy:r.top-p.top+r.height/2}}
+function path(d,o={}){
+  const p=document.createElementNS(NS,'path');p.setAttribute('d',d);
+  if(o.w)p.style.strokeWidth=o.w;
+  if(o.rot)p.setAttribute('transform',`rotate(-1.4 ${o.rot.cx} ${o.rot.cy})`);
+  G.appendChild(p);
+  if(anim){
+    const len=p.getTotalLength(),dur=Math.max(150,Math.min(620,len*2.3));
+    p.style.strokeDasharray=len;
+    const a=p.animate([{strokeDashoffset:len,opacity:0},{opacity:1,offset:.02},{strokeDashoffset:0,opacity:1}],{duration:dur,delay:o.hold?o.at:t,fill:'both',easing:'cubic-bezier(.3,.6,.4,1)'});
+    if(o.hold){a.pause();held.push(a)}else t+=dur*.9;
+  }
+}
+function note(x,y,lines,o={}){
+  const e=document.createElementNS(NS,'text');
+  e.setAttribute('transform',`rotate(${o.rot??-4} ${x} ${y})`);
+  if(o.size)e.style.fontSize=o.size+'px';
+  if(o.anchor)e.setAttribute('text-anchor',o.anchor);
+  lines.forEach((l,i)=>{const s=document.createElementNS(NS,'tspan');s.setAttribute('x',x);s.setAttribute('y',y+i*(o.lh||19));s.textContent=l;e.appendChild(s)});
+  G.appendChild(e);
+  if(anim){e.animate([{opacity:0},{opacity:1}],{duration:240,delay:t,fill:'both'});t+=300}
+}
+
+function draw(){
+  seed=23;t=650;held=[];
+  ink.innerHTML='<defs><filter id="pen" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.3"/></filter></defs><g filter="url(#pen)"></g>';
+  G=ink.lastChild;
+  const W=page.getBoundingClientRect().width, M=W-104, nx=M+9;
+  const row=k=>rel($(`[data-k="${k}"]`)), name=k=>rel($(`[data-k="${k}"] .n`));
+  const R=rel($('#rw'));
+
+  for(const k of ['file','grech','yabl','ogur']){const r=row(k);path(tick(r.x-12,r.cy+1,.75),{rot:r,w:1.9})}
+  t+=150;
+  let r=row('kola');path(loop(r.cx,r.cy,r.w/2+8,11.500),{rot:r});note(nx,r.cy-3,['21 кубик','сахара!']);
+  r=row('sok');path(loop(r.cx,r.cy,r.w/2+8,11.500),{rot:r});note(nx,r.cy+7,['+ ещё 20!']);
+  r=row('chips');let n=name('chips');path(wavy(n.x-1,n.r+3,n.b-4),{rot:r});note(nx,r.cy+7,['зачем?'],{rot:-6});
+  const a=row('choco'),b=row('syrok'),bx=a.r+2,mid=(a.cy+b.cy)/2;
+  path(spline([[bx,a.y+5],[bx+5,a.y+8],[bx+5,mid-5],[bx+10,mid],[bx+5,mid+5],[bx+5,b.b-8],[bx,b.b-5]]),{w:1.9});
+  note(nx+2,mid-3,['сладкое:','1 190 тг'],{rot:-3});
+  const v=rel($('#total .v'));
+  path(stroke(v.x-3,v.b-3,v.r+3,v.b-4.500));path(stroke(v.x-1,v.b+.5,v.r+4,v.b-1));
+  note(nx,v.cy-6,['3 490 тг —','на вредное'],{rot:-3});
+  t+=200;
+  const gx=M+52,gy=R.y+48;
+  note(gx,gy+30,['3'],{size:96,anchor:'middle',rot:-6});
+  path(loop(gx,gy,37,45,1.6),{w:2.5});
+
+  const c=rel($('#cubes'));
+  path(stroke(c.x+48,c.b+1,c.x+212,c.b-2),{hold:1,at:0});path(stroke(c.x+52,c.b+5,c.x+208,c.b+3),{hold:1,at:160});
+  const T=rel($('#tally'));let at=420,k=0;
+  for(let g=0;g<13;g++){
+    const x0=T.x+2+(g%7)*46,y0=T.y+4+Math.floor(g/7)*32,cnt=g<12?4:2;
+    for(let i=0;i<cnt;i++,k++){path(stroke(x0+i*7+j(1),y0+j(1.5),x0+i*7+j(1.2),y0+22+j(1.5),.8),{hold:1,at,w:1.9});at+=42}
+    if(g<12){path(stroke(x0-5,y0+17+j(1.5),x0+27,y0+5+j(1.5),1),{hold:1,at,w:1.9});at+=60}
+  }
+  if(!anim)return;
+  new IntersectionObserver((es,io)=>{if(es[0].isIntersecting){held.forEach(h=>h.play());io.disconnect()}},{threshold:.6}).observe($('#tally'));
+}
+
+/* ── пересдача ── */
+$('#gloop').setAttribute('d',loop(46,40,36,31,1.2));
+const swaps=[...document.querySelectorAll('.swap')];
+swaps.forEach(b=>b.addEventListener('click',()=>{
+  b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true');
+  const on=swaps.filter(s=>s.getAttribute('aria-pressed')==='true'),sum=f=>on.reduce((a,s)=>a+ +s.dataset[f],0),sc=54+sum('pts');
+  $('#grade').textContent=sc<60?'3':sc<68?'3+':sc<76?'4':'4+';
+  $('#save').textContent=on.length?`${sc} из 100 · −${sum('g')} г сахара · −${sum('t')} ₸ с такого чека`:'Отметь замены, на которые согласен, — оценка пересчитается.';
+}));
+
+document.fonts.ready.then(()=>requestAnimationFrame(()=>{anim=!still;teeth();draw()}));
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{anim=false;teeth();draw()},150)});
+</script>
+</body>
+</html>

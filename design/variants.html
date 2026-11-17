@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Чек-ап — варианты дизайна</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:#E9E7E2;color:#17171A;font-family:'Onest',system-ui,sans-serif;line-height:1.5}
+  button{font:inherit;cursor:pointer;border:0;touch-action:manipulation}
+  .page{max-width:1280px;margin:0 auto;padding:32px 16px 64px}
+  .page h1{font-family:'Unbounded',sans-serif;font-weight:700;font-size:clamp(22px,4vw,34px);margin:0 0 6px;letter-spacing:-.01em}
+  .page .lead{margin:0 0 32px;color:#55554F;max-width:60ch}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;align-items:start}
+  @media (max-width:1180px){.grid{grid-template-columns:1fr;gap:56px}}
+  .variant{display:flex;flex-direction:column;align-items:center}
+  .meta{width:100%;max-width:380px;margin-bottom:16px}
+  .meta .tag{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#17171A;color:#fff;font-weight:700;margin-right:8px}
+  .meta h2{display:inline;font-size:20px;font-weight:700;margin:0;vertical-align:middle}
+  .meta p{margin:8px 0 0;color:#55554F;font-size:15px}
+  .phone{width:100%;max-width:380px;border-radius:46px;border:10px solid #101012;overflow:hidden;background:#101012;box-shadow:0 24px 60px -24px rgba(0,0,0,.45)}
+  .screen{border-radius:36px;overflow:hidden}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ───────── A · ЧЕК ───────── */
+  .a{background:#12372A;padding:18px 16px 22px;font-family:'JetBrains Mono',ui-monospace,monospace;color:#1B1B1B}
+  .a-top{display:flex;justify-content:space-between;align-items:center;color:#F6F2E8;margin-bottom:22px;font-weight:800;letter-spacing:.08em;font-size:14px}
+  .a-top button{width:44px;height:44px;border-radius:50%;background:rgba(246,242,232,.12);color:#F6F2E8;display:grid;place-items:center}
+  .receipt{position:relative;background:#F6F2E8;padding:20px 16px 22px;font-size:12.5px;line-height:1.55}
+  .receipt::before,.receipt::after{content:"";position:absolute;left:0;right:0;height:8px;background-size:16px 8px;background-repeat:repeat-x}
+  .receipt::before{top:-8px;background-image:linear-gradient(45deg,#F6F2E8 25%,transparent 25%),linear-gradient(315deg,#F6F2E8 25%,transparent 25%);background-position:-8px 0,-8px 0}
+  .receipt::after{bottom:-8px;background-image:linear-gradient(135deg,#F6F2E8 25%,transparent 25%),linear-gradient(225deg,#F6F2E8 25%,transparent 25%);background-position:-8px 0,-8px 0}
+  .r-c{text-align:center}
+  .r-title{font-weight:800;font-size:17px;letter-spacing:.14em}
+  .r-sub{color:#55524A;font-size:11.5px}
+  .dash{border:0;border-top:1.5px dashed #1B1B1B;margin:12px 0;opacity:.55}
+  .r-score{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:2px}
+  .r-score b{font-size:64px;font-weight:800;line-height:1;letter-spacing:-.04em}
+  .r-score span{font-size:18px;font-weight:700;color:#55524A}
+  .segs{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;margin:10px 0 6px}
+  .segs i{height:12px;background:#1B1B1B}
+  .segs i.off{background:transparent;border:1.5px solid #1B1B1B;opacity:.4}
+  .row{display:grid;grid-template-columns:1fr 46px 62px;gap:6px;align-items:baseline}
+  .row .g,.row .p{text-align:right}
+  .row.h{font-size:10.5px;color:#55524A;letter-spacing:.06em;margin-bottom:2px}
+  .bad{display:inline-block;background:#1B1B1B;color:#F6F2E8;font-size:9.5px;font-weight:700;padding:0 4px;margin-left:4px;letter-spacing:.06em;vertical-align:1px}
+  .r-more{color:#55524A;margin-top:4px}
+  .sum{display:flex;justify-content:space-between;font-weight:800;font-size:14px}
+  .sum small{font-weight:500;font-size:11.5px;color:#55524A;display:block}
+  .stampbox{position:relative;padding-right:118px;min-height:92px}
+  .stamp{position:absolute;right:-2px;top:2px;width:112px;height:86px;border:3px solid #C8261B;color:#C8261B;border-radius:8px;transform:rotate(-9deg);display:grid;place-content:center;text-align:center;font-weight:800;line-height:1.05;letter-spacing:.04em;font-size:11px;mix-blend-mode:multiply}
+  .stamp b{font-size:32px;display:block;letter-spacing:-.02em}
+  .swap{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin-top:6px}
+  .swap .to{font-weight:700}
+  .swap .d{text-align:right;font-weight:700;white-space:nowrap}
+  .swap s{color:#55524A}
+  .total{background:#1B1B1B;color:#F6F2E8;padding:8px 10px;display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-top:12px}
+  .barcode{height:38px;margin:14px auto 6px;width:78%;background:repeating-linear-gradient(90deg,#1B1B1B 0 2px,transparent 2px 4px,#1B1B1B 4px 5px,transparent 5px 9px,#1B1B1B 9px 12px,transparent 12px 14px)}
+  .a-cta{margin-top:26px;width:100%;min-height:56px;background:#F2E64B;color:#1B1B1B;font-weight:800;letter-spacing:.08em;font-size:15px;display:flex;align-items:center;justify-content:center;gap:10px}
+
+  /* ───────── B · СВЕТОФОР ───────── */
+  .b{background:#FFF7E8;color:#1B1300;font-family:'Onest',sans-serif;padding-bottom:0}
+  .b-hero{background:#FFB703;padding:20px 20px 26px;border-radius:0 0 32px 32px}
+  .b-bar{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:14px}
+  .b-bar button{width:44px;height:44px;border-radius:50%;background:#1B1300;color:#FFF7E8;display:grid;place-items:center}
+  .b-score{font-family:'Unbounded',sans-serif;font-weight:900;font-size:112px;line-height:.95;letter-spacing:-.05em;margin:14px 0 0}
+  .b-verdict{font-family:'Unbounded',sans-serif;font-weight:700;font-size:20px;margin:6px 0 14px}
+  .b-verdict small{font-family:'Onest',sans-serif;font-weight:500;font-size:15px;opacity:.75;margin-left:6px}
+  .lights{display:inline-flex;gap:8px;background:#1B1300;padding:8px 12px;border-radius:999px;align-items:center}
+  .lights i{width:14px;height:14px;border-radius:50%;background:#4a3f25}
+  .lights i.on{background:#FFB703;box-shadow:0 0 0 3px rgba(255,183,3,.3)}
+  .lights span{color:#FFF7E8;font-size:13px;font-weight:600;margin-left:4px}
+  .b-body{padding:16px;display:grid;gap:12px}
+  .card{border-radius:28px;padding:18px}
+  .card h3{margin:0;font-size:14px;font-weight:600;opacity:.85}
+  .big{font-family:'Unbounded',sans-serif;font-weight:900;font-size:40px;line-height:1.05;letter-spacing:-.03em;margin:4px 0}
+  .c-sugar{background:#D62828;color:#fff}
+  .cubes{display:grid;grid-template-columns:repeat(16,1fr);gap:4px;margin:12px 0 10px}
+  .cubes i{aspect-ratio:1;background:#fff;border-radius:3px}
+  .c-sugar p,.c-money p{margin:0;font-size:14px;font-weight:500}
+  .c-money{background:#1B1300;color:#FFF7E8}
+  .meter{height:14px;border-radius:999px;background:#3a2f12;margin:12px 0 8px;overflow:hidden}
+  .meter i{display:block;height:100%;width:35%;background:#FFB703;border-radius:999px}
+  .c-swap{background:#17753F;color:#fff}
+  .c-swap .big{font-size:26px}
+  .pill{background:#fff;color:#1B1300;border-radius:18px;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:0 10px;align-items:center;margin-top:8px;font-size:14px}
+  .pill s{opacity:.6;font-size:13px}
+  .pill b{display:block;font-weight:700}
+  .pill .d{font-weight:700;color:#17753F;text-align:right;font-size:13px;line-height:1.35}
+  .b-cta{margin:4px 0 0;min-height:60px;border-radius:999px;background:#1B1300;color:#FFF7E8;font-family:'Unbounded',sans-serif;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:10px;width:100%}
+  .nav{display:grid;grid-template-columns:repeat(3,1fr);padding:8px 8px 14px;margin-top:6px}
+  .nav button{min-height:52px;background:none;display:grid;justify-items:center;gap:2px;font-size:12px;font-weight:600;color:inherit;opacity:.55}
+  .nav button[aria-current]{opacity:1}
+  .b .nav{border-top:2px solid #1B1300}
+
+  /* ───────── C · ПРИБОР ───────── */
+  .c{background:#0A0E0D;color:#E8EFEA;font-family:'Geologica',sans-serif;padding:20px 16px 0}
+  .c-bar{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#9BAAA2}
+  .c-bar strong{color:#E8EFEA;font-weight:500}
+  .gauge{position:relative;width:216px;height:216px;margin:18px auto 8px}
+  .gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .gauge .mid{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+  .gauge .mid b{font-size:76px;font-weight:300;line-height:1;letter-spacing:-.04em}
+  .gauge .mid span{font-size:13px;color:#9BAAA2;letter-spacing:.08em;text-transform:uppercase}
+  .c-verdict{text-align:center;font-size:15px;color:#FFB020;margin-bottom:18px;display:flex;gap:8px;justify-content:center;align-items:center}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .tile{background:#141A18;border:1px solid #222B28;border-radius:18px;padding:12px}
+  .tile b{display:block;font-size:24px;font-weight:500;letter-spacing:-.02em}
+  .tile span{font-size:12px;color:#9BAAA2}
+  .panel{background:#141A18;border:1px solid #222B28;border-radius:22px;padding:16px;margin-top:10px}
+  .panel h3{margin:0 0 12px;font-size:13px;font-weight:500;color:#9BAAA2;letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between}
+  .panel h3 em{font-style:normal;color:#E8EFEA;text-transform:none;letter-spacing:0}
+  .hbar{display:grid;grid-template-columns:86px 1fr 44px;gap:10px;align-items:center;font-size:13.5px;margin-top:8px}
+  .hbar .t{height:8px;border-radius:99px;background:#222B28;overflow:hidden}
+  .hbar .t i{display:block;height:100%;border-radius:99px;background:#FF5C5C}
+  .hbar .v{text-align:right;color:#9BAAA2}
+  .sw{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-top:1px solid #222B28;font-size:14px}
+  .sw:first-of-type{border-top:0;padding-top:0}
+  .sw s{color:#7C8B84;font-size:13px}
+  .sw b{font-weight:500;display:block}
+  .sw .d{color:#C8F53C;text-align:right;font-size:13px;line-height:1.5}
+  .after{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:12px;border-top:1px solid #222B28;font-size:14px}
+  .after b{font-size:26px;font-weight:400;color:#C8F53C}
+  .c-cta{margin-top:14px;width:100%;min-height:58px;border-radius:18px;background:#C8F53C;color:#0A0E0D;font-weight:600;font-size:16px;display:flex;align-items:center;justify-content:center;gap:10px}
+  .c .nav{border-top:1px solid #222B28;margin:14px -16px 0}
+  .c .nav button[aria-current]{color:#C8F53C}
+  svg.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Чек-ап: три направления дизайна</h1>
+  <p class="lead">Один и тот же экран — результат после сканирования чека из Magnum на 9 870 ₸. Данные одинаковые, меняется только характер приложения.</p>
+
+  <div class="grid">
+
+    <!-- ══════════ A ══════════ -->
+    <section class="variant" aria-labelledby="ta">
+      <div class="meta">
+        <span class="tag">A</span><h2 id="ta">«Чек»</h2>
+        <p>Результат печатается как второй чек — «чек здоровья». Моноширинный шрифт, бумага, красный штамп.</p>
+      </div>
+      <div class="phone"><div class="screen a">
+        <div class="a-top">
+          <span>ЧЕК-АП</span>
+          <button aria-label="Меню"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        </div>
+        <div class="receipt">
+          <div class="r-c">
+            <div class="r-title">ЧЕК ЗДОРОВЬЯ</div>
+            <div class="r-sub">MAGNUM · 16.11.2026 · 18:42</div>
+            <div class="r-sub">13 позиций · 9 870 ₸</div>
+          </div>
+          <hr class="dash">
+          <div class="r-c r-sub">ОЦЕНКА КОРЗИНЫ</div>
+          <div class="r-score num"><b>54</b><span>/100</span></div>
+          <div class="segs" id="segs" aria-hidden="true"></div>
+          <div class="r-c" style="font-weight:700">ТАК СЕБЕ</div>
+          <hr class="dash">
+          <div class="row h"><span>ТОВАР</span><span class="g">САХАР</span><span class="p">ЦЕНА</span></div>
+          <div class="row num"><span>Кола 1 л<span class="bad">ВРЕД</span></span><span class="g">106 г</span><span class="p">620 ₸</span></div>
+          <div class="row num"><span>Сок ябл. 1 л<span class="bad">ВРЕД</span></span><span class="g">100 г</span><span class="p">790 ₸</span></div>
+          <div class="row num"><span>Шоколад 90 г<span class="bad">ВРЕД</span></span><span class="g">50 г</span><span class="p">750 ₸</span></div>
+          <div class="row num"><span>Сырки ×2<span class="bad">ВРЕД</span></span><span class="g">24 г</span><span class="p">440 ₸</span></div>
+          <div class="row num"><span>Чипсы 150 г<span class="bad">ВРЕД</span></span><span class="g">2 г</span><span class="p">890 ₸</span></div>
+          <div class="row num"><span>Йогурт питьевой</span><span class="g">30 г</span><span class="p">480 ₸</span></div>
+          <div class="r-more">+ ещё 7 позиций — всё ок</div>
+          <hr class="dash">
+          <div class="stampbox">
+            <div class="sum num"><span>САХАР ВСЕГО</span><span>312 г</span></div>
+            <div class="r-sub">норма взрослого на 6 дней</div>
+            <div class="sum num" style="margin-top:10px"><span>ВРЕДНОЕ</span><span>3 490 ₸</span></div>
+            <div class="r-sub">35% этого чека</div>
+            <div class="stamp num"><b>62</b>КУБИКА<br>САХАРА</div>
+          </div>
+          <hr class="dash">
+          <div style="font-weight:800;letter-spacing:.1em">ЗАМЕНЫ</div>
+          <div class="swap num"><span><s>Кола</s> → <span class="to">Минералка с лимоном</span></span><span class="d">−340 ₸</span></div>
+          <div class="swap num"><span><s>Сок</s> → <span class="to">Яблоки 1 кг</span></span><span class="d">−140 ₸</span></div>
+          <div class="swap num"><span><s>Йогурт</s> → <span class="to">Кефир 1%</span></span><span class="d">−60 ₸</span></div>
+          <div class="total num"><span>С ЗАМЕНАМИ</span><span>78/100 · −540 ₸</span></div>
+          <div class="barcode" aria-hidden="true"></div>
+          <div class="r-c r-sub">СПАСИБО, ЧТО ЕДИТЕ С УМОМ</div>
+        </div>
+        <button class="a-cta"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>СКАНИРОВАТЬ ЧЕК</button>
+      </div></div>
+    </section>
+
+    <!-- ══════════ B ══════════ -->
+    <section class="variant" aria-labelledby="tb">
+      <div class="meta">
+        <span class="tag">B</span><h2 id="tb">«Светофор»</h2>
+        <p>Яркие плоские блоки и огромная цифра. Цвет экрана меняется от оценки: зелёный, жёлтый, красный.</p>
+      </div>
+      <div class="phone"><div class="screen b">
+        <div class="b-hero">
+          <div class="b-bar">
+            <span>Magnum · 16 ноября · 9 870 ₸</span>
+            <button aria-label="Поделиться"><svg class="ic" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></button>
+          </div>
+          <div class="b-score num">54</div>
+          <div class="b-verdict">Так себе<small>из 100</small></div>
+          <div class="lights" role="img" aria-label="Оценка: жёлтая зона"><i></i><i class="on"></i><i></i><span>жёлтая зона</span></div>
+        </div>
+        <div class="b-body">
+          <div class="card c-sugar">
+            <h3>Сахар в этом чеке</h3>
+            <div class="big num">62 кубика</div>
+            <div class="cubes" id="cubes" aria-hidden="true"></div>
+            <p class="num">312 г — норма взрослого на 6 дней</p>
+          </div>
+          <div class="card c-money">
+            <h3>На вредное ушло</h3>
+            <div class="big num">3 490 ₸</div>
+            <div class="meter" role="img" aria-label="35 процентов чека"><i></i></div>
+            <p>35% чека: кола, сок, чипсы, шоколад, сырки</p>
+          </div>
+          <div class="card c-swap">
+            <h3>Замени три товара</h3>
+            <div class="big num">будет 78 и −540 ₸</div>
+            <div class="pill num"><span><s>Кола 1 л</s><b>Минералка с лимоном</b></span><span class="d">−106 г<br>−340 ₸</span></div>
+            <div class="pill num"><span><s>Сок яблочный</s><b>Яблоки 1 кг</b></span><span class="d">−100 г<br>−140 ₸</span></div>
+            <div class="pill num"><span><s>Питьевой йогурт</s><b>Кефир 1%</b></span><span class="d">−30 г<br>−60 ₸</span></div>
+          </div>
+          <button class="b-cta"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>Сканировать чек</button>
+        </div>
+        <nav class="nav" aria-label="Разделы">
+          <button aria-current="page"><svg class="ic" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg>Чеки</button>
+          <button><svg class="ic" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Неделя</button>
+          <button><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 5a3 3 0 0 1 0 6M18 15c2 .6 3 2.500 3 5"/></svg>Семья</button>
+        </nav>
+      </div></div>
+    </section>
+
+    <!-- ══════════ C ══════════ -->
+    <section class="variant" aria-labelledby="tc">
+      <div class="meta">
+        <span class="tag">C</span><h2 id="tc">«Прибор»</h2>
+        <p>Тёмный интерфейс как у фитнес-трекера: шкала, графики, точные цифры. Выглядит дорого и технологично.</p>
+      </div>
+      <div class="phone"><div class="screen c">
+        <div class="c-bar"><span>Magnum · 16 ноября</span><strong class="num">9 870 ₸</strong></div>
+        <div class="gauge" role="img" aria-label="Оценка корзины 54 из 100">
+          <svg viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#222B28" stroke-width="10"/>
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#FFB020" stroke-width="10" stroke-linecap="round" stroke-dasharray="237.5 439.8"/>
+          </svg>
+          <div class="mid"><b class="num">54</b><span>из 100</span></div>
+        </div>
+        <div class="c-verdict"><svg class="ic" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M12 9v4M12 17h.01M10.3 4.3 2.6 17.5A2 2 0 0 0 4.300 20.500h15.400a2 2 0 0 0 1.700-3L13.700 4.300a2 2 0 0 0-3.400 0z"/></svg>Так себе — много сахара</div>
+        <div class="tiles">
+          <div class="tile"><b class="num">312 г</b><span>сахара</span></div>
+          <div class="tile"><b class="num">62</b><span>кубика</span></div>
+          <div class="tile"><b class="num">35%</b><span>вредное</span></div>
+        </div>
+        <div class="panel">
+          <h3>Откуда сахар <em class="num">312 г</em></h3>
+          <div class="hbar num"><span>Кола</span><span class="t"><i style="width:100%"></i></span><span class="v">106 г</span></div>
+          <div class="hbar num"><span>Сок</span><span class="t"><i style="width:94%"></i></span><span class="v">100 г</span></div>
+          <div class="hbar num"><span>Шоколад</span><span class="t"><i style="width:47%"></i></span><span class="v">50 г</span></div>
+          <div class="hbar num"><span>Йогурт</span><span class="t"><i style="width:28%"></i></span><span class="v">30 г</span></div>
+          <div class="hbar num"><span>Сырки</span><span class="t"><i style="width:23%"></i></span><span class="v">24 г</span></div>
+        </div>
+        <div class="panel">
+          <h3>Замены <em>в том же магазине</em></h3>
+          <div class="sw num"><span><s>Кола 1 л</s><b>Минералка с лимоном</b></span><span class="d">−106 г<br>−340 ₸</span></div>
+          <div class="sw num"><span><s>Сок яблочный 1 л</s><b>Яблоки 1 кг</b></span><span class="d">−100 г<br>−140 ₸</span></div>
+          <div class="sw num"><span><s>Питьевой йогурт</s><b>Кефир 1%</b></span><span class="d">−30 г<br>−60 ₸</span></div>
+          <div class="after num"><span>Оценка с заменами</span><b>78</b></div>
+        </div>
+        <button class="c-cta"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>Сканировать чек</button>
+        <nav class="nav" aria-label="Разделы">
+          <button aria-current="page"><svg class="ic" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg>Чеки</button>
+          <button><svg class="ic" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Неделя</button>
+          <button><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 5a3 3 0 0 1 0 6M18 15c2 .6 3 2.500 3 5"/></svg>Семья</button>
+        </nav>
+      </div></div>
+    </section>
+
+  </div>
+</main>
+<script>
+  const segs=document.getElementById('segs');
+  for(let i=0;i<20;i++){const s=document.createElement('i');if(i>=11)s.className='off';segs.appendChild(s)}
+  const cubes=document.getElementById('cubes');
+  for(let i=0;i<62;i++)cubes.appendChild(document.createElement('i'));
+</script>
+</body>
+</html>

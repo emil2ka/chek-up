@@ -1,0 +1,236 @@
+/* Экран сканирования */
+
+.scan {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: calc(env(safe-area-inset-top) + 10px) 20px calc(env(safe-area-inset-bottom) + 28px);
+  color: var(--white);
+}
+.scan-top {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  min-height: 48px;
+}
+.scan-step {
+  text-align: center;
+  color: color-mix(in srgb, var(--white) 82%, transparent);
+}
+
+/* ── Чек под сканером ── */
+.scan-stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 0 18px;
+}
+.scan-frame {
+  --fw: min(62vw, 250px, calc(42dvh / 1.4));
+  position: relative;
+  width: var(--fw);
+  aspect-ratio: 1 / 1.4;
+  filter: drop-shadow(0 24px 30px color-mix(in srgb, var(--ink) 45%, transparent));
+  animation: scan-in 460ms cubic-bezier(.2, .9, .25, 1.15) both;
+}
+.corner {
+  position: absolute;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border: 0 solid var(--white);
+}
+.corner.tl { top: -16px; left: -16px; border-width: 4px 0 0 4px; border-radius: 12px 0 0 0; }
+.corner.tr { top: -16px; right: -16px; border-width: 4px 4px 0 0; border-radius: 0 12px 0 0; }
+.corner.bl { bottom: -16px; left: -16px; border-width: 0 0 4px 4px; border-radius: 0 0 0 12px; }
+.corner.br { bottom: -16px; right: -16px; border-width: 0 4px 4px 0; border-radius: 0 0 12px 0; }
+.corner { animation: corner-pulse 1.3s ease-in-out infinite alternate; }
+
+.paper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px 30px;
+  overflow: hidden;
+  border-radius: 8px 8px 0 0;
+  background: var(--white);
+  color: var(--ink);
+  /* зубчатый отрыв снизу */
+  -webkit-mask: conic-gradient(from -45deg at bottom, transparent, var(--white) 1deg 89deg, transparent 90deg) 50% / 16px 100%;
+  mask: conic-gradient(from -45deg at bottom, transparent, var(--white) 1deg 89deg, transparent 90deg) 50% / 16px 100%;
+  transform: rotate(-2.5deg);
+  animation: paper-bob 2.8s ease-in-out infinite alternate;
+}
+.paper.has-photo { padding: 0; background: var(--tint); }
+.paper-photo { width: 100%; height: 100%; object-fit: cover; }
+
+.paper-head {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed var(--line);
+  min-height: 52px;
+}
+.paper-store {
+  font-family: var(--font-d);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -.03em;
+  min-height: 1.2em;
+}
+.paper-date { font-weight: 700; font-size: 12px; color: var(--mute); min-height: 1.2em; }
+.paper-lines {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  flex: 1;
+  margin-top: 14px;
+  overflow: hidden;
+}
+.paper-lines i {
+  display: block;
+  width: var(--w);
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--line) 0 68%, transparent 68% 78%, color-mix(in srgb, var(--mute) 40%, var(--white)) 78%);
+  animation: line-in 300ms ease-out both;
+  animation-delay: var(--d);
+}
+.paper-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 2px dashed var(--line);
+}
+.paper-total i { display: block; height: 10px; border-radius: 4px; background: var(--ink); }
+.paper-total i:first-child { width: 34%; }
+.paper-total i:last-child { width: 24%; }
+
+/* Светящаяся линия сканера */
+.beam {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  animation: beam 1.25s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+.beam::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 70px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--blue-3) 45%, transparent));
+}
+.beam span {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: -2px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--blue-2);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--white) 70%, transparent),
+    0 0 14px 3px var(--blue-3),
+    0 0 34px 10px color-mix(in srgb, var(--blue-2) 55%, transparent);
+}
+
+/* ── Подписи ── */
+.scan-info { text-align: center; }
+.scan-title { font-size: 30px; letter-spacing: -.045em; }
+.dots i { font-style: normal; animation: dot-blink 1s infinite both; }
+.dots i:nth-child(2) { animation-delay: 160ms; }
+.dots i:nth-child(3) { animation-delay: 320ms; }
+
+.scan-ticker {
+  position: relative;
+  height: 66px;
+  margin-top: 14px;
+  overflow: hidden;
+}
+.tick {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 46px;
+  height: fit-content;
+  margin: auto;
+  padding: 10px 18px;
+  border-radius: 23px;
+  background: color-mix(in srgb, var(--white) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--white) 25%, transparent);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.3;
+  text-align: left;
+  text-wrap: balance;
+  animation: tick-in 260ms cubic-bezier(.2, .9, .3, 1.2) both;
+}
+.tick b { font-family: var(--font-d); font-weight: 800; white-space: nowrap; }
+.tick.is-wait { background: transparent; box-shadow: none; color: color-mix(in srgb, var(--white) 80%, transparent); }
+.tick.out { animation: tick-out 240ms ease-in both; }
+.tick-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--white);
+  box-shadow: 0 0 10px var(--white);
+}
+
+.scan-count { margin-top: 18px; display: grid; justify-items: center; }
+.scan-num {
+  font-family: var(--font-d);
+  font-weight: 900;
+  font-size: 68px;
+  line-height: .95;
+  letter-spacing: -.06em;
+  font-variant-numeric: tabular-nums;
+}
+.scan-num.bump { animation: bump 260ms cubic-bezier(.3, 1.6, .5, 1); }
+.scan-unit {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--white) 86%, transparent);
+}
+
+@keyframes scan-in { from { opacity: 0; transform: translateY(30px) scale(.9); } }
+@keyframes paper-bob {
+  from { transform: rotate(-2.5deg) translateY(0); }
+  to { transform: rotate(-1deg) translateY(-6px); }
+}
+@keyframes corner-pulse { to { opacity: .55; } }
+@keyframes line-in { from { opacity: 0; transform: scaleX(.3); transform-origin: left; } }
+@keyframes beam {
+  from { top: 0%; }
+  to { top: 100%; }
+}
+@keyframes dot-blink { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
+@keyframes tick-in { from { opacity: 0; transform: translateY(26px); } }
+@keyframes tick-out { to { opacity: 0; transform: translateY(-26px); } }
+@keyframes bump { from { transform: scale(1.18); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .beam { top: 45%; animation: none !important; }
+  .paper { transform: rotate(-2deg); }
+  .dots i, .corner { animation: none !important; }
+}
+
+@media (max-height: 680px) {
+  .scan-stage { padding: 18px 0 12px; }
+  .scan-num { font-size: 54px; }
+  .scan-ticker { margin-top: 10px; }
+}

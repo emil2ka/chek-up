@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'calendar.dart';
+import 'cart.dart';
 import 'engine.dart';
 import 'i18n.dart';
 import 'insights.dart';
@@ -274,6 +275,7 @@ class AppStore extends ChangeNotifier {
         receipt: demo ? null : r,
       ),
     );
+    if (!demo) unawaited(carts.settle(r, e.id));
     return (id: e.id, duplicate: false);
   }
 
@@ -945,6 +947,7 @@ class AppStore extends ChangeNotifier {
     _dirty = {};
     _tombHistory = {};
     _tombShop = {};
+    carts.clear();
     history = const [];
     shop = const [];
     marks = const [];

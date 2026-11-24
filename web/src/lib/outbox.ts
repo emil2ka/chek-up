@@ -1,6 +1,7 @@
 // Очередь чеков: сфоткал и убрал телефон. Фото лежат в IndexedDB этого устройства, читаются по одному в фоне,
 // без сети ждут. Как только чек прочитан, фото удаляется. Только для клиента.
 import { todayIso } from './calendar';
+import { carts } from './cartStore';
 import { analyze } from './engine';
 import { isDemo, receiptOf } from './insights';
 import { findDuplicate } from './plan';
@@ -107,6 +108,7 @@ export function saveReceipt(receipt: Receipt): { entryId: string; duplicate: boo
   if (dup) return { entryId: dup.id, duplicate: true };
   const a = analyze(receipt);
   const e = history.save({ id: history.newId(), receiptId: receipt.id, store: receipt.store, date: receipt.date, cubes: a.cubes, score: a.score, swaps: [], receipt });
+  carts.settle(receipt, e.id);
   return { entryId: e.id, duplicate: false };
 }
 

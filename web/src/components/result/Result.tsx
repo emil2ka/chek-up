@@ -14,6 +14,7 @@ import { IconChevron, IconEdit } from '@/components/icons';
 import { MetricTabs } from '@/components/ui/MetricTabs';
 import { SixGrid } from '@/components/ui/SixMetrics';
 import { rowCls, iconCls, Switch } from '@/components/ui/kit';
+import { CartFactCard } from '@/components/cart/CartFactCard';
 import { conclusion, metricPhrase, resultModel, swapRows } from './model';
 import { Prices } from './Prices';
 import { attachPile, type PileHandle } from './attachPile';
@@ -42,7 +43,7 @@ const noop = () => () => {};
 const sortNums = (a: number, b: number) => a - b;
 const NO_OFF: number[] = [];
 
-export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score, level = 0, author, demo, onBack, onScan, onSwaps, onFlags, onEdit }: ResultProps) {
+export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score, level = 0, author, demo, cart, onBack, onScan, onSwaps, onFlags, onEdit }: ResultProps) {
   const [metric, setMetric] = useState<MetricId>('sugar');
   const model = useMemo(() => resultModel(receipt, swaps, metric, off, score), [receipt, swaps, metric, off, score]);
   const rows = useMemo(() => swapRows(receipt, metric, off), [receipt, metric, off]);
@@ -206,6 +207,8 @@ export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score,
             {author ? ` · ${t('внесено: {n}', { n: author })}` : ''}{demo ? ` · ${t('пример, в учёт не идёт')}` : ''}{other ? ` · ${t('не считаем: {n}', { n: other })}` : ''}
           </p>
         </section>
+
+        {cart && <CartFactCard fact={cart} />}
 
         <section className="rs-sec" aria-labelledby="rs-h-all">
           <h2 id="rs-h-all" className="rs-h">{t('Всё, что в чеке')}</h2>

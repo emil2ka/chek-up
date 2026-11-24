@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#1238F5",
     "theme_color": "#1238F5",
-    "description": "Чек-ап: узнай всё, что в твоих чеках",
+    "description": "Чек-ап: узнай всё, что ты покупаешь",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

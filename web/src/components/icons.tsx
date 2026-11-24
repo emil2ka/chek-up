@@ -163,3 +163,17 @@ export const IconClock = (p: P) => (
     <circle cx="12" cy="12" r="8.200" /><path d="M12 7.500V12l3 2" />
   </svg>
 );
+
+export const IconBasket = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <path d="M3.5 10h17l-1.6 8.2a2 2 0 0 1-2 1.6H7.1a2 2 0 0 1-2-1.6z" />
+    <path d="M8 10l3-6M16 10l-3-6M9.5 13.5v3M14.5 13.5v3" />
+  </svg>
+);
+
+export const IconHome = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.3} {...p}>
+    <path d="M4 11.2L12 4.5l8 6.7V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+    <path d="M9.5 20v-5.5h5V20" />
+  </svg>
+);

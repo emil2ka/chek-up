@@ -14,6 +14,7 @@ import '../core/outbox.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
 import '../ui/metric_icon.dart';
+import 'cart.dart';
 import 'shell.dart';
 
 const _duration =
@@ -90,6 +91,21 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     if (!mounted) return;
     if (o.kind == 'error') {
       _waiter?.cancel();
+      if (o.code == 'not_receipt' && widget.photos.isNotEmpty) {
+        final nav = Navigator.of(context), photos = widget.photos;
+        nav.pop();
+        showToast(
+          t('Похоже, это не чек'),
+          action: (
+            label: t('Это корзина'),
+            run: () {
+              unawaited(outbox.remove(_jobId));
+              scanCart(nav, photos);
+            },
+          ),
+        );
+        return;
+      }
       showToast(
         o.code == 'unavailable' || o.code == 'rate_limit'
             ? t('Чек в очереди: прочитаем, как только получится')

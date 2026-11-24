@@ -1,6 +1,7 @@
 // «Профиль»: состав семьи и норма, достижения, справка и очистка истории.
 import 'package:flutter/material.dart';
 
+import '../core/cart.dart';
 import '../core/engine.dart';
 import '../core/i18n.dart';
 import '../core/insights.dart';
@@ -434,6 +435,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onYes: () {
                       setState(() => _confirm = false);
                       store.clearMine();
+                      carts.clear();
                       showToast(t('Твои чеки удалены'));
                     },
                   )

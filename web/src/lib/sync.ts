@@ -1,5 +1,6 @@
 // Синхронизация с сервером «Чек-апа» (тот же аккаунт, что у мобильного приложения). Только для клиента.
 // Отправляем только изменённое (dirty.ts), получаем изменения семьи после последнего номера. Контракт — src/lib/syncSchema.ts.
+import { carts } from './cartStore';
 import { dirty } from './dirty';
 import { familyStore, weekMarks } from './family';
 import { history, subscribeHistory, tombstones } from './store';
@@ -270,7 +271,7 @@ export function wipeDevice(): void {
     clearTimeout(retry);
     memAuth = null;
     for (const k of [AUTH_KEY, CURSOR_KEY]) try { localStorage.removeItem(k); } catch { /* ничего */ }
-    dirty.clear(); history.wipe(); profile.wipe(); weekMarks.clear(); familyStore.clear();
+    dirty.clear(); history.wipe(); carts.clear(); profile.wipe(); weekMarks.clear(); familyStore.clear();
     set(IDLE);
   } finally {
     applying = false;

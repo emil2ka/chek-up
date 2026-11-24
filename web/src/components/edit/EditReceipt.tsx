@@ -28,6 +28,8 @@ type Props = {
   off: number[];
   /** новый чек, введённый вручную */
   manual?: boolean;
+  /** корзина до кассы: без магазина, даты и возврата */
+  cart?: boolean;
   entries: HistoryEntry[];
   onSave(r: EditResult): void;
   onClose(): void;
@@ -61,7 +63,7 @@ export function usualItems(entries: HistoryEntry[], limit = 8): ReceiptItem[] {
   return [...by.values()].filter(x => x.n >= 2).sort((a, b) => b.n - a.n || b.at.localeCompare(a.at)).slice(0, limit).map(x => x.it);
 }
 
-export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, onDelete }: Props) {
+export function EditReceipt({ receipt, off, manual, cart, entries, onSave, onClose, onDelete }: Props) {
   const [store, setStore] = useState(receipt.store === 'Магазин' && manual ? '' : receipt.store);
   const [date, setDate] = useState(receipt.date);
   const [refund, setRefund] = useState(!!receipt.refund);
@@ -109,19 +111,20 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
 
   return (
     <Sheet
-      title={manual ? t('Чек вручную') : t('Изменить чек')}
-      kicker={manual ? undefined : receipt.store}
+      title={manual ? t('Чек вручную') : cart ? t('Исправить корзину') : t('Изменить чек')}
+      kicker={manual || cart ? undefined : receipt.store}
       onClose={onClose}
       footer={
         <div className="grid gap-2">
           <p className="flex items-baseline justify-between px-1 text-[14px] font-bold text-mute" aria-live="polite">
-            <span>{money(sum)}{gap ? <span className="text-[#B26A00]"> · {t('на чеке')} {money(receipt.sum!)}</span> : ''}</span>
-            {rows.length > 0 && <span>{a.cubes} {pl(a.cubes, SUGAR_CUBES)} · {a.score}/100</span>}
+            <span>{cart && !sum ? t('без цен') : money(sum)}{gap ? <span className="text-[#B26A00]"> · {t('на чеке')} {money(receipt.sum!)}</span> : ''}</span>
+            {rows.length > 0 && <span>{a.cubes} {pl(a.cubes, SUGAR_CUBES)}{cart ? '' : ` · ${a.score}/100`}</span>}
           </p>
           <button type="button" className={primaryCls} disabled={!rows.length || badDate} onClick={save}>{t('Сохранить')}</button>
         </div>
       }
     >
+      {!cart && (
       <div className="grid grid-cols-2 gap-2">
         <label className="col-span-2 grid gap-1">
           <span className="text-[13px] font-bold text-mute">{t('Магазин')}</span>
@@ -134,6 +137,7 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
         </label>
         <div className="self-end"><Switch label={t('Возврат')} checked={refund} onChange={setRefund} /></div>
       </div>
+      )}
       {badDate && <p className="mt-1 px-1 text-[13px] font-bold text-bad">{t('Дата не может быть в будущем')}</p>}
       {unsure > 0 && <p className="mt-3 rounded-2xl bg-[color-mix(in_srgb,var(--mid)_16%,var(--white))] px-3.5 py-3 text-[14px] leading-snug font-bold">{t('Проверь {n} {w}: прочитались плохо.', { n: unsure, w: pl(unsure, CHECK_F) })}</p>}
       {!!gap && <p className="mt-2 rounded-2xl bg-[color-mix(in_srgb,var(--mid)_16%,var(--white))] px-3.5 py-3 text-[14px] leading-snug font-bold">{gap < 0 ? t('Не хватает {n} до суммы на чеке: возможно, пропущена строка.', { n: money(-gap) }) : t('На {n} больше суммы на чеке: возможно, есть лишняя строка или скидка.', { n: money(gap) })}</p>}
@@ -150,7 +154,7 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
                     {r.off ? t('не для нас') : r.it.nf ? t('не еда') : `${t('сахар')} ${amountTxt(r.it.s, 'sugar')}${r.it.w ? ` · ${t('на {n} нед.', { n: r.it.w })}` : ''}`}
                   </span>
                 </span>
-                <b className="font-display text-[15px] font-extrabold whitespace-nowrap tabular-nums">{money(r.it.p)}</b>
+                <b className="font-display text-[15px] font-extrabold whitespace-nowrap tabular-nums">{cart && !r.it.p ? '' : money(r.it.p)}</b>
                 <IconChevron className={`size-5 text-mute transition-transform ${expanded ? 'rotate-90' : ''}`} />
               </button>
               {expanded && (
@@ -161,7 +165,7 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
                   </label>
                   {r.it.raw && r.it.raw !== r.it.n && <p className="px-1 text-[13px] font-semibold text-mute">{t('На чеке')}: {r.it.raw}</p>}
                   <NumField label={t('Цена')} unit="₸" value={r.it.p} onChange={v => set(r.key, x => ({ ...x, it: { ...reprice(x.it, Math.round(v)), q: undefined } }))} />
-                  <Switch label={t('Не для нас')} hint={t('подарок, для соседей: не считать')} checked={r.off} onChange={v => set(r.key, x => ({ ...x, off: v }))} />
+                  {!cart && <Switch label={t('Не для нас')} hint={t('подарок, для соседей: не считать')} checked={r.off} onChange={v => set(r.key, x => ({ ...x, off: v }))} />}
                   <Switch label={t('Не еда')} checked={!!r.it.nf} onChange={v => patch(r.key, v ? { nf: 1 } : { nf: undefined })} />
                   {!r.it.nf && (
                     <>
@@ -194,18 +198,18 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
           </div>
         : <button type="button" className="mt-4 min-h-12 w-full rounded-2xl text-[14px] font-bold text-bad" onClick={() => setConfirm(true)}>{t('Удалить чек')}</button>)}
 
-      <AnimatePresence>{adding && <AddItem usual={usual} onAdd={add} onClose={() => setAdding(false)} />}</AnimatePresence>
+      <AnimatePresence>{adding && <AddItem cart={cart} usual={usual} onAdd={add} onClose={() => setAdding(false)} />}</AnimatePresence>
     </Sheet>
   );
 }
 
-function AddItem({ usual, onAdd, onClose }: { usual: ReceiptItem[]; onAdd(it: ReceiptItem): void; onClose(): void }) {
+function AddItem({ usual, cart, onAdd, onClose }: { usual: ReceiptItem[]; cart?: boolean; onAdd(it: ReceiptItem): void; onClose(): void }) {
   const [q, setQ] = useState('');
   const query = q.toLowerCase().replaceAll('ё', 'е').trim();
   const found = query ? CATALOG.filter(c => c.name.toLowerCase().replaceAll('ё', 'е').includes(query)).slice(0, 5) : [];
   const submit = () => { if (q.trim()) onAdd(buildItem(lineOf({ n: q.trim(), p: 0 }))); };
   return (
-    <Sheet title={t('Что купили?')} onClose={onClose}>
+    <Sheet title={cart ? t('Что ещё в корзине?') : t('Что купили?')} onClose={onClose}>
       <form onSubmit={e => { e.preventDefault(); submit(); }} className="grid gap-2">
         <input data-autofocus className={inputCls} value={q} maxLength={120} onChange={e => setQ(e.target.value)} placeholder={t('Кола 1 л, хлеб, яблоки 1,2 кг')} aria-label={t('Название с весом или объёмом')} enterKeyHint="done" />
         <button type="submit" className={primaryCls} disabled={!q.trim()}>{t('Добавить')}</button>

@@ -40,7 +40,7 @@ type GridProps = {
 /** Плитки со значениями; с onChange нажатие выбирает показатель. */
 export function SixGrid({ totals, available = METRIC_IDS, value, onChange, ratio }: GridProps) {
   return (
-    <ul className="grid grid-cols-3 gap-2">
+    <ul className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-3">
       {METRIC_IDS.map(m => {
         const known = available.includes(m), on = value === m;
         const body = (

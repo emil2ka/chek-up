@@ -5,11 +5,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { addDays } from './calendar';
+import { advise, cartAnalysis, cartMoney, decide, moves, weekAdd } from './cart';
 import { analyze } from './engine';
 import { completeness, goalState, monthStats, receiptOf, weekFacts, weekStats } from './insights';
 import { confirmedSwaps, findDuplicate, sameFood } from './plan';
 import { computeStreak, weekToClose, type WeekMark } from './streak';
-import type { HistoryEntry, Receipt, ReceiptItem } from './types';
+import type { Cart, HistoryEntry, Receipt, ReceiptItem } from './types';
 
 let seed = 20261124;
 const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
@@ -56,6 +57,12 @@ function build() {
     goal: goalState(entries, p, marks, 10, { week: '2026-11-23', now: NOW }),
     completeness: completeness(entries, marks, '2026-11-16'),
     duplicates: dup.map(r => findDuplicate(r, entries, receiptOf)?.id ?? null),
+    cart: entries.slice(0, 24).map((e, k) => {
+      const items = e.receipt!.items.map(it => (k % 2 ? { ...it, p: 0, ...(it.swap ? { swap: { ...it.swap, p: 0 } } : {}) } : it));
+      const c: Cart = { id: e.id, createdAt: 0, date: e.date, kind: 'basket', store: '', hidden: false, items, out: [], swaps: [] };
+      const list = moves(items), d = decide(list), a = advise(c), done = { ...c, ...d };
+      return { moves: list.map(m => [m.i, m.kind, m.metric, m.gain]), enough: a.enough, metric: a.metric, cubes: [a.before.cubes, a.after.cubes], score: [cartAnalysis(c).score, cartAnalysis(done).score], money: cartMoney(done), week: Math.round(weekAdd(done, d.out, d.swaps, 'sugar') * 1000) / 1000 };
+    }),
     same: FOODS.flatMap(a => FOODS.map(b => (sameFood(a, b) ? 1 : 0))),
   }));
 }

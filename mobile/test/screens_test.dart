@@ -3,11 +3,13 @@ import 'dart:io';
 
 import 'package:chek_up/core/data.dart';
 import 'package:chek_up/core/calendar.dart';
+import 'package:chek_up/core/cart.dart';
 import 'package:chek_up/core/engine.dart';
 import 'package:chek_up/core/i18n.dart';
 import 'package:chek_up/core/insights.dart';
 import 'package:chek_up/core/models.dart';
 import 'package:chek_up/core/store.dart';
+import 'package:chek_up/screens/cart.dart';
 import 'package:chek_up/screens/catalog.dart';
 import 'package:chek_up/screens/edit.dart';
 import 'package:chek_up/screens/home.dart';
@@ -63,7 +65,7 @@ void main() {
       );
     }
     store.addToShop(const [
-      ShopItem(name: 'Минералка с лимоном, 1 л', instead: 'Кола, 1 л'),
+      ShopItem(name: 'Минералка без сахара, 1 л', instead: 'Кола, 1 л'),
     ]);
   });
 
@@ -118,6 +120,7 @@ void main() {
       'правка': () =>
           EditSheet(receipt: demoReceipts[0], off: const [1], onDelete: () {}),
       'список': () => const ShopListPage(),
+      'корзина': () => CartPage(id: carts.demo().id),
     };
     for (final (e, kk) in [
       for (final e in screens.entries) ...[(e, false), (e, true)],

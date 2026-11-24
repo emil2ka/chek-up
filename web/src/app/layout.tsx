@@ -6,8 +6,8 @@ import '@fontsource-variable/montserrat';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Чек-ап: узнай всё, что в твоих чеках',
-  description: 'Сфоткай чек из магазина: покажем сахар, соль, жиры, калории, углеводы и белки, траты и чем заменить.',
+  title: 'Чек-ап: узнай всё, что ты покупаешь',
+  description: 'До кассы подскажем, что убрать из корзины, после покажем, что вышло по чеку: сахар, соль, жиры, калории, углеводы и белки, траты.',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Чек-ап' },
 };
 

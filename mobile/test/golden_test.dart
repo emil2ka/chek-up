@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:chek_up/core/calendar.dart';
+import 'package:chek_up/core/cart.dart';
 import 'package:chek_up/core/engine.dart';
 import 'package:chek_up/core/insights.dart';
 import 'package:chek_up/core/models.dart';
@@ -172,6 +173,38 @@ void main() {
       for (final r in g['dup'] as List)
         findDuplicate(Receipt.fromJson(r), entries, receiptOf)?.id,
     ], g['duplicates']);
+    expect([
+      for (final (k, e) in entries.take(24).indexed)
+        () {
+          final items = [
+            for (final it in e.receipt!.items)
+              k.isOdd ? it.copyWith(p: 0, swap: it.swap?.copyWith(p: 0)) : it,
+          ];
+          final c = Cart(
+            id: e.id,
+            kind: 'basket',
+            store: '',
+            date: e.date,
+            createdAt: 0,
+            items: items,
+          );
+          final list = cartMoves(items), d = decide(list), a = advise(c);
+          final done = c.copyWith(out: d.out, swaps: d.swaps);
+          return {
+            'moves': [
+              for (final m in list) [m.i, m.kind, m.metric.name, m.gain],
+            ],
+            'enough': a.enough,
+            'metric': a.metric.name,
+            'cubes': [a.before.cubes, a.after.cubes],
+            'score': [cartAnalysis(c).score, cartAnalysis(done).score],
+            'money': cartMoney(done),
+            'week':
+                (weekAdd(done, d.out, d.swaps, MetricId.sugar) * 1000).round() /
+                1000,
+          };
+        }(),
+    ], g['cart']);
     const foods = [
       'Кола 1 л',
       'Минералка с лимоном, 1 л',

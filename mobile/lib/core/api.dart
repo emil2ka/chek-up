@@ -48,7 +48,26 @@ class Api {
     String? qr, {
     String? token,
   }) {
-    final req = http.MultipartRequest('POST', Uri.parse('$apiUrl/api/scan'))
+    final req = _photos('/api/scan', photos, token);
+    if (qr != null) req.fields['qr'] = qr;
+    return _read(req, const Duration(seconds: 60));
+  }
+
+  /// Корзина до кассы: фото или скриншоты, до трёх.
+  static Future<Map<String, dynamic>> cart(
+    List<Uint8List> photos, {
+    String? token,
+  }) => _read(
+    _photos('/api/cart', photos.take(3).toList(), token),
+    const Duration(seconds: 60),
+  );
+
+  static http.MultipartRequest _photos(
+    String path,
+    List<Uint8List> photos,
+    String? token,
+  ) {
+    final req = http.MultipartRequest('POST', Uri.parse('$apiUrl$path'))
       ..headers.addAll({if (token != null) 'authorization': 'Bearer $token'});
     for (final (i, b) in photos.indexed) {
       req.files.add(
@@ -60,8 +79,7 @@ class Api {
         ),
       );
     }
-    if (qr != null) req.fields['qr'] = qr;
-    return _read(req, const Duration(seconds: 60));
+    return req;
   }
 
   static Future<Map<String, dynamic>> _read(

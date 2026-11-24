@@ -1,7 +1,7 @@
 // Разбор и проверка ответов модели. Модели иногда присылают JSON в ```-блоке, строками вместо чисел,
 // служебные строки чека и отрицательные суммы — всё это чистим здесь, а не в провайдерах.
 import { ScanError } from './errors';
-import { EnrichmentSchema, ExtractionSchema } from './model';
+import { CartSchema, EnrichmentSchema, ExtractionSchema } from './model';
 
 export type Line = { name: string; qty: number; price: number; unsure?: boolean };
 export type Extracted = { store: string; date: string; time: string; total: number; refund: boolean; lines: Line[] };
@@ -16,6 +16,9 @@ const MAX_PRICE = 10_000_000; // ₸ за строку — больше на к�
 
 /** Служебные строки, которые модель иногда принимает за товар. */
 const SERVICE = /^(итог|итого|всего|сумма|ндс|ққс|сдача|наличные|наличными|оплата|оплачено|карта|картой|безналичн\p{L}*|скидка|скидки|бонус\p{L}*|округление|к оплате|получено|фискальн\p{L}*|кассир|смена|рнм|знм|бин|инн)(?![\p{L}\p{N}])/iu;
+
+/** Строки заказа, которые не товар. */
+const DELIVERY = /^(доставка|сборка|сервисный сбор|упаковка заказа|промокод|чаевые|минимальн\p{L}* заказ)(?![\p{L}\p{N}])/iu;
 
 /** Достать JSON из ответа: объект, строка с JSON или JSON внутри ```json … ```. */
 export function extractJson(raw: unknown): unknown {
@@ -56,6 +59,38 @@ export function parseExtraction(raw: unknown): Extracted {
 
   const total = Math.abs(Math.round(x.total));
   return { store: cleanName(x.store).slice(0, 60), date: normalizeDate(x.date), time: normalizeTime(x.time), total: total <= MAX_PRICE ? total : 0, refund: x.is_refund, lines };
+}
+
+export type ExtractedCart = { kind: 'basket' | 'order'; store: string; hidden: boolean; lines: Line[] };
+
+/** Корзина: ответ модели → товары. Цены может не быть (0). Бросает ScanError: not_cart, is_receipt, cart_empty, unreadable. */
+export function parseCart(raw: unknown): ExtractedCart {
+  const parsed = CartSchema.safeParse(extractJson(raw));
+  if (!parsed.success) throw new ScanError('unreadable', 'ответ модели не по схеме');
+  const x = parsed.data;
+  if (x.kind === 'receipt') throw new ScanError('is_receipt');
+  if (x.kind === 'other') throw new ScanError('not_cart');
+  const by = new Map<string, Line>();
+  for (const it of x.items) {
+    const name = cleanName(it.name);
+    if (!name || SERVICE.test(name) || DELIVERY.test(name)) continue;
+    const price = Number.isFinite(it.price) && it.price > 0 && it.price <= MAX_PRICE ? Math.round(it.price) : 0;
+    const qty = Number.isFinite(it.qty) && it.qty > 0 && it.qty < 100 ? it.qty : 1;
+    // один товар с нескольких кадров — одна строка: берём большее количество, а не сумму
+    const key = name.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const prev = by.get(key);
+    by.set(key, prev && (x.kind === 'basket' || prev.price === price)
+      ? { ...prev, qty: Math.max(prev.qty, qty), price: Math.max(prev.price, price) }
+      // в заказе название напечатано: сомневаться можно только на фото
+      : { name, qty, price, ...(it.sure || x.kind === 'order' ? {} : { unsure: true }) });
+    if (by.size >= MAX_LINES) break;
+  }
+  if (!by.size) throw new ScanError('cart_empty');
+  // у одних магазинов в строке цена за штуку, у других — за всё: сверяем с суммой заказа
+  const lines = [...by.values()], each = lines.map(l => (Number.isInteger(l.qty) ? l.price * l.qty : l.price));
+  const sum = (list: number[]) => list.reduce((n, v) => n + v, 0);
+  if (x.total > 0 && Math.abs(sum(each) - x.total) < Math.abs(sum(lines.map(l => l.price)) - x.total)) lines.forEach((l, i) => { l.price = each[i]; });
+  return { kind: x.kind, store: /^(unknown|none|null|неизвестн\p{L}*|не видно|нет)$/iu.test(x.store.trim()) ? '' : cleanName(x.store).slice(0, 60), hidden: x.hidden, lines };
 }
 
 /** Шаг 2: ответ модели → оценки по номерам позиций. Мусор не валит чек — вернётся пустая карта. */

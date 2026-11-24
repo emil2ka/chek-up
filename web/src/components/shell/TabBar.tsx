@@ -2,12 +2,12 @@
 // Нижняя навигация: плавающая белая панель поверх экранов-разделов.
 import { motion, useReducedMotion } from 'motion/react';
 import { t } from '@/lib/i18n';
-import { IconBars, IconCamera, IconSearch, IconUser } from '@/components/icons';
+import { IconBars, IconHome, IconSearch, IconUser } from '@/components/icons';
 
 export type Tab = 'home' | 'week' | 'catalog' | 'profile';
 
 const TABS = [
-  { id: 'home', label: 'Чек', Icon: IconCamera },
+  { id: 'home', label: 'Главная', Icon: IconHome },
   { id: 'week', label: 'Неделя', Icon: IconBars },
   { id: 'catalog', label: 'Продукты', Icon: IconSearch },
   { id: 'profile', label: 'Профиль', Icon: IconUser },

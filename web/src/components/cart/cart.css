@@ -1,0 +1,69 @@
+/* Экран корзины до кассы: добавляется к result.css. */
+.ct .rs-sheet { padding-bottom: 24px; }
+.ct-note { margin-top: 12px; padding: 0 4px; font: 600 13px/1.4 var(--font-t); color: var(--mute); }
+
+.ct-list { display: grid; gap: 10px; }
+.ct-row { padding: 12px; border-radius: 24px; background: var(--tint); transition: background .2s ease; }
+.ct-row[data-state] { background: #E6F8EF; }
+.ct-row-t { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.ct-row-n b { display: block; font: 700 clamp(14px, 3.9vw, 15px)/1.25 var(--font-t); }
+.ct-row-n small { display: block; margin-top: 2px; font: 700 13px/1.3 var(--font-t); color: var(--mute); }
+.ct-row[data-state] .ct-row-n b { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--mute); }
+.ct-row-p { font: 800 14px/1 var(--font-d); letter-spacing: -.02em; white-space: nowrap; }
+.ct-row-b { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.ct-row-b button {
+  min-height: 48px; padding: 8px 10px; border-radius: 16px; background: #fff; color: var(--ink);
+  display: grid; align-content: center; justify-items: center; gap: 2px; text-align: center;
+  font: 800 14px/1.15 var(--font-t);
+  transition: background .2s ease, color .2s ease, transform .12s ease, box-shadow .2s ease;
+}
+.ct-row-b button > span { display: inline-flex; align-items: center; gap: 5px; }
+.ct .ct-row-b svg { width: 16px; height: 16px; }
+.ct-row-b small { max-width: 100%; font: 600 12px/1.25 var(--font-t); color: var(--mute); overflow-wrap: anywhere; }
+.ct-row-b .ct-diff { font-weight: 800; color: #0E7A48; }
+.ct-row-b button[data-best] { color: var(--blue-1); box-shadow: inset 0 0 0 2px var(--blue-1); }
+.ct-row-b button:active { transform: scale(.97); }
+.ct-row-b button[aria-pressed="true"] { background: #0E8A51; color: #fff; box-shadow: none; animation: rs-pop .3s cubic-bezier(.3, 1.6, .5, 1); }
+.ct-row-b button[aria-pressed="true"] small { color: rgba(255, 255, 255, .92); }
+
+.ct-week { padding: 18px 16px; border-radius: 24px; background: var(--tint); }
+.ct-week .rs-h { padding: 0; margin-bottom: 8px; }
+.ct-week-n { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font: 600 14px/1.3 var(--font-t); color: var(--mute); }
+.ct-week-n b { font: 900 34px/1 var(--font-d); letter-spacing: -.04em; color: #0E8A51; }
+.ct-week-n b[data-tone="mid"] { color: #B57300; }
+.ct-week-n b[data-tone="bad"] { color: var(--bad); }
+.ct-week-n s { font: 800 15px/1 var(--font-d); }
+
+.ct-rest { display: grid; gap: 6px; margin-top: 10px; }
+.ct-rest li { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; gap: 8px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 16px; background: var(--tint); }
+.ct-rest-n { font: 600 14px/1.3 var(--font-t); }
+.ct-rest-n small { display: block; font: 600 12px/1.3 var(--font-t); color: #9A6200; }
+.ct-rest-v { font: 800 13px/1 var(--font-d); color: var(--mute); white-space: nowrap; }
+.ct-rest button { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; color: var(--mute); }
+.ct-rest button:active { transform: scale(.92); }
+.ct-rest li[data-off] .ct-rest-n { text-decoration: line-through; color: var(--mute); }
+.ct-rest li[data-off] button { color: var(--blue-1); }
+
+.ct-foot {
+  position: sticky; bottom: 0; z-index: 6;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  background: #fff; color: var(--ink);
+  box-shadow: 0 -10px 30px rgba(8, 14, 60, .12);
+}
+.ct-foot-t { display: grid; gap: 3px; }
+.ct-foot-t b { display: inline-flex; align-items: center; gap: 5px; font: 900 22px/1 var(--font-d); letter-spacing: -.04em; }
+.ct-foot-t s { color: var(--mute); text-decoration-thickness: 2px; font-size: 17px; }
+.ct .ct-foot-t svg { width: 18px; height: 18px; }
+.ct-foot-t span { font: 800 13px/1.1 var(--font-t); color: #0E7A48; }
+.ct-go { min-height: 56px; border-radius: var(--r-btn); background: #0E8A51; color: #fff; font: 700 16px/1.2 var(--font-d); letter-spacing: -.01em; transition: transform .12s ease; }
+.ct-go.is-blue { background: var(--blue-1); box-shadow: 0 10px 24px rgba(18, 56, 245, .32); }
+.ct-go:active { transform: scale(.98); }
+.rs .ct-row-b button:focus-visible { border-radius: 16px; }
+@media (prefers-reduced-motion: reduce) { .ct *, .ct-foot * { animation: none !important; transition: none !important; } }
+
+/* карточка «до кассы» на экране чека */
+.rs-cartfact { padding: 16px; border-radius: 24px; background: #E6F8EF; }
+.rs-cartfact h2 { font: 800 clamp(16px, 4.7vw, 19px)/1.2 var(--font-d); letter-spacing: -.02em; }
+.rs-cartfact .rs-cartfact-n { margin-top: 6px; font: 900 30px/1.05 var(--font-d); letter-spacing: -.04em; color: #0E7A48; }
+.rs-cartfact p:not(.rs-cartfact-n) { margin-top: 6px; font: 600 14px/1.4 var(--font-t); color: var(--ink); }

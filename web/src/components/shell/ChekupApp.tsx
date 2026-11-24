@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { weekOf, weekTxt, todayIso } from '@/lib/calendar';
-import { RECEIPTS } from '@/lib/data';
+import { cartReceipt } from '@/lib/cart';
+import { carts, factFor, waitingCart } from '@/lib/cartStore';
+import { DEMO_CART, RECEIPTS } from '@/lib/data';
 import { dirty } from '@/lib/dirty';
 import { analyze, METRIC_IDS, metricTxt } from '@/lib/engine';
 import { familyStore, weekMarks } from '@/lib/family';
@@ -16,13 +18,18 @@ import { useNow } from '@/lib/now';
 import { factOf } from '@/lib/plan';
 import { profile as profileStore, profileServerSnapshot, profileSnapshot, subscribeProfile } from '@/lib/profile';
 import { registerServiceWorker, takeShared } from '@/lib/pwa';
-import { ReceiptSchema } from '@/lib/schema';
+import { enrichCart } from '@/lib/recognize';
+import type { ScanErrorCode } from '@/lib/scan/errors';
+import { ReceiptSchema, type CartResponse } from '@/lib/schema';
 import { shareCard } from '@/lib/shareCard';
 import { history as store, historyServerSnapshot, historySnapshot, subscribeHistory } from '@/lib/store';
 import { computeStreak, weekToClose, type WeekMark } from '@/lib/streak';
 import { authProviders, postAuthed, startSync } from '@/lib/sync';
-import type { HistoryEntry, MetricId, Receipt } from '@/lib/types';
+import type { Cart as CartData, HistoryEntry, MetricId, Receipt } from '@/lib/types';
 import { JoinSheet, SignInSheet } from '@/components/account/Account';
+import { Cart } from '@/components/cart/Cart';
+import { CartScan } from '@/components/cart/CartScan';
+import { CartSheet } from '@/components/cart/CartSheet';
 import { Catalog } from '@/components/catalog/Catalog';
 import { EditReceipt, type EditResult } from '@/components/edit/EditReceipt';
 import { Home } from '@/components/home/Home';
@@ -40,21 +47,25 @@ import { Toast } from './Toast';
 type View =
   | { key: number; name: Tab }
   | { key: number; name: 'scan'; files: File[]; jobId: string | null; receipt: Receipt | null }
-  | { key: number; name: 'result'; id: string };
+  | { key: number; name: 'result'; id: string }
+  | { key: number; name: 'cartscan'; files: File[] }
+  | { key: number; name: 'cart'; id: string };
 type ViewInit = View extends infer V ? (V extends View ? Omit<V, 'key'> : never) : never;
 
 /** Наше состояние в history.state (Next.js дописывает туда свои поля). */
-type NavState = { s?: 'scan' | 'result'; id?: string } | null;
+type NavState = { s?: 'scan' | 'result' | 'cart'; id?: string } | null;
 const navState = (): NavState => (typeof window === 'undefined' ? null : (window.history.state as NavState));
 
 const noop = () => () => {};
-const isTab = (name: View['name']): name is Tab => name !== 'scan' && name !== 'result';
+const isTab = (name: View['name']): name is Tab => name !== 'scan' && name !== 'result' && name !== 'cartscan' && name !== 'cart';
 
 type ToastItem = { id: number; text: string; ms: number; action?: { label: string; run(): void } };
 type Overlay =
   | { name: 'edit'; id: string }
   | { name: 'manual'; jobId: string | null; receipt: Receipt }
   | { name: 'photos'; files: File[] }
+  | { name: 'cartpick' }
+  | { name: 'editcart'; id: string }
   | { name: 'signin' }
   | { name: 'join'; code: string };
 
@@ -75,6 +86,7 @@ export default function ChekupApp() {
   const prof = useSyncExternalStore(subscribeProfile, profileSnapshot, profileServerSnapshot);
   const family = useSyncExternalStore(familyStore.subscribe, familyStore.get, familyStore.serverSnapshot);
   const marks = useSyncExternalStore(weekMarks.subscribe, weekMarks.get, weekMarks.serverSnapshot);
+  const cartList = useSyncExternalStore(carts.subscribe, carts.get, carts.serverSnapshot);
   const jobs = useSyncExternalStore(subscribeOutbox, outboxSnapshot, outboxServerSnapshot);
   const hydrated = useSyncExternalStore(noop, () => true, () => false);
   const now = useNow();
@@ -104,7 +116,10 @@ export default function ChekupApp() {
   const seq = useRef(0);
   const camera = useRef<HTMLInputElement>(null);
   const gallery = useRef<HTMLInputElement>(null);
-  const addTo = useRef<File[]>([]); // кадры длинного чека, к которым доснимаем ещё один
+  const addTo = useRef<File[]>([]); // кадры длинного чека или корзины, к которым доснимаем ещё один
+  const shooting = useRef<'receipt' | 'cart' | 'ask'>('receipt'); // что снимаем
+  const [cartFiles, setCartFiles] = useState<{ id: string; files: File[] } | null>(null); // кадры последней корзины: чтобы доснять
+  const [refining, setRefining] = useState<{ id: string; n: number } | null>(null);
   const [replayIntro, setReplayIntro] = useState(false);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const closeOverlay = useCallback(() => setOverlay(null), []);
@@ -150,9 +165,17 @@ export default function ChekupApp() {
     go({ name: 'result', id });
   }, [go, goHome, showToast]);
 
+  const openCart = useCallback((id: string, push: boolean) => {
+    if (!carts.byId(id)) { if (!push) { window.history.replaceState(null, ''); goHome(); } return; }
+    const st: NavState = { s: 'cart', id };
+    if (push) window.history.pushState(st, '');
+    else window.history.replaceState(st, '');
+    go({ name: 'cart', id });
+  }, [go, goHome]);
+
   const enterScan = useCallback((v: { files: File[]; jobId: string | null; receipt: Receipt | null }) => {
     const s = navState()?.s;
-    if (s === 'scan' || s === 'result') window.history.replaceState({ s: 'scan' } satisfies NavState, '');
+    if (s) window.history.replaceState({ s: 'scan' } satisfies NavState, '');
     else window.history.pushState({ s: 'scan' } satisfies NavState, '');
     go({ name: 'scan', ...v });
   }, [go]);
@@ -164,23 +187,32 @@ export default function ChekupApp() {
     void enqueue(files, null, id);
   }, [enterScan]);
 
+  /** Корзина до кассы: фото или скриншоты — на экран разбора. */
+  const scanCart = useCallback((files: File[]) => {
+    if (navState()?.s) window.history.replaceState({ s: 'scan' } satisfies NavState, '');
+    else window.history.pushState({ s: 'scan' } satisfies NavState, '');
+    go({ name: 'cartscan', files });
+  }, [go]);
+
   const back = useCallback(() => {
     if (navState()?.s) window.history.back(); // вернёт на главную через popstate
     else goHome();
   }, [goHome]);
 
   const pick = (input: HTMLInputElement | null) => { if (input) { input.value = ''; input.click(); } };
-  const openCamera = useCallback(() => { addTo.current = []; pick(camera.current); }, []);
-  const openGallery = useCallback(() => { addTo.current = []; pick(gallery.current); }, []);
+  const shoot = useCallback((what: 'receipt' | 'cart' | 'ask', from: 'camera' | 'gallery') => { addTo.current = []; shooting.current = what; pick((from === 'camera' ? camera : gallery).current); }, []);
+  const openCamera = useCallback(() => shoot('receipt', 'camera'), [shoot]);
+  const openGallery = useCallback(() => shoot('ask', 'gallery'), [shoot]);
 
   const addPhotos = useCallback((files: File[]) => {
     if (!files.length) return;
     const prev = addTo.current;
     addTo.current = [];
-    if (prev.length) scanFiles([...prev, ...files].slice(0, 3));
-    else if (files.length === 1) scanFiles(files);
+    if (shooting.current === 'cart') scanCart([...prev, ...files].slice(-3));
+    else if (prev.length) scanFiles([...prev, ...files].slice(0, 3));
+    else if (shooting.current === 'receipt' && files.length === 1) scanFiles(files);
     else setOverlay({ name: 'photos', files });
-  }, [scanFiles]);
+  }, [scanFiles, scanCart]);
 
   // ── Кнопка «назад» браузера ──
   useEffect(() => {
@@ -188,6 +220,7 @@ export default function ChekupApp() {
       const st = e.state as NavState;
       setOverlay(null);
       if (st?.s === 'result' && st.id) openSaved(st.id, false);
+      else if (st?.s === 'cart' && st.id) openCart(st.id, false);
       else if (viewRef.current.name !== 'home') {
         if (st?.s) window.history.replaceState(null, ''); // сканирование нельзя «продолжить»
         goHome();
@@ -195,7 +228,7 @@ export default function ChekupApp() {
     };
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);
-  }, [goHome, openSaved]);
+  }, [goHome, openSaved, openCart]);
 
   // ── Старт: если перезагрузили страницу на результате — открыть его снова; приглашение и фото из «Поделиться» ──
   // Читать history.state можно только после гидратации, иначе разметка разойдётся с серверной.
@@ -205,11 +238,12 @@ export default function ChekupApp() {
     if (join || shared) window.history.replaceState(navState(), '', location.pathname);
     const st = navState();
     if (st?.s === 'result' && st.id && store.get(st.id)) openSaved(st.id, false);
+    else if (st?.s === 'cart' && st.id && carts.byId(st.id)) openCart(st.id, false);
     else if (st?.s) window.history.replaceState(null, '');
     if (join) queueMicrotask(() => setOverlay({ name: 'join', code: join.toUpperCase().slice(0, 14) }));
-    if (shared) void takeShared().then(addPhotos);
+    if (shared) { shooting.current = 'ask'; void takeShared().then(addPhotos); }
     registerServiceWorker();
-  }, [openSaved, addPhotos]);
+  }, [openSaved, openCart, addPhotos]);
 
   // ── iOS: доступ к датчику наклона по первому нажатию любой кнопки ──
   useEffect(() => {
@@ -272,6 +306,13 @@ export default function ChekupApp() {
   // ── Чек прочитан на экране ──
   const onScanned = (o: Outcome) => {
     if (o.kind === 'error') {
+      const v = viewRef.current;
+      if (o.code === 'not_receipt' && v.name === 'scan' && v.files.length) {
+        const { files, jobId } = v;
+        showToast(t('Похоже, это не чек'), 8000, { label: t('Это корзина'), run: () => { if (jobId) void outbox.remove(jobId); scanCart(files); } });
+        back();
+        return;
+      }
       showToast(o.code === 'unavailable' || o.code === 'rate_limit' ? t('Чек в очереди: прочитаем, как только получится') : t(scanErrorText(o.code)));
       back();
       return;
@@ -286,6 +327,47 @@ export default function ChekupApp() {
     openSaved(o.entryId, false);
     if (o.kind === 'duplicate') showToast(t('Этот чек уже есть в журнале, второй раз не считаем'));
   };
+
+  // ── Корзина узнана ──
+  const onCart = (files: File[], r: CartResponse) => {
+    const c = carts.add(r.cart, r.notice ? { demo: true } : {});
+    setCartFiles(r.notice ? null : { id: c.id, files });
+    openCart(c.id, false);
+    if (r.notice) { showToast(t(r.notice)); return; }
+    if (!r.pending.length) return;
+    setRefining({ id: c.id, n: r.pending.length });
+    void enrichCart(c, r.pending).then(items => {
+      setRefining(x => (x?.id === c.id ? null : x));
+      const cur = carts.byId(c.id);
+      // пока уточняли, человек мог исправить корзину: тогда его правка важнее
+      if (items && cur && cur.items.length === items.length && cur.items.every((it, i) => it.n === c.items[i].n)) carts.patch(c.id, { items });
+    });
+  };
+  const onCartError = (files: File[], code: ScanErrorCode) => {
+    if (code === 'is_receipt') showToast(t('Это уже чек, а не корзина'), 8000, { label: t('Открыть как чек'), run: () => scanFiles(files) });
+    else showToast(code === 'unavailable' && navigator.onLine === false ? t('Нет интернета: корзину пока не проверить') : t(scanErrorText(code)), 6000);
+    back();
+  };
+  const finishCart = (c: CartData) => {
+    back();
+    if (c.demo) { carts.remove(c.id); return; }
+    if (c.doneAt) return;
+    carts.finish(c.id);
+    showToast(t('Готово. После кассы сфоткай чек: сверим, что получилось'), 5200);
+  };
+  const saveCartEdit = (c: CartData, r: EditResult) => {
+    // решения держатся за название: строки могли удалить или переставить
+    const at = (i: number) => r.receipt.items.findIndex(it => it.n === c.items[i]?.n || (it.raw !== undefined && it.raw === c.items[i]?.n));
+    const move = (list: number[], need: boolean) => [...new Set(list.map(at).filter(i => i >= 0 && (!need || !!r.receipt.items[i].swap)))].sort((a, b) => a - b);
+    const out = [...new Set([...move(c.out, false), ...r.off])].sort((a, b) => a - b);
+    carts.patch(c.id, { items: r.receipt.items, out, swaps: move(c.swaps, true).filter(i => !out.includes(i)) });
+    setOverlay(null);
+  };
+  const waiting = hydrated ? waitingCart(cartList, now || undefined) : null;
+  const weekSugar = useMemo(() => {
+    const w = weekStats(real, prof, { now });
+    return { total: w.metrics.sugar.total, norm: w.metrics.sugar.norm };
+  }, [real, prof, now]);
 
   // ── Правка чека ──
   const saveEdit = (e: HistoryEntry, r: EditResult) => {
@@ -353,6 +435,9 @@ export default function ChekupApp() {
             done={done}
             week={week}
             hideMoney={child}
+            waiting={waiting}
+            onCart={() => setOverlay({ name: 'cartpick' })}
+            onOpenCart={id => openCart(id, true)}
             onScan={openCamera}
             onGallery={openGallery}
             onManual={jobId => setOverlay({ name: 'manual', jobId: jobId ?? null, receipt: blankReceipt() })}
@@ -390,6 +475,7 @@ export default function ChekupApp() {
             best={best}
             onClear={() => {
               for (const e of entries) if (!e.by || e.by === family.me.id || isDemo(e)) store.remove(e.id);
+              carts.clear();
               showToast(t('Твои чеки удалены'), 2600);
             }}
             onReplayIntro={() => setReplayIntro(true)}
@@ -408,6 +494,27 @@ export default function ChekupApp() {
             onDone={o => { if (alive()) onScanned(o); }}
           />
         );
+      case 'cartscan':
+        return <CartScan files={v.files} onCancel={() => { if (alive()) back(); }} onDone={r => { if (alive()) onCart(v.files, r); }} onError={code => { if (alive()) onCartError(v.files, code); }} />;
+      case 'cart': {
+        const c = cartList.find(x => x.id === v.id);
+        if (!c) return null;
+        const mine = cartFiles?.id === c.id ? cartFiles.files : null;
+        return (
+          <Cart
+            cart={c}
+            pending={refining?.id === c.id ? refining.n : 0}
+            level={streak.level}
+            week={weekSugar}
+            onBack={() => { if (alive()) back(); }}
+            onChange={p => carts.patch(c.id, p)}
+            onDone={() => { if (alive()) finishCart(c); }}
+            onEdit={() => setOverlay({ name: 'editcart', id: c.id })}
+            onMore={mine && mine.length < 3 ? () => { addTo.current = mine; shooting.current = 'cart'; pick(camera.current); } : undefined}
+            onDelete={() => { if (!alive()) return; back(); carts.remove(c.id); showToast(t('Корзина удалена'), 2400); }}
+          />
+        );
+      }
       case 'result': {
         const e = entries.find(x => x.id === v.id) ?? null;
         const receipt = e && receiptOf(e);
@@ -425,6 +532,7 @@ export default function ChekupApp() {
             level={streak.level}
             author={mine ? undefined : names.get(e.by!)}
             demo={isDemo(e)}
+            cart={factFor(cartList, e.id)}
             onBack={() => { if (alive()) back(); }}
             onScan={openCamera}
             onSwaps={swaps => { store.patch(e.id, { swaps, score: receipt.masked ? e.score : factOf(e, receipt).score }); }}
@@ -448,6 +556,7 @@ export default function ChekupApp() {
   const tab = isTab(view.name) ? view.name : null;
   const intro = hydrated && (!prof.onboarded || replayIntro);
   const editing = overlay?.name === 'edit' ? entries.find(e => e.id === overlay.id) ?? null : null;
+  const editingCart = overlay?.name === 'editcart' ? cartList.find(c => c.id === overlay.id) ?? null : null;
   const editingReceipt = editing && receiptOf(editing);
 
   return (
@@ -498,13 +607,27 @@ export default function ChekupApp() {
           <EditReceipt key="manual" manual receipt={overlay.receipt} off={[]} entries={real} onSave={r => saveManual(r, overlay.jobId)} onClose={closeOverlay} />
         )}
         {!intro && overlay?.name === 'photos' && (
-          <Sheet key="photos" title={t('Выбрано фото: {n}', { n: overlay.files.length })} onClose={closeOverlay}>
+          <Sheet key="photos" title={overlay.files.length > 1 ? t('Выбрано фото: {n}', { n: overlay.files.length }) : t('Что на фото?')} onClose={closeOverlay}>
             <div className="grid gap-2">
-              <button type="button" className={primaryCls} onClick={() => { const { files } = overlay; setOverlay(null); void (async () => { for (const f of files.slice(0, 10)) await enqueue([f]); })(); showToast(t('Чеки в очереди: читаю по одному, можно закрыть телефон'), 4200); }}>{t('Это разные чеки')}</button>
-              <button type="button" className={quietCls} disabled={overlay.files.length > 3} onClick={() => { const { files } = overlay; setOverlay(null); scanFiles(files); }}>{t('Это один длинный чек')}</button>
+              {overlay.files.length <= 3 && <button type="button" className={quietCls} onClick={() => { const { files } = overlay; setOverlay(null); scanCart(files); }}>{t('Корзина или заказ, до оплаты')}</button>}
+              {overlay.files.length === 1 && <button type="button" className={primaryCls} onClick={() => { const { files } = overlay; setOverlay(null); scanFiles(files); }}>{t('Чек, уже оплачен')}</button>}
+              {overlay.files.length > 1 && <button type="button" className={primaryCls} onClick={() => { const { files } = overlay; setOverlay(null); void (async () => { for (const f of files.slice(0, 10)) await enqueue([f]); })(); showToast(t('Чеки в очереди: читаю по одному, можно закрыть телефон'), 4200); }}>{t('Это разные чеки')}</button>}
+              {overlay.files.length > 1 && <button type="button" className={quietCls} disabled={overlay.files.length > 3} onClick={() => { const { files } = overlay; setOverlay(null); scanFiles(files); }}>{t('Это один длинный чек')}</button>}
               {overlay.files.length > 3 && <p className="px-1 text-[13px] font-semibold text-mute">{t('Длинный чек: до трёх кадров. Разных чеков за раз: до десяти.')}</p>}
             </div>
           </Sheet>
+        )}
+        {!intro && overlay?.name === 'cartpick' && (
+          <CartSheet
+            key="cartpick"
+            onClose={closeOverlay}
+            onCamera={() => { setOverlay(null); shoot('cart', 'camera'); }}
+            onGallery={() => { setOverlay(null); shoot('cart', 'gallery'); }}
+            onDemo={() => { setOverlay(null); openCart(carts.add(DEMO_CART, { demo: true }).id, true); }}
+          />
+        )}
+        {!intro && editingCart && (
+          <EditReceipt key={`cart-${editingCart.id}`} cart receipt={cartReceipt(editingCart)} off={editingCart.out} entries={real} onSave={r => saveCartEdit(editingCart, r)} onClose={closeOverlay} />
         )}
         {!intro && overlay?.name === 'signin' && <SignInSheet key="signin" onClose={closeOverlay} onDone={() => { setOverlay(null); showToast(t('Готово, чеки сохранены в аккаунте'), 3600); }} />}
         {!intro && overlay?.name === 'join' && <JoinSheet key="join" initial={overlay.code} onClose={closeOverlay} onDone={() => { setOverlay(null); showToast(t('Добро пожаловать в семью'), 3600); }} />}

@@ -43,9 +43,9 @@ export const CATS: { id: Cat | 'all'; label: string }[] = [
 
 export const CATALOG: CatalogItem[] = [
   // ── напитки ──
-  { id: 'cola-1', name: 'Кола', portion: 'бутылка 1 л', g: 106, t: 0.1, f: 0, k: 420, c: 106, b: 0, cat: 'drinks', swap: 'Минералка с лимоном' },
+  { id: 'cola-1', name: 'Кола', portion: 'бутылка 1 л', g: 106, t: 0.1, f: 0, k: 420, c: 106, b: 0, cat: 'drinks', swap: 'Минералка без сахара' },
   { id: 'juice-1', name: 'Сок яблочный', portion: 'пакет 1 л', g: 100, t: 0, f: 0, k: 460, c: 110, b: 1, cat: 'drinks', swap: 'Целые яблоки и вода' },
-  { id: 'cola-05', name: 'Кола', portion: 'бутылка 0,5 л', g: 53, t: 0.05, f: 0, k: 210, c: 53, b: 0, cat: 'drinks', swap: 'Минералка с лимоном' },
+  { id: 'cola-05', name: 'Кола', portion: 'бутылка 0,5 л', g: 53, t: 0.05, f: 0, k: 210, c: 53, b: 0, cat: 'drinks', swap: 'Минералка без сахара' },
   { id: 'energy', name: 'Энергетик', portion: 'банка 0,45 л', g: 50, t: 0.1, f: 0, k: 205, c: 50, b: 0, cat: 'drinks', x: 'energy', swap: 'Чёрный чай или вода' },
   { id: 'ice-tea', name: 'Холодный чай', portion: 'бутылка 0,5 л', g: 38, t: 0, f: 0, k: 150, c: 38, b: 0, cat: 'drinks', swap: 'Зелёный чай без сахара' },
   { id: 'milkshake', name: 'Молочный коктейль', portion: 'бутылка 0,3 л', g: 27, t: 0.35, f: 3, k: 210, c: 30, b: 10, cat: 'drinks', swap: 'Молоко 2,5%' },

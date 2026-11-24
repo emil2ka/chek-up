@@ -59,6 +59,48 @@ export const ExtractionSchema = z.object({
 }).loose();
 export type Extraction = z.infer<typeof ExtractionSchema>;
 
+// ── Корзина до кассы: фото корзины или скриншот заказа → товары ──────
+
+export const CART_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['kind', 'store', 'hidden', 'total', 'items'],
+  properties: {
+    kind: { type: 'string', enum: ['basket', 'order', 'receipt', 'other'], description: 'basket — товары на фото (корзина, тележка, пакет, стол, руки, полка); order — скриншот корзины или заказа из приложения или с сайта; receipt — кассовый чек; other — ничего из этого' },
+    store: { type: 'string', description: 'магазин или сервис доставки, если видно; иначе пустая строка' },
+    total: { type: 'number', description: 'на скриншоте заказа: сумма за товары без доставки и сборов, как напечатана; 0, если её нет' },
+    hidden: { type: 'boolean', description: 'true, если часть товаров закрыта другими или не попала в кадр' },
+    items: {
+      type: 'array',
+      description: 'товары, по одному элементу на каждый вид товара',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'qty', 'price', 'sure'],
+        properties: {
+          name: { type: 'string', description: 'название по-русски: что это за продукт, марка если видна, вес или объём если видны' },
+          qty: { type: 'number', description: 'сколько штук видно; для весового товара в заказе — вес в кг' },
+          price: { type: 'number', description: 'цена у строки в тенге ровно как напечатана (не умножай на количество); 0, если не видна' },
+          sure: { type: 'boolean', description: 'false, если не уверен, что это за товар' },
+        },
+      },
+    },
+  },
+} as const;
+
+export const CartSchema = z.object({
+  kind: z.enum(['basket', 'order', 'receipt', 'other']),
+  store: z.string().catch(''),
+  hidden: z.boolean().catch(false),
+  total: num.catch(0),
+  items: z.array(z.object({
+    name: z.string(),
+    qty: num.catch(1),
+    price: num.catch(0),
+    sure: z.boolean().catch(true),
+  }).loose()).catch([]),
+}).loose();
+
 // ── Шаг 2: позиции → сахар, соль, жиры, калории, «вредное», замена ───
 
 export const ENRICHMENT_JSON_SCHEMA = {

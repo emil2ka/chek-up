@@ -67,7 +67,7 @@ describe('buildItem', () => {
     const it1 = buildItem({ name: 'Напиток Coca-Cola 1 л', qty: 1, price: 620 }, est({ sugar: 300 }));
     expect(it1.s).toBe(106);
     expect(it1.junk).toBe(1);
-    expect(it1.swap).toMatchObject({ n: 'Минералка с лимоном, 1 л', s: 0 });
+    expect(it1.swap).toMatchObject({ n: 'Минералка без сахара, 1 л', s: 0 });
     expect(it1.swap!.p).toBeGreaterThan(0);
   });
 

@@ -1,6 +1,7 @@
 // Главный экран: заголовок, кнопки, живые кубики внизу, примеры и «Мои чеки».
 import 'package:flutter/material.dart';
 
+import '../core/cart.dart';
 import '../core/data.dart';
 import '../core/engine.dart';
 import '../core/i18n.dart';
@@ -14,6 +15,7 @@ import '../ui/kit.dart';
 import '../ui/metric_icon.dart';
 import '../ui/pile.dart';
 import '../ui/streak_view.dart';
+import 'cart.dart';
 import 'shell.dart';
 
 const _homeCubes = 11;
@@ -187,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       Rise(
                         delay: 90,
-                        child: Text(t('что в твоих чеках'), style: h1),
+                        child: Text(t('что ты покупаешь'), style: h1),
                       ),
                       if (mine) ...[
                         const SizedBox(height: 14),
@@ -211,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           delay: 220,
                           child: Text(
                             t(
-                              'Сфоткай чек: покажем, что внутри покупок, сколько ушло денег и что взять вместо.',
+                              'До кассы подскажем, что убрать из корзины. После покажем, что вышло по чеку.',
                             ),
                             style: body(
                               short ? 16 : 17,
@@ -231,11 +233,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            WhiteButton(
-                              t('Сфоткать чек'),
-                              icon: Icons.photo_camera_rounded,
-                              badge: true,
-                              onTap: () => openCamera(context),
+                            const _Waiting(),
+                            IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: _BigBtn(
+                                      Icons.shopping_basket_rounded,
+                                      t('До кассы'),
+                                      t('Проверить корзину'),
+                                      () => openCartSheet(context),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _BigBtn(
+                                      Icons.photo_camera_rounded,
+                                      t('После'),
+                                      t('Сфоткать чек'),
+                                      () => openCamera(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 10),
                             Row(
@@ -333,6 +354,111 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+}
+
+/// Главное действие: до кассы или после.
+class _BigBtn extends StatelessWidget {
+  final IconData icon;
+  final String when, what;
+  final VoidCallback onTap;
+  const _BigBtn(this.icon, this.when, this.what, this.onTap);
+  @override
+  Widget build(BuildContext context) => Press(
+    onTap: onTap,
+    child: Container(
+      constraints: const BoxConstraints(minHeight: 118),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: const Border(
+          bottom: BorderSide(color: Color(0xFFD5E0FF), width: 4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ink.withValues(alpha: .5),
+            blurRadius: 36,
+            offset: const Offset(0, 18),
+            spreadRadius: -10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: blue1,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tint,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(when, style: body(12, w: 800, color: blue1)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            what,
+            style: disp(
+              MediaQuery.sizeOf(context).width < 350 ? 14 : 16.5,
+              w: 700,
+              color: blue1,
+              h: 1.1,
+              ls: -.02,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Корзина, которая ждёт чека с кассы.
+class _Waiting extends StatelessWidget {
+  const _Waiting();
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: carts,
+    builder: (context, _) {
+      final c = carts.waiting;
+      if (c == null) return const SizedBox.shrink();
+      final n = cartAnalysis(c).a.cubes;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: RowBtn(
+          t('Корзина ждёт чека: {n} {w}', {'n': n, 'w': pl(n, cubesF)}),
+          hint: t('сфоткай чек после кассы, сверим'),
+          icon: Icons.shopping_basket_rounded,
+          iconColor: const Color(0xFF0E7A48),
+          onTap: () => openCart(Navigator.of(context), c.id),
+        ),
+      );
+    },
+  );
 }
 
 /// Очередь чеков: читается, ждёт сети, не прочитался.

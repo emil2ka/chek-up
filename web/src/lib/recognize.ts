@@ -1,10 +1,11 @@
 // Чтение чека (клиент): фото сжимаются здесь и уходят в POST /api/scan, ключей на клиенте нет.
 // Сервер отвечает, как только прочитал позиции; показатели неизвестных позиций — вторым запросом (enrich).
 import { z } from 'zod';
-import { ReceiptItemSchema, ScanResponseSchema, type ScanResponse } from './schema';
+import { cartReceipt } from './cart';
+import { CartResponseSchema, ReceiptItemSchema, ScanResponseSchema, type CartResponse, type ScanResponse } from './schema';
 import { ScanError, isScanErrorCode } from './scan/errors';
 import { authed, postAuthed, SyncError } from './sync';
-import type { Receipt, ReceiptItem } from './types';
+import type { Cart, Receipt, ReceiptItem } from './types';
 
 const MAX_SIDE = 1600;          // px по длинной стороне — текст чека читается, а файл в разы легче
 const MAX_UPLOAD = 7 * 1024 * 1024;
@@ -27,20 +28,33 @@ export async function shrink(file: Blob): Promise<Blob> {
   }
 }
 
+async function send(path: string, body: FormData): Promise<unknown> {
+  try {
+    return await authed(path, { method: 'POST', body });
+  } catch (e) {
+    if (e instanceof SyncError) throw new ScanError(isScanErrorCode(e.code) ? e.code : e.httpStatus === 413 ? 'too_large' : e.httpStatus === 429 ? 'rate_limit' : 'unavailable', e.code);
+    throw e;
+  }
+}
+
+/** Корзина до кассы: фото или скриншоты. @throws ScanError */
+export async function recognizeCart(files: Blob[]): Promise<CartResponse> {
+  const photos = await Promise.all(files.slice(0, 3).map(shrink));
+  if (photos.some(p => p.size > MAX_UPLOAD)) throw new ScanError('too_large');
+  const body = new FormData();
+  photos.forEach((p, i) => body.append('photo', p, p.type === 'image/jpeg' ? `cart-${i}.jpg` : `cart-${i}`));
+  const parsed = CartResponseSchema.safeParse(await send('/api/cart', body));
+  if (!parsed.success) throw new ScanError('unavailable', 'ответ сервера не по схеме');
+  return parsed.data;
+}
+
 /** @throws ScanError с понятным текстом: не чек, не читается, лимит, сервис недоступен… */
 export async function recognize(photos: Blob[], qr: string | null): Promise<ScanResponse> {
   if (photos.some(p => p.size > MAX_UPLOAD)) throw new ScanError('too_large');
   const body = new FormData();
   photos.forEach((p, i) => body.append('photo', p, p.type === 'image/jpeg' ? `receipt-${i}.jpg` : `receipt-${i}`));
   if (qr) body.append('qr', qr);
-  let data: unknown;
-  try {
-    data = await authed('/api/scan', { method: 'POST', body });
-  } catch (e) {
-    if (e instanceof SyncError) throw new ScanError(isScanErrorCode(e.code) ? e.code : e.httpStatus === 413 ? 'too_large' : e.httpStatus === 429 ? 'rate_limit' : 'unavailable', e.code);
-    throw e;
-  }
-  const parsed = ScanResponseSchema.safeParse(data);
+  const parsed = ScanResponseSchema.safeParse(await send('/api/scan', body));
   if (!parsed.success) throw new ScanError('unavailable', 'ответ сервера не по схеме');
   return parsed.data;
 }
@@ -61,3 +75,10 @@ export async function enrich(receipt: Receipt, pending: number[]): Promise<Map<s
 }
 export const applyEnriched = (r: Receipt, by: Map<string, ReceiptItem>): Receipt =>
   ({ ...r, items: r.items.map(it => (it.src === undefined && !it.nf ? { ...(by.get(`${it.n}|${it.p}`) ?? it), ...(it.q ? { q: it.q } : {}) } : it)) });
+
+/** Уточнить товары корзины, которых нет в справочнике; null — не вышло. Порядок позиций не меняется. */
+export async function enrichCart(c: Cart, pending: number[]): Promise<ReceiptItem[] | null> {
+  const r = cartReceipt(c);
+  const by = await enrich(r, pending);
+  return by && applyEnriched(r, by).items;
+}

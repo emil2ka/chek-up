@@ -6,8 +6,10 @@ import { SugarPile, PALETTES, skinFor } from '@/lib/pile';
 import { t } from '@/lib/i18n';
 import type { JobInfo } from '@/lib/outbox';
 import type { Streak } from '@/lib/streak';
-import type { HistoryEntry, MetricId, Receipt } from '@/lib/types';
-import { IconCamera, IconCube, IconEdit, IconImage, IconReceipt } from '@/components/icons';
+import type { Cart, HistoryEntry, MetricId, Receipt } from '@/lib/types';
+import { cartCubes } from '@/lib/cartStore';
+import { CUBES, pl } from '@/lib/engine';
+import { IconBasket, IconCamera, IconChevron, IconCube, IconEdit, IconImage, IconReceipt } from '@/components/icons';
 import { StreakPill } from '@/components/streak/Streak';
 import { SixRow } from '@/components/ui/SixMetrics';
 import { DemoSheet } from './DemoSheet';
@@ -28,6 +30,10 @@ type Props = {
   /** сколько чего за эту неделю; null — пока ничего */
   week: Record<MetricId, number> | null;
   hideMoney: boolean;
+  /** корзина, которая ждёт чека */
+  waiting: Cart | null;
+  onCart(): void;
+  onOpenCart(id: string): void;
   onScan(): void;
   onGallery(): void;
   /** внести руками; id — чек из очереди, который не прочитался */
@@ -37,7 +43,7 @@ type Props = {
   onWeek(): void;
 };
 
-export function Home({ ready, entries, real, jobs, streak, done, week, hideMoney, onScan, onGallery, onManual, onDemo, onOpen, onWeek }: Props) {
+export function Home({ ready, entries, real, jobs, streak, done, week, hideMoney, waiting, onCart, onOpenCart, onScan, onGallery, onManual, onDemo, onOpen, onWeek }: Props) {
   const hasHistory = ready && entries.length > 0;
   const mine = ready && real;
   const heroRef = useRef<HTMLDivElement>(null);
@@ -116,12 +122,12 @@ export function Home({ ready, entries, real, jobs, streak, done, week, hideMoney
           <div className="mt-5.5 short:mt-2.5">
             <h1 className={`font-display leading-[1] font-black tracking-[-.045em] text-white ${mine ? 'text-[clamp(26px,8vw,33px)]' : 'text-[clamp(36px,11.4vw,50px)]'}`}>
               <span className="rise block">{t('Узнай')} <span className="hl">{t('всё,')}</span></span>
-              <span className="rise block" style={{ '--d': '90ms' } as CSSProperties}>{t('что в твоих чеках')}</span>
+              <span className="rise block" style={{ '--d': '90ms' } as CSSProperties}>{t('что ты покупаешь')}</span>
             </h1>
             {!mine && (
               <>
                 <p className="rise mt-4 max-w-[32ch] text-[17px] leading-[1.4] font-semibold text-white/92 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
-                  {t('Сфоткай чек: покажем, что внутри покупок, сколько ушло денег и что взять вместо.')}
+                  {t('До кассы подскажем, что убрать из корзины. После покажем, что вышло по чеку.')}
                 </p>
                 <div className="rise mt-4 rounded-[22px] bg-ink/18 px-2.5 pt-3 pb-2.5 text-white shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)] short:mt-3" style={{ '--d': '280ms' } as CSSProperties}>
                   <SixRow label={t('Что покажем')} />
@@ -139,16 +145,29 @@ export function Home({ ready, entries, real, jobs, streak, done, week, hideMoney
           {ready && <OutboxCards jobs={jobs} onManual={onManual} />}
 
           <div className="rise mt-auto grid gap-2.5 pt-6" style={{ '--d': '320ms' } as CSSProperties}>
-            <button
-              type="button"
-              onClick={onScan}
-              className="btn-white pointer-events-auto inline-flex min-h-17 items-center justify-center gap-3 rounded-[22px] px-5.5 font-display text-lg font-bold tracking-[-.01em] [text-shadow:none] transition-transform duration-150 select-none active:scale-[.965]"
-            >
-              <span className="-ml-1.5 grid size-10.5 place-items-center rounded-[14px] bg-blue-1 text-white shadow-[inset_0_-3px_0_color-mix(in_srgb,var(--ink)_30%,transparent)]">
-                <IconCamera className="size-6" />
-              </span>
-              <span>{t('Сфоткать чек')}</span>
-            </button>
+            {waiting && (
+              <button type="button" onClick={() => onOpenCart(waiting.id)} className="on-light pointer-events-auto flex min-h-15 items-center gap-3 rounded-[20px] bg-white px-3.5 py-2.5 text-left text-ink [text-shadow:none] active:scale-[.985]">
+                <span className="grid size-9 flex-none place-items-center rounded-xl bg-[#E6F8EF] text-[#0E7A48]"><IconBasket className="size-5" /></span>
+                <span className="min-w-0 flex-1 text-[14px] leading-snug font-bold">{t('Корзина ждёт чека: {n} {w}', { n: cartCubes(waiting), w: pl(cartCubes(waiting), CUBES) })}<span className="block text-[13px] font-semibold text-mute">{t('сфоткай чек после кассы, сверим')}</span></span>
+                <IconChevron className="size-5 text-mute" />
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-2.5">
+              {([[IconBasket, t('До кассы'), t('Проверить корзину'), onCart], [IconCamera, t('После'), t('Сфоткать чек'), onScan]] as const).map(([Icon, when, what, fn]) => (
+                <button
+                  key={what}
+                  type="button"
+                  onClick={fn}
+                  className="btn-white pointer-events-auto grid min-h-31 content-between justify-items-start gap-2 rounded-[24px] p-3.5 text-left [text-shadow:none] transition-transform duration-150 select-none active:scale-[.965] short:min-h-27"
+                >
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="grid size-10.5 place-items-center rounded-[14px] bg-blue-1 text-white shadow-[inset_0_-3px_0_color-mix(in_srgb,var(--ink)_30%,transparent)]"><Icon className="size-6" /></span>
+                    <span className="rounded-full bg-tint px-2.5 py-1 text-[12px] leading-none font-extrabold text-blue-1">{when}</span>
+                  </span>
+                  <span className="font-display text-[17px] leading-[1.1] font-bold tracking-[-.02em] text-balance">{what}</span>
+                </button>
+              ))}
+            </div>
             <div className="grid grid-cols-2 gap-2.5">
               <button type="button" onClick={onGallery} className="btn-glass pointer-events-auto inline-flex min-h-13 items-center justify-center gap-2.5 rounded-btn px-3 text-[15px] font-bold transition-transform duration-150 select-none active:scale-[.965]"><IconImage className="size-5.5 flex-none" /><span>{t('Из галереи')}</span></button>
               <button type="button" onClick={() => onManual()} className="btn-glass pointer-events-auto inline-flex min-h-13 items-center justify-center gap-2.5 rounded-btn px-3 text-[15px] font-bold transition-transform duration-150 select-none active:scale-[.965]"><IconEdit className="size-5.5 flex-none" /><span>{t('Вручную')}</span></button>

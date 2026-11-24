@@ -99,6 +99,7 @@ Future<EditResult?> editReceipt(
   required Receipt receipt,
   List<int> off = const [],
   bool manual = false,
+  bool cart = false,
   VoidCallback? onDelete,
 }) => showModalBottomSheet<EditResult>(
   context: context,
@@ -107,8 +108,13 @@ Future<EditResult?> editReceipt(
   backgroundColor: Colors.transparent,
   barrierColor: ink.withValues(alpha: .58),
   constraints: const BoxConstraints(maxWidth: 430),
-  builder: (_) =>
-      EditSheet(receipt: receipt, off: off, manual: manual, onDelete: onDelete),
+  builder: (_) => EditSheet(
+    receipt: receipt,
+    off: off,
+    manual: manual,
+    cart: cart,
+    onDelete: onDelete,
+  ),
 );
 
 Receipt blankReceipt() => Receipt(
@@ -124,12 +130,16 @@ class EditSheet extends StatefulWidget {
   final Receipt receipt;
   final List<int> off;
   final bool manual;
+
+  /// корзина до кассы: без магазина, даты и возврата
+  final bool cart;
   final VoidCallback? onDelete;
   const EditSheet({
     super.key,
     required this.receipt,
     this.off = const [],
     this.manual = false,
+    this.cart = false,
     this.onDelete,
   });
   @override
@@ -196,7 +206,7 @@ class _EditSheetState extends State<EditSheet> {
   Future<void> _add() async {
     final it = await showSheet<Item>(
       context,
-      title: t('Что купили?'),
+      title: widget.cart ? t('Что ещё в корзине?') : t('Что купили?'),
       builder: (_) => const _AddItem(),
     );
     if (it == null || !mounted) return;
@@ -297,7 +307,11 @@ class _EditSheetState extends State<EditSheet> {
     );
 
     return SheetFrame(
-      title: widget.manual ? t('Чек вручную') : t('Изменить чек'),
+      title: widget.manual
+          ? t('Чек вручную')
+          : widget.cart
+          ? t('Исправить корзину')
+          : t('Изменить чек'),
       footer: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -308,7 +322,11 @@ class _EditSheetState extends State<EditSheet> {
                 child: Text.rich(
                   TextSpan(
                     children: [
-                      TextSpan(text: money(sum)),
+                      TextSpan(
+                        text: widget.cart && sum == 0
+                            ? t('без цен')
+                            : money(sum),
+                      ),
                       if (gap != 0)
                         TextSpan(
                           text:
@@ -322,7 +340,7 @@ class _EditSheetState extends State<EditSheet> {
               ),
               if (_rows.isNotEmpty)
                 Text(
-                  '${a.cubes} ${pl(a.cubes, cubesF)} · ${a.score}/100',
+                  '${a.cubes} ${pl(a.cubes, cubesF)}${widget.cart ? '' : ' · ${a.score}/100'}',
                   style: body(14, w: 700, color: mute),
                 ),
             ],
@@ -339,23 +357,25 @@ class _EditSheetState extends State<EditSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Field(
-            controller: _store,
-            label: t('Магазин'),
-            hint: 'Magnum, Small…',
-            maxLength: 60,
-          ),
-          const SizedBox(height: 8),
-          RowBtn(
-            dayTxt(_date),
-            icon: Icons.calendar_month_rounded,
-            onTap: _pickDate,
-          ),
-          SwitchRow(
-            t('Возврат'),
-            value: _refund,
-            onChanged: (v) => setState(() => _refund = v),
-          ),
+          if (!widget.cart) ...[
+            Field(
+              controller: _store,
+              label: t('Магазин'),
+              hint: 'Magnum, Small…',
+              maxLength: 60,
+            ),
+            const SizedBox(height: 8),
+            RowBtn(
+              dayTxt(_date),
+              icon: Icons.calendar_month_rounded,
+              onTap: _pickDate,
+            ),
+            SwitchRow(
+              t('Возврат'),
+              value: _refund,
+              onChanged: (v) => setState(() => _refund = v),
+            ),
+          ],
           if (unsure > 0)
             note(
               t('Проверь {n} {w}: прочитались плохо.', {
@@ -469,7 +489,10 @@ class _EditSheetState extends State<EditSheet> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(money(it.p), style: disp(14, w: 800, ls: -.02)),
+                  Text(
+                    widget.cart && it.p == 0 ? '' : money(it.p),
+                    style: disp(14, w: 800, ls: -.02),
+                  ),
                   AnimatedRotation(
                     turns: open ? .25 : 0,
                     duration: const Duration(milliseconds: 180),
@@ -529,16 +552,17 @@ class _EditSheetState extends State<EditSheet> {
                     },
                   ),
                   const SizedBox(height: 8),
-                  SwitchRow(
-                    t('Не для нас'),
-                    hint: t('подарок, для соседей: не считать'),
-                    value: r.off,
-                    white: true,
-                    onChanged: (v) => setState(() {
-                      r.off = v;
-                      r.touched = true;
-                    }),
-                  ),
+                  if (!widget.cart)
+                    SwitchRow(
+                      t('Не для нас'),
+                      hint: t('подарок, для соседей: не считать'),
+                      value: r.off,
+                      white: true,
+                      onChanged: (v) => setState(() {
+                        r.off = v;
+                        r.touched = true;
+                      }),
+                    ),
                   SwitchRow(
                     t('Не еда'),
                     value: it.nf,

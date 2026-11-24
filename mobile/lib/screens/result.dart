@@ -14,6 +14,8 @@ import '../ui/kit.dart';
 import '../ui/metric_icon.dart';
 import '../ui/pile_hero.dart';
 import '../ui/share_card.dart';
+import '../core/cart.dart';
+import 'cart.dart';
 import 'edit.dart';
 import 'prices_card.dart';
 import 'shell.dart';
@@ -87,7 +89,7 @@ class _ResultPageState extends State<ResultPage> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: store,
+    listenable: Listenable.merge([store, carts]),
     builder: (context, _) {
       final e = store.entry(widget.entryId);
       final r = e == null ? null : receiptOf(e);
@@ -201,6 +203,7 @@ class _ResultPageState extends State<ResultPage> {
                           style: body(13, color: mute),
                         ),
                       ),
+                      if (carts.factFor(_e.id) case final f?) CartFactCard(f),
                       const SizedBox(height: 26),
                       SecTitle(t('Всё, что в чеке')),
                       SixGrid(

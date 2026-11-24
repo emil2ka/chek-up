@@ -5,9 +5,9 @@
 import type { ReceiptItem } from '../types';
 import { buildItem, lineOf } from './build';
 import type { ScanConfig } from './config';
-import { ENRICHMENT_JSON_SCHEMA, EXTRACTION_JSON_SCHEMA } from './model';
-import { parseEnrichment, parseExtraction, type Extracted } from './parse';
-import { ENRICH_SYSTEM, EXTRACT_SYSTEM, EXTRACT_USER, enrichUser } from './prompts';
+import { CART_JSON_SCHEMA, ENRICHMENT_JSON_SCHEMA, EXTRACTION_JSON_SCHEMA } from './model';
+import { parseCart, parseEnrichment, parseExtraction, type Extracted, type ExtractedCart } from './parse';
+import { CART_SYSTEM, CART_USER, ENRICH_SYSTEM, EXTRACT_SYSTEM, EXTRACT_USER, enrichUser } from './prompts';
 import type { ImageInput } from './providers/types';
 
 const VISION_TIMEOUT = 40_000;
@@ -21,6 +21,15 @@ export async function extractPhotos(images: ImageInput[], cfg: ScanConfig): Prom
     schemaName: 'receipt_lines', schema: EXTRACTION_JSON_SCHEMA, signal: AbortSignal.timeout(VISION_TIMEOUT), maxTokens: 6000,
   });
   return parseExtraction(raw);
+}
+
+/** Фото корзины или скриншот заказа → товары. */
+export async function extractCart(images: ImageInput[], cfg: ScanConfig): Promise<ExtractedCart> {
+  const raw = await cfg.provider.generateJson({
+    model: cfg.visionModel, system: CART_SYSTEM, user: CART_USER, images,
+    schemaName: 'cart_items', schema: CART_JSON_SCHEMA, signal: AbortSignal.timeout(VISION_TIMEOUT), maxTokens: 4000,
+  });
+  return parseCart(raw);
 }
 
 export async function enrichItems(items: Pick<ReceiptItem, 'n' | 'p'>[], cfg: ScanConfig): Promise<(ReceiptItem | null)[]> {

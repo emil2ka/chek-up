@@ -134,6 +134,8 @@ export type ResultProps = {
   author?: string;
   /** демо-чек: в учёт не идёт */
   demo?: boolean;
+  /** чек сверен с корзиной до кассы */
+  cart?: CartFact | null;
   /** нажата «назад» */
   onBack(): void;
   /** нажата «Внести ещё чек» */
@@ -167,4 +169,36 @@ export type HistoryEntry = {
   savedAt: number;
   /** сам чек — для распознанных по фото (их нет в data.ts); у демо-чеков поля нет */
   receipt?: Receipt;
+};
+
+/** Что узнали на фото корзины или скриншоте заказа. Цен может не быть (p = 0). */
+export type CartDraft = { kind: 'basket' | 'order'; store: string; /** часть товаров не видна */ hidden: boolean; items: ReceiptItem[] };
+
+/** Чем кончилась корзина: сверка с чеком. Показатели — на сколько меньше домой попало, чем лежало в корзине. */
+export type CartFact = {
+  /** запись журнала с чеком */
+  entryId: string;
+  /** решений принято и выполнено */
+  planned: number; kept: number;
+  saved: Record<MetricId, number>;
+  /** ₸, если цены известны */
+  money: number;
+  /** хотели убрать, но купили */
+  slipped: string[];
+};
+
+/** Корзина до кассы. Живёт на устройстве: это ещё не покупка, в журнал и норму не входит. */
+export type Cart = CartDraft & {
+  id: string;
+  createdAt: number;
+  /** день, когда собирали: YYYY-MM-DD */
+  date: string;
+  /** решили убрать */
+  out: number[];
+  /** решили заменить */
+  swaps: number[];
+  /** «готово, на кассу»: время */
+  doneAt?: number;
+  fact?: CartFact;
+  demo?: true;
 };

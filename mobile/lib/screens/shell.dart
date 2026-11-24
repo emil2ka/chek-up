@@ -14,6 +14,7 @@ import '../ui/forms.dart';
 import '../ui/kit.dart';
 import 'account.dart';
 import 'barcode.dart';
+import 'cart.dart';
 import 'catalog.dart';
 import 'edit.dart';
 import 'home.dart';
@@ -27,7 +28,7 @@ import 'week.dart';
 double tabBarSpace(BuildContext context) =>
     88 + MediaQuery.paddingOf(context).bottom;
 
-Route<T> _route<T>(Widget page) => PageRouteBuilder<T>(
+Route<T> pageRoute<T>(Widget page) => PageRouteBuilder<T>(
   transitionDuration: const Duration(milliseconds: 280),
   reverseTransitionDuration: const Duration(milliseconds: 220),
   pageBuilder: (_, _, _) => page,
@@ -79,7 +80,7 @@ Future<XFile?> _shoot() async {
 
 void _scan(NavigatorState nav, List<XFile> photos) {
   nav.popUntil((r) => r.isFirst);
-  nav.push(_route(ScanPage(photos: photos)));
+  nav.push(pageRoute(ScanPage(photos: photos)));
 }
 
 Future<void> openCamera(BuildContext context) async {
@@ -93,41 +94,55 @@ Future<XFile?> shootMore() => _shoot();
 
 void scanAgain(NavigatorState nav, List<XFile> photos) => _scan(nav, photos);
 
-Future<void> openGallery(BuildContext context) async {
-  final nav = Navigator.of(context);
-  List<XFile> files;
+/// Снимки из галереи; пусто — передумали.
+Future<List<XFile>> pickPhotos() async {
   try {
-    files = await ImagePicker().pickMultiImage(
+    return await ImagePicker().pickMultiImage(
       maxWidth: _side,
       maxHeight: _side,
       imageQuality: 85,
     );
   } catch (_) {
     showToast(t('Не получилось открыть галерею'));
-    return;
+    return const [];
   }
+}
+
+Future<void> openGallery(BuildContext context) async {
+  final nav = Navigator.of(context);
+  final files = await pickPhotos();
   if (files.isEmpty) return;
-  if (files.length == 1) {
-    _scan(nav, files);
-    return;
-  }
   if (!context.mounted) return;
-  final one = await showSheet<bool>(
+  final what = await showSheet<String>(
     context,
-    title: t('Выбрано фото: {n}', {'n': files.length}),
+    title: files.length > 1
+        ? t('Выбрано фото: {n}', {'n': files.length})
+        : t('Что на фото?'),
     builder: (context) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (files.length <= 3) ...[
+          FlatBtn(
+            t('Корзина или заказ, до оплаты'),
+            onTap: () => Navigator.pop(context, 'cart'),
+          ),
+          const SizedBox(height: 8),
+        ],
         FlatBtn(
-          t('Это разные чеки'),
+          files.length > 1 ? t('Это разные чеки') : t('Чек, уже оплачен'),
           primary: true,
-          onTap: () => Navigator.pop(context, false),
+          onTap: () =>
+              Navigator.pop(context, files.length > 1 ? 'many' : 'one'),
         ),
-        const SizedBox(height: 8),
-        FlatBtn(
-          t('Это один длинный чек'),
-          onTap: files.length > 3 ? null : () => Navigator.pop(context, true),
-        ),
+        if (files.length > 1) ...[
+          const SizedBox(height: 8),
+          FlatBtn(
+            t('Это один длинный чек'),
+            onTap: files.length > 3
+                ? null
+                : () => Navigator.pop(context, 'one'),
+          ),
+        ],
         if (files.length > 3)
           Padding(
             padding: const EdgeInsets.all(8),
@@ -139,8 +154,12 @@ Future<void> openGallery(BuildContext context) async {
       ],
     ),
   );
-  if (one == null) return;
-  if (one) {
+  if (what == null) return;
+  if (what == 'cart') {
+    scanCart(nav, files);
+    return;
+  }
+  if (what == 'one') {
     _scan(nav, files);
     return;
   }
@@ -163,7 +182,7 @@ Future<void> openManual(BuildContext context, {String? jobId}) async {
 }
 
 void openDemo(BuildContext context, Receipt receipt) =>
-    Navigator.of(context).push(_route(ScanPage(receipt: receipt)));
+    Navigator.of(context).push(pageRoute(ScanPage(receipt: receipt)));
 
 void openResult(NavigatorState nav, String id, {bool replace = false}) {
   final e = store.entry(id);
@@ -171,7 +190,7 @@ void openResult(NavigatorState nav, String id, {bool replace = false}) {
     showToast(t('Этот чек не получилось открыть'));
     return;
   }
-  final route = _route<void>(ResultPage(entryId: id));
+  final route = pageRoute<void>(ResultPage(entryId: id));
   replace ? nav.pushReplacement(route) : nav.push(route);
 }
 
@@ -179,9 +198,9 @@ void openSaved(BuildContext context, String id) =>
     openResult(Navigator.of(context), id);
 
 void openBarcode(BuildContext context) =>
-    Navigator.of(context).push(_route(const BarcodePage()));
+    Navigator.of(context).push(pageRoute(const BarcodePage()));
 void openShopList(BuildContext context) =>
-    Navigator.of(context).push(_route(const ShopListPage()));
+    Navigator.of(context).push(pageRoute(const ShopListPage()));
 
 const _asked = 'chekup.askedLogin';
 
@@ -199,7 +218,7 @@ class _ShellState extends State<Shell> {
   bool _replayIntro = false, _asking = false;
 
   static const _tabs = [
-    (Icons.photo_camera_rounded, 'Чек'),
+    (Icons.home_rounded, 'Главная'),
     (Icons.bar_chart_rounded, 'Неделя'),
     (Icons.search_rounded, 'Продукты'),
     (Icons.person_rounded, 'Профиль'),

@@ -69,10 +69,10 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
                   ))}
                 </div>
                 <h1 className="font-display text-[clamp(34px,10.6vw,44px)] leading-[1] font-black tracking-[-.045em]">
-                  {t('Узнай')} <span className="hl">{t('всё,')}</span> {t('что в твоих чеках')}
+                  {t('Узнай')} <span className="hl">{t('всё,')}</span> {t('что ты покупаешь')}
                 </h1>
                 <p className="mt-4 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  {t('Сфоткай чек из магазина: покажем, что внутри покупок, сколько ушло денег и что взять вместо.')}
+                  {t('До кассы сфоткай корзину: подскажем, что убрать. После покупки сфоткай чек: покажем, что вышло.')}
                 </p>
               </>
             )}

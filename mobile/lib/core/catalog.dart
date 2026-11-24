@@ -54,7 +54,7 @@ const catalog = <CatalogItem>[
     c: 106,
     b: 0,
     cat: 'drinks',
-    swap: 'Минералка с лимоном',
+    swap: 'Минералка без сахара',
   ),
   CatalogItem(
     id: 'juice-1',
@@ -80,7 +80,7 @@ const catalog = <CatalogItem>[
     c: 53,
     b: 0,
     cat: 'drinks',
-    swap: 'Минералка с лимоном',
+    swap: 'Минералка без сахара',
   ),
   CatalogItem(
     id: 'energy',

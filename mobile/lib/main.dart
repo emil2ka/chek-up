@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'core/cart.dart';
 import 'core/outbox.dart';
 import 'core/reminder.dart';
 import 'core/store.dart';
@@ -13,6 +14,7 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
   store.onToast = showToast;
   await store.load();
+  await carts.load();
   // вернулся в приложение — подтянуть изменения с другого устройства
   AppLifecycleListener(
     onResume: () {

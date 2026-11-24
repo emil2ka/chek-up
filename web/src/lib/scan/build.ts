@@ -101,11 +101,20 @@ export function buildItem(line: Line, est?: Estimate): ReceiptItem {
       const rs = ref.swap;
       const cand = { s: Math.round(rs.per100 * (mass ?? 0) / 100), t: round1(fromRef(rs.salt100)), f: round1(fromRef(rs.fat100)) };
       if (harm(cand) < harm(own)) {
-        swap = { n: swapName(rs.n, amountFromName(line.name)), p: line.price ? Math.max(1, Math.round(line.price * rs.priceK)) : 0, ...cand, k: Math.round(fromRef(rs.kcal100)), c: Math.round(Math.max(cand.s, fromRef(rs.carbs100))), b: Math.round(fromRef(rs.protein100)) };
+        swap = { n: swapName(rs.n, amountFromName(line.name)) + (amountFromName(line.name) && Number.isInteger(line.qty) && line.qty > 1 ? `, ${line.qty} шт` : ''), p: line.price ? Math.max(1, Math.round(line.price * rs.priceK)) : 0, ...cand, k: Math.round(fromRef(rs.kcal100)), c: Math.round(Math.max(cand.s, fromRef(rs.carbs100))), b: Math.round(fromRef(rs.protein100)) };
       }
     }
   }
   return { n: name, p: line.price, s, t, f, k, c, b, src: ref ? 'ref' : 'ai', ...(junk ? { junk } : {}), ...(x ? { x } : {}), ...(w ? { w } : {}), ...(swap ? { swap } : {}), ...doubt };
+}
+
+const PIECE_KG = 0.15; // яблоко, банан, помидор
+/** Товар из корзины. На фото видно «четыре яблока», а не килограммы: штучные овощи и фрукты считаем по весу штуки. */
+export function buildCartItem(line: Line): ReceiptItem {
+  const it = buildItem(line);
+  if (findReference(line.name)?.key !== 'veg' || !Number.isInteger(line.qty) || line.qty < 2 || amountFromName(line.name)) return it;
+  const byWeight = buildItem({ ...line, qty: Math.round(line.qty * PIECE_KG * 1000) / 1000 + 0.0001 });
+  return { ...byWeight, n: it.n };
 }
 
 export function buildReceipt(x: Extracted, estimates: Map<number, Estimate> = new Map(), o: { via?: Receipt['via']; fiscal?: string; today?: string } = {}): Receipt {

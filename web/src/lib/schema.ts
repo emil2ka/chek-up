@@ -49,6 +49,33 @@ export const ScanResponseSchema = z.object({
 });
 export type ScanResponse = z.infer<typeof ScanResponseSchema>;
 
+/** Ответ POST /api/cart: что лежит в корзине до оплаты. Цен может не быть (p = 0). */
+export const CartResponseSchema = z.object({
+  cart: z.object({
+    kind: z.enum(['basket', 'order']),
+    store: z.string(),
+    /** часть товаров не видна */
+    hidden: z.boolean(),
+    items: z.array(ReceiptItemSchema).min(1),
+  }),
+  notice: z.string().nullable(),
+  pending: z.array(z.number().int().nonnegative()).default([]),
+});
+export type CartResponse = z.infer<typeof CartResponseSchema>;
+
+/** Корзина, как она хранится на устройстве. */
+const nums = z.array(z.number().int().nonnegative()).catch([]);
+export const CartSchema = z.object({
+  id: z.string().min(1), createdAt: z.number(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  kind: z.enum(['basket', 'order']), store: z.string().catch(''), hidden: z.boolean().catch(false),
+  items: z.array(ReceiptItemSchema).min(1), out: nums, swaps: nums,
+  doneAt: z.number().optional(), demo: z.literal(true).optional(),
+  fact: z.object({
+    entryId: z.string(), planned: z.number(), kept: z.number(), money: z.number(), slipped: z.array(z.string()),
+    saved: z.object({ sugar: z.number(), salt: z.number(), fat: z.number(), kcal: z.number(), carbs: z.number(), protein: z.number() }),
+  }).optional(),
+});
+
 // Схема и тип Receipt из types.ts должны совпадать.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const receiptMatches: Same<z.infer<typeof ReceiptSchema>, Receipt> = true;

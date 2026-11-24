@@ -15,7 +15,7 @@ export function gemini(apiKey: string): LlmProvider {
     id: 'gemini',
     async generateJson(t: JsonTask) {
       const parts: unknown[] = [];
-      if (t.image) parts.push({ inlineData: { mimeType: t.image.mime, data: t.image.base64 } });
+      for (const im of t.images ?? []) parts.push({ inlineData: { mimeType: im.mime, data: im.base64 } });
       parts.push({ text: t.user });
 
       const data = await postJson(

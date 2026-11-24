@@ -16,7 +16,7 @@ export function openAiResponses(apiKey: string, baseUrl = 'https://api.openai.co
     id: 'openai',
     async generateJson(t: JsonTask) {
       const content: unknown[] = [{ type: 'input_text', text: t.user }];
-      if (t.image) content.push({ type: 'input_image', image_url: `data:${t.image.mime};base64,${t.image.base64}`, detail: 'high' });
+      for (const im of t.images ?? []) content.push({ type: 'input_image', image_url: `data:${im.mime};base64,${im.base64}`, detail: 'high' });
 
       const data = await postJson(
         `${baseUrl}/responses`,

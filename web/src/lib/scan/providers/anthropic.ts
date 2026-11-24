@@ -12,9 +12,9 @@ export function anthropic(apiKey: string): LlmProvider {
     id: 'anthropic',
     async generateJson(t: JsonTask) {
       const content: Anthropic.ContentBlockParam[] = [];
-      if (t.image) {
-        if (!IMAGE_MIMES.includes(t.image.mime)) throw new ScanError('bad_request', `anthropic: формат ${t.image.mime}`);
-        content.push({ type: 'image', source: { type: 'base64', media_type: t.image.mime as ImageMime, data: t.image.base64 } });
+      for (const im of t.images ?? []) {
+        if (!IMAGE_MIMES.includes(im.mime)) throw new ScanError('bad_request', `anthropic: формат ${im.mime}`);
+        content.push({ type: 'image', source: { type: 'base64', media_type: im.mime as ImageMime, data: im.base64 } });
       }
       content.push({ type: 'text', text: t.user });
 

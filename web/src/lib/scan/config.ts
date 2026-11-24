@@ -16,7 +16,7 @@ export const DEFAULT_MODELS: Record<ProviderId, { vision: string; text: string }
   openai: { vision: 'gpt-6-luna', text: 'gpt-6-luna' },                       // для масштаба: ≈0,47 ₸ за чек, предоплата $5
   mistral: { vision: 'mistral-ocr-4-1', text: 'mistral-small-2603' },         // ≈2,5 ₸ за чек, заявлен хороший казахский
   anthropic: { vision: 'claude-haiku-5-5', text: 'claude-haiku-5-5' },
-  openrouter: { vision: 'z-ai/glm-5.3-flash', text: 'z-ai/glm-5.3-flash' }, // проверена на тестовом чеке: 12/12 позиций; ≈17–22 с на чек
+  openrouter: { vision: 'z-ai/glm-5.3-flash', text: 'z-ai/glm-5.3-flash' }, // проверена на тестовом чеке: 15/15 позиций, сумма точная, 3–5 с, ≈0,3 ₸ за чек
 };
 
 const KEYS: Record<ProviderId, string> = {
@@ -29,6 +29,12 @@ const KEYS: Record<ProviderId, string> = {
 /** Если ключей несколько и SCAN_PROVIDER не задан — берётся первый по этому порядку (рекомендация исследования). */
 const ORDER: ProviderId[] = ['gemini', 'openai', 'mistral', 'anthropic', 'openrouter'];
 
+/**
+ * Настройки OpenRouter. Без «минимальных размышлений» GLM тратит весь ответ на них и не возвращает чек (проверено 24.11.2026).
+ * data_collection: deny — только провайдеры, которые не учатся на наших данных: на чеках бывают имена.
+ */
+const OPENROUTER = { reasoning: { effort: 'minimal' }, provider: { data_collection: 'deny', require_parameters: true, sort: 'throughput' } };
+
 export type ScanConfig = { provider: LlmProvider; visionModel: string; textModel: string };
 
 const env = (name: string): string => (process.env[name] ?? '').trim();
@@ -39,7 +45,7 @@ function make(id: ProviderId, key: string): LlmProvider {
     case 'mistral': return mistral(key);
     case 'gemini': return gemini(key);
     case 'anthropic': return anthropic(key);
-    case 'openrouter': return chatCompletions({ id, baseUrl: 'https://openrouter.ai/api/v1', apiKey: key, extraHeaders: { 'X-Title': 'Chek-up' } });
+    case 'openrouter': return chatCompletions({ id, baseUrl: 'https://openrouter.ai/api/v1', apiKey: key, extraHeaders: { 'X-Title': 'Chek-up' }, extraBody: OPENROUTER });
   }
 }
 

@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { analyze } from '../engine';
 import { ReceiptSchema } from '../schema';
-import { buildItem, buildReceipt } from './build';
+import { applyCorrection, buildItem, buildReceipt as build, lineOf, needsModel, rawKey, storeKey } from './build';
+import type { Extracted } from './parse';
 import type { Estimate } from './parse';
-import { amountFromName, findReference } from './reference';
+import { amountFromName, findReference, isNonFood } from './reference';
 
-const est = (o: Partial<Estimate> & { sugar: number }): Estimate => ({ salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: false, swap: null, ...o });
+const buildReceipt = (x: Partial<Extracted> & Pick<Extracted, 'lines'>, _e: unknown = null, today?: string) => build({ store: '', date: '', time: '', total: 0, refund: false, ...x }, undefined, { today });
+
+const est = (o: Partial<Estimate> & { sugar: number }): Estimate => ({ salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, name: '', food: true, flag: null, junk: false, swap: null, ...o });
 
 describe('справочник', () => {
   it.each([
     ['Напиток Coca-Cola 1 л', 'soda'],
     ['НАП Б/А КОКА-КОЛА 1Л', 'soda'],
-    ['Coca-Cola Zero 0,5 л', null],
+    ['Coca-Cola Zero 0,5 л', 'zero-drink'],
     ['Сок яблочный Gracio 1 л', 'juice'],
     ['Шырын алма 1л', 'juice'],
     ['Молоко Простоквашино 3,2% 1 л', 'plain-dairy'],
@@ -79,7 +82,7 @@ describe('buildItem', () => {
   });
 
   it('неизвестный товар — оценка модели и её замена', () => {
-    const it3 = buildItem({ name: 'Батончик протеиновый X', qty: 1, price: 900 }, est({ sugar: 12, junk: true, swap: { n: 'Орехи 50 г', p: 600, s: 0, t: 0, f: 3, k: 300, c: 0, b: 0 } }));
+    const it3 = buildItem({ name: 'Закуска Орион X', qty: 1, price: 900 }, est({ sugar: 12, junk: true, swap: { n: 'Орехи 50 г', p: 600, s: 0, t: 0, f: 3, k: 300, c: 0, b: 0 } }));
     expect(it3).toMatchObject({ s: 12, junk: 1, swap: { n: 'Орехи 50 г', p: 600, s: 0 } });
   });
 
@@ -187,7 +190,86 @@ describe('buildReceipt', () => {
   });
 
   it('без магазина и даты — «Мой чек» и сегодняшняя дата', () => {
-    const r = buildReceipt({ ...x, store: '', date: '' }, new Map(), new Date('2026-11-16T09:00:00Z'));
+    const r = buildReceipt({ ...x, store: '', date: '' }, null, '2026-11-16');
     expect(r).toMatchObject({ title: 'Мой чек', store: 'Магазин', date: '2026-11-16' });
+  });
+});
+
+describe('не еда и запасы', () => {
+  it.each(['Стиральный порошок Persil 3 кг', 'Пакет майка', 'Туалетная бумага 4 рулона', 'Шампунь 400 мл', 'Корм для кошек Whiskas', 'Гель для душа', 'Салфетки влажные', 'Подгузники Pampers 4', 'Фольга пищевая', 'Средство для мытья посуды Fairy', 'Зубная паста', 'Соль для посудомоечных машин'])('%s — не еда', n => {
+    expect(isNonFood(n)).toBe(true);
+    expect(buildItem({ name: n, qty: 1, price: 900 })).toMatchObject({ nf: 1, s: 0 });
+  });
+  it.each(['Чай в пакетиках 100 шт', 'Сухое молоко', 'Паста томатная', 'Крем-сыр', 'Мыльная опера', 'Шоколад Ариель', 'Каша в пакетиках'])('%s — не бытовая химия', n => {
+    expect(isNonFood(n)).toBe(false);
+  });
+  it('сахар, мука, масло растягиваются по весу, хлеб и кола — нет', () => {
+    expect(buildItem({ name: 'Сахар-песок 1 кг', qty: 1, price: 500 })).toMatchObject({ s: 1000, w: 8 });
+    expect(buildItem({ name: 'Сахар-песок 5 кг', qty: 1, price: 2500 })).toMatchObject({ s: 5000, w: 26 });
+    expect(buildItem({ name: 'Мука в/с 2 кг', qty: 1, price: 700 }).w).toBe(5);
+    expect(buildItem({ name: 'Соль поваренная 1 кг', qty: 1, price: 120 })).toMatchObject({ t: 970, w: 24 });
+    expect(buildItem({ name: 'Хлеб 400 г', qty: 1, price: 200 }).w).toBeUndefined();
+    expect(buildItem({ name: 'Кола 1 л', qty: 1, price: 600 }).w).toBeUndefined();
+  });
+});
+
+describe('расширенный справочник', () => {
+  it.each([
+    ['Кола Zero 1 л', 'zero-drink'], ['Напиток Coca-Cola без сахара 0,5 л', 'zero-drink'], ['Напиток Coca-Cola 1 л', 'soda'],
+    ['Масса творожная с изюмом 180 г', 'curd-mass'], ['Сырок глазированный 45 г', 'glazed-curd'], ['Сыр плавленый Hochland', 'processed-cheese'], ['Курт 100 г', 'kurt'], ['Құрт үй', 'kurt'],
+    ['Мёд натуральный 500 г', 'honey'], ['Торт Медовик 1 кг', 'cake'], ['Изюм 200 г', 'dried-fruit'], ['Шоколад молочный с изюмом 90 г', 'chocolate'], ['Чак-чак 300 г', 'chak-chak'],
+    ['Хлопья овсяные 800 г', 'oats'], ['Печенье овсяное 300 г', 'cookies'], ['Каша быстрого приготовления Быстров', 'instant-porridge'], ['Паста томатная 270 г', 'tomato-paste'], ['Nutella 350 г', 'choc-paste'],
+    ['Соль йодированная 1 кг', 'salt'], ['Огурцы солёные 500 г', 'pickles'], ['Мука пшеничная 2 кг', 'flour'], ['Рис Акмарал 800 г', 'rice'], ['Күріш 1 кг', 'rice'], ['Казы 500 г', 'qazy'],
+    ['Котлеты куриные 400 г', 'nuggets'], ['Молоко 2,5% 1 л', 'plain-dairy'], ['Молоко овсяное 1 л', 'plant-milk'], ['Кофе 3 в 1 MacCoffee', 'coffee-3in1'], ['Салат Оливье 300 г', 'salad-ready'], ['Орбит мята', 'gum'],
+  ])('%s → %s', (name, key) => expect(findReference(name)?.key).toBe(key));
+  it('у всех категорий разумные числа и разные ключи', async () => {
+    const { REFERENCE } = await import('./reference');
+    expect(new Set(REFERENCE.map(r => r.key)).size).toBe(REFERENCE.length);
+    expect(REFERENCE.length).toBeGreaterThan(95);
+    for (const r of REFERENCE) {
+      for (const v of [r.per100, r.salt100, r.fat100, r.carbs100, r.protein100]) expect(v, r.key).toBeGreaterThanOrEqual(0);
+      expect(r.per100, r.key).toBeLessThanOrEqual(Math.max(r.carbs100, r.per100 ? r.carbs100 + 1 : 0) + 0.01);
+      expect(r.kcal100, r.key).toBeLessThanOrEqual(905);
+      expect(r.typical, r.key).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('количество в названии', () => {
+  it('вес и штуки сохраняются и читаются обратно', () => {
+    expect(buildItem({ name: 'Бананы', qty: 1.24, price: 900 }).n).toBe('Бананы, 1,24 кг');
+    expect(buildItem({ name: 'Яблоки Апорт 1,240 кг', qty: 1.24, price: 806 }).n).toBe('Яблоки Апорт 1,240 кг');
+    const two = buildItem({ name: 'Сырок глазированный 45 г', qty: 2, price: 440 });
+    expect(two.n).toBe('Сырок глазированный 45 г, 2 шт');
+    expect(lineOf(two)).toEqual({ name: 'Сырок глазированный 45 г', qty: 2, price: 440 });
+    expect(buildItem(lineOf(two))).toEqual(two);
+  });
+  it('сомнительная строка помечена, неизвестной нужна модель', () => {
+    expect(buildItem({ name: 'Кола 1 л', qty: 1, price: 600, unsure: true }).q).toBe(1);
+    expect(needsModel(buildItem({ name: 'ORION XQ-17', qty: 1, price: 600 }))).toBe(true);
+    expect(needsModel(buildItem({ name: 'Кола 1 л', qty: 1, price: 600 }))).toBe(false);
+    expect(needsModel(buildItem({ name: 'Пакет майка', qty: 1, price: 30 }))).toBe(false);
+  });
+});
+
+describe('исправления', () => {
+  const read = buildItem({ name: 'НАП ГАЗ ТЕСТ', qty: 1, price: 500 });
+  it('новое название пересчитывает показатели, цена остаётся', () => {
+    const fixed = applyCorrection(read, { n: 'Кола 1 л' });
+    expect(fixed).toMatchObject({ n: 'Кола 1 л', p: 500, s: 106, raw: 'НАП ГАЗ ТЕСТ', src: 'user' });
+  });
+  it('введённые числа важнее справочника, снимается пометка сомнения', () => {
+    const x = applyCorrection({ ...read, q: 1 }, { n: 'Кола 1 л', s: 40 });
+    expect(x.s).toBe(40);
+    expect(x.q).toBeUndefined();
+  });
+  it('можно пометить не едой и вернуть обратно', () => {
+    const nf = applyCorrection(read, { n: read.n, nf: 1 });
+    expect(nf).toMatchObject({ nf: 1, s: 0 });
+    expect(applyCorrection(nf, { n: 'Кола 1 л', s: 106 }).nf).toBeUndefined();
+  });
+  it('ключи магазина и строки не зависят от регистра, кавычек и формы собственности', () => {
+    expect(storeKey('ТОО «MAGNUM Cash&Carry»')).toBe(storeKey('magnum cash carry'));
+    expect(rawKey('МОЛ ПРОСТ 3,2%  1Л')).toBe(rawKey('мол прост 3 2 1л'));
   });
 });

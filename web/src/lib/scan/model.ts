@@ -7,22 +7,26 @@ import { z } from 'zod';
 export const EXTRACTION_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['is_receipt', 'store', 'date', 'items'],
+  required: ['is_receipt', 'is_refund', 'store', 'date', 'time', 'total', 'items'],
   properties: {
     is_receipt: { type: 'boolean', description: 'true, если на фото кассовый чек' },
+    is_refund: { type: 'boolean', description: 'true, если это чек возврата' },
     store: { type: 'string', description: 'магазин или сеть; пустая строка, если не видно' },
     date: { type: 'string', description: 'дата покупки YYYY-MM-DD; пустая строка, если не видно' },
+    time: { type: 'string', description: 'время покупки HH:MM; пустая строка, если не видно' },
+    total: { type: 'number', description: 'итоговая сумма, напечатанная на чеке; 0, если не видно' },
     items: {
       type: 'array',
       description: 'товарные позиции по порядку, без итогов, НДС, оплаты и скидок отдельной строкой',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'qty', 'price'],
+        required: ['name', 'qty', 'price', 'sure'],
         properties: {
           name: { type: 'string', description: 'понятное название с объёмом/весом, сокращения кассы расшифрованы' },
           qty: { type: 'number', description: 'количество; для весового товара — вес в кг' },
           price: { type: 'number', description: 'сумма по строке в тенге' },
+          sure: { type: 'boolean', description: 'false, если название или цена читаются плохо' },
         },
       },
     },
@@ -43,10 +47,14 @@ export const ExtractionSchema = z.object({
   is_receipt: z.boolean(),
   store: z.string().catch(''),
   date: z.string().catch(''),
+  is_refund: z.boolean().catch(false),
+  time: z.string().catch(''),
+  total: num.catch(0),
   items: z.array(z.object({
     name: z.string(),
     qty: num.catch(1),
     price: num,
+    sure: z.boolean().catch(true),
   }).loose()).catch([]),
 }).loose();
 export type Extraction = z.infer<typeof ExtractionSchema>;
@@ -63,9 +71,11 @@ export const ENRICHMENT_JSON_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['i', 'sugar_g', 'salt_g', 'sat_fat_g', 'kcal', 'carbs_g', 'protein_g', 'flag', 'junk', 'swap_name', 'swap_price', 'swap_sugar_g', 'swap_salt_g', 'swap_sat_fat_g', 'swap_kcal', 'swap_carbs_g', 'swap_protein_g'],
+        required: ['i', 'name', 'food', 'sugar_g', 'salt_g', 'sat_fat_g', 'kcal', 'carbs_g', 'protein_g', 'flag', 'junk', 'swap_name', 'swap_price', 'swap_sugar_g', 'swap_salt_g', 'swap_sat_fat_g', 'swap_kcal', 'swap_carbs_g', 'swap_protein_g'],
         properties: {
           i: { type: 'integer', description: 'номер позиции из запроса' },
+          name: { type: 'string', description: 'понятное название: расшифруй кассовые сокращения, сохрани объём и вес' },
+          food: { type: 'boolean', description: 'false для не-еды: бытовая химия, пакеты, косметика, корм' },
           sugar_g: { type: 'number', description: 'добавленный сахар на всю позицию, г' },
           salt_g: { type: 'number', description: 'соль (NaCl) на всю позицию, г; если известен натрий — умножь на 2,5' },
           sat_fat_g: { type: 'number', description: 'насыщенные жиры на всю позицию, г' },
@@ -91,6 +101,8 @@ export const ENRICHMENT_JSON_SCHEMA = {
 export const EnrichmentSchema = z.object({
   items: z.array(z.object({
     i: z.number().int(),
+    name: z.string().catch(''),
+    food: z.boolean().catch(true),
     sugar_g: num,
     // новые поля: модель может их пропустить — тогда 0, а справочник всё равно перекроет известные категории
     salt_g: num.catch(0),

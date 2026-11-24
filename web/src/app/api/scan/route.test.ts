@@ -1,12 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from './route';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAnonymousUser } from '@/server/auth';
+import { openPglite, type Db } from '@/server/db';
+import { saveCorrections } from '@/server/corrections';
+import { membershipOf } from '@/server/family';
 
-const KEYS = ['OPENAI_API_KEY', 'MISTRAL_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'SCAN_PROVIDER', 'SCAN_VISION_MODEL', 'SCAN_TEXT_MODEL'];
+let db: Db, token = '', userId = '';
+vi.mock('@/server/db', async orig => ({ ...(await orig<typeof import('@/server/db')>()), getDb: async () => db }));
+const { POST } = await import('./route');
+const { POST: ENRICH } = await import('./enrich/route');
+beforeAll(async () => { db = await openPglite(); }, 60_000);
+beforeEach(async () => { ({ token, userId } = await createAnonymousUser(db)); });
+
+const KEYS = ['SCAN_USER_CAP', 'SCAN_DAILY_CAP', 'OPENAI_API_KEY', 'MISTRAL_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'SCAN_PROVIDER', 'SCAN_VISION_MODEL', 'SCAN_TEXT_MODEL'];
 
 const send = (photo?: Blob, type = 'image/jpeg') => {
   const fd = new FormData();
   if (photo) fd.append('photo', new File([photo], 'r.jpg', { type }));
-  return POST(new Request('http://localhost/api/scan', { method: 'POST', body: fd, headers: { 'x-forwarded-for': `10.0.0.${Math.random() * 250 | 0}` } }));
+  return POST(new Request('http://localhost/api/scan', { method: 'POST', body: fd, headers: { 'x-forwarded-for': `10.0.${Math.random() * 250 | 0}.${Math.random() * 250 | 0}`, authorization: `Bearer ${token}` } }));
 };
 const jpeg = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])]);
 
@@ -31,23 +41,47 @@ describe('POST /api/scan', () => {
     expect((await res.json()).error.code).toBe('bad_request');
   });
 
-  it('OpenRouter возвращает углеводы и белки для позиции и замены', async () => {
+  it('без входа не работает', async () => {
+    const fd = new FormData();
+    fd.append('photo', new File([jpeg], 'r.jpg', { type: 'image/jpeg' }));
+    expect((await POST(new Request('http://localhost/api/scan', { method: 'POST', body: fd }))).status).toBe(401);
+  });
+
+  it('OpenRouter: минимальные размышления, провайдеры без обучения на данных; неизвестная позиция — в pending, уточняется отдельно', async () => {
     vi.stubEnv('SCAN_PROVIDER', 'openrouter');
     vi.stubEnv('OPENROUTER_API_KEY', 'router-test');
     const output = (payload: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(payload) } }] });
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(output({ is_receipt: true, store: 'Тест', date: '2026-11-16', items: [{ name: 'ORION XQ-17', qty: 1, price: 620 }] }))
-      .mockResolvedValueOnce(output({ items: [{ i: 0, junk: true, sugar_g: 25, salt_g: 1, sat_fat_g: 7, kcal: 300, carbs_g: 45, protein_g: 8, swap_name: 'Несладкий десерт', swap_price: 400, swap_sugar_g: 2, swap_salt_g: 0, swap_sat_fat_g: 1, swap_kcal: 140, swap_carbs_g: 11, swap_protein_g: 14 }] }));
+      .mockResolvedValueOnce(output({ is_receipt: true, store: 'Тест', date: '2026-11-16', items: [{ name: 'ORION XQ-17', qty: 1, price: 620 }, { name: 'Кола 1 л', qty: 1, price: 600 }] }))
+      .mockResolvedValueOnce(output({ items: [{ i: 0, name: 'Печенье Orion', junk: true, sugar_g: 25, salt_g: 1, sat_fat_g: 7, kcal: 300, carbs_g: 45, protein_g: 8, swap_name: 'Несладкий десерт', swap_price: 400, swap_sugar_g: 2, swap_salt_g: 0, swap_sat_fat_g: 1, swap_kcal: 140, swap_carbs_g: 11, swap_protein_g: 14 }] }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await send(jpeg);
-    expect(response.status).toBe(200);
-    expect((await response.json()).receipt.items[0]).toMatchObject({ c: 45, b: 8, swap: { c: 11, b: 14 } });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    for (const [url, init] of fetchMock.mock.calls) {
-      expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
-      expect(JSON.parse(init.body).model).toBe('z-ai/glm-5.3-flash');
-    }
+    const body = await (await send(jpeg)).json();
+    expect(body.pending).toEqual([0]);
+    expect(body.receipt.items[1]).toMatchObject({ s: 106, src: 'ref' });
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent).toMatchObject({ model: 'z-ai/glm-5.3-flash', reasoning: { effort: 'minimal' }, provider: { data_collection: 'deny' } });
+
+    const res = await ENRICH(new Request('http://x', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ items: [{ n: 'ORION XQ-17', p: 620 }] }) }));
+    expect((await res.json()).items[0]).toMatchObject({ n: 'Печенье Orion', c: 45, b: 8, swap: { c: 11, b: 14 } });
+  });
+
+  it('исправленное однажды подставляется само', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    await saveCorrections(db, (await membershipOf(db, userId)).familyId, 'Magnum', [{ raw: 'ORION XQ-17', item: { n: 'Кола 1 л' } }]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(geminiText({ is_receipt: true, store: 'ТОО "Magnum"', date: '2026-11-16', items: [{ name: 'Orion  xq-17', qty: 1, price: 620 }] })));
+    const body = await (await send(jpeg)).json();
+    expect(body.receipt.items[0]).toMatchObject({ n: 'Кола 1 л', p: 620, s: 106, src: 'user' });
+    expect(body.pending).toEqual([]);
+  });
+
+  it('дневной лимит пользователя', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    vi.stubEnv('SCAN_USER_CAP', '1');
+    vi.stubGlobal('fetch', vi.fn(async () => geminiText({ is_receipt: true, store: 'M', date: '2026-11-16', items: [{ name: 'Кола 1 л', qty: 1, price: 620 }] })));
+    expect((await send(jpeg)).status).toBe(200);
+    const res = await send(jpeg);
+    expect([res.status, (await res.json()).error.code]).toEqual([429, 'daily_limit']);
   });
 
   it('с ключом Gemini — распознанный чек; ключ уходит только в заголовке', async () => {
@@ -104,7 +138,6 @@ describe('POST /api/scan: основной и запасной провайде�
     expect(body).toMatchObject({ model: 'gpt-6-luna', reasoning: { effort: 'none' }, store: false, text: { format: { type: 'json_schema', strict: true } } });
     expect(body.input[0].content[1]).toMatchObject({ type: 'input_image', detail: 'high' });
     expect(body.input[0].content[1].image_url).toMatch(/^data:image\/jpeg;base64,/);
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body).input[0].content).toHaveLength(1); // текстовый шаг без фото
   });
 
   it('OpenAI: отказ модели → unreadable', async () => {
@@ -129,8 +162,6 @@ describe('POST /api/scan: основной и запасной провайде�
     const b1 = JSON.parse(init1.body);
     expect(url1).toBe('https://api.mistral.ai/v1/ocr');
     expect(b1).toMatchObject({ model: 'mistral-ocr-4-1', document: { type: 'image_url' }, document_annotation_format: { type: 'json_schema' } });
-    expect(fetchMock.mock.calls[1][0]).toBe('https://api.mistral.ai/v1/chat/completions');
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ model: 'mistral-small-2603', response_format: { type: 'json_schema' } });
   });
 
   it('SCAN_PROVIDER и SCAN_VISION_MODEL переключают модель одной настройкой', async () => {

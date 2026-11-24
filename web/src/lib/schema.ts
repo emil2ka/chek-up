@@ -21,6 +21,7 @@ export const ReceiptItemSchema = SwapItemSchema.extend({
   w: z.number().int().min(1).max(26).optional(),
   q: z.literal(1).optional(),
   src: z.enum(['ref', 'ai', 'user']).optional(),
+  raw: z.string().max(160).optional(),
 });
 
 export const ReceiptSchema = z.object({
@@ -35,6 +36,7 @@ export const ReceiptSchema = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   sum: z.number().nonnegative().optional(),
   masked: z.boolean().optional(),
+  via: z.enum(['photo', 'qr', 'manual']).optional(),
 });
 
 /** Ответ POST /api/scan */
@@ -42,6 +44,8 @@ export const ScanResponseSchema = z.object({
   receipt: ReceiptSchema,
   /** уведомление для пользователя (например, про демо-режим) или null */
   notice: z.string().nullable(),
+  /** позиции без справочника: показатели для них клиент запросит отдельно (POST /api/scan/enrich) */
+  pending: z.array(z.number().int().nonnegative()).default([]),
 });
 export type ScanResponse = z.infer<typeof ScanResponseSchema>;
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScanError } from './errors';
-import { scanPhoto } from './pipeline';
+import { enrichItems, extractPhotos } from './pipeline';
 import { postJson } from './providers/http';
 import type { JsonTask, LlmProvider } from './providers/types';
 
@@ -28,34 +28,33 @@ const extraction = JSON.stringify({
   ],
 });
 
-describe('scanPhoto', () => {
-  it('два шага: фото → позиции → сахар', async () => {
-    const p = fake([
-      extraction,
-      { items: [
-        { i: 0, sugar_g: 212, junk: true, swap_name: 'Вода с лимоном 2 л', swap_price: 420, swap_sugar_g: 0 },
-        { i: 1, sugar_g: 0, junk: false, swap_name: '', swap_price: 0, swap_sugar_g: 0 },
-      ] },
-    ]);
-    const r = await scanPhoto(IMG, { provider: p, visionModel: 'v', textModel: 't' });
-    expect(p.tasks.map(t => [t.model, !!t.image])).toEqual([['v', true], ['t', false]]);
-    expect(p.tasks[1].user).toContain('справочник: сладкая газировка');
-    expect(r.items[0]).toMatchObject({ n: 'Лимонад 2 л', p: 890, s: 212, junk: 1, swap: { n: 'Вода с лимоном 2 л', p: 420, s: 0 } });
-    expect(r.items[1]).toMatchObject({ n: 'Бананы', s: 0 });
-    expect(r.approx).toBe(true);
-  });
+const cfg = (p: LlmProvider) => ({ provider: p, visionModel: 'v', textModel: 't' });
 
-  it('если второй шаг упал — чек собирается по справочнику', async () => {
-    const p = fake([extraction, new ScanError('unavailable', 'тест')]);
-    const r = await scanPhoto(IMG, { provider: p, visionModel: 'v', textModel: 't' });
-    expect(r.items[0].s).toBe(212);
+describe('extractPhotos', () => {
+  it('отдаёт позиции, несколько кадров уходят одним запросом', async () => {
+    const p = fake([extraction]);
+    const x = await extractPhotos([IMG, IMG], cfg(p));
+    expect(p.tasks).toHaveLength(1);
+    expect(p.tasks[0]).toMatchObject({ model: 'v', images: [IMG, IMG] });
+    expect(x.lines.map(l => l.name)).toEqual(['Лимонад 2 л', 'Бананы']);
   });
+  it('ошибки доходят до пользователя', async () => {
+    await expect(extractPhotos([IMG], cfg(fake([{ is_receipt: false, store: '', date: '', items: [] }])))).rejects.toMatchObject({ code: 'not_receipt' });
+    await expect(extractPhotos([IMG], cfg(fake([new ScanError('rate_limit')])))).rejects.toMatchObject({ code: 'rate_limit' });
+  });
+});
 
-  it('ошибки первого шага доходят до пользователя', async () => {
-    await expect(scanPhoto(IMG, { provider: fake([{ is_receipt: false, store: '', date: '', items: [] }]), visionModel: 'v', textModel: 't' }))
-      .rejects.toMatchObject({ code: 'not_receipt' });
-    await expect(scanPhoto(IMG, { provider: fake([new ScanError('rate_limit')]), visionModel: 'v', textModel: 't' }))
-      .rejects.toMatchObject({ code: 'rate_limit' });
+describe('enrichItems', () => {
+  it('оценивает неизвестные позиции и расшифровывает название; чего нет в ответе — null', async () => {
+    const p = fake([{ items: [{ i: 0, name: 'Печенье Орион 200 г', food: true, sugar_g: 60, kcal: 900, junk: true, swap_name: 'Хлебцы 100 г', swap_price: 300, swap_sugar_g: 2 }] }]);
+    const r = await enrichItems([{ n: 'ORION XQ-17', p: 700 }, { n: 'НЕПОНЯТНО', p: 100 }], cfg(p));
+    expect(p.tasks[0].images).toBeUndefined();
+    expect(r[0]).toMatchObject({ n: 'Печенье Орион 200 г', p: 700, s: 60, k: 900, junk: 1, src: 'ai', swap: { n: 'Хлебцы 100 г' } });
+    expect(r[1]).toBeNull();
+  });
+  it('модель сказала «не еда»', async () => {
+    const r = await enrichItems([{ n: 'XYZ 12', p: 700 }], cfg(fake([{ items: [{ i: 0, name: 'Салют праздничный', food: false, sugar_g: 0 }] }])));
+    expect(r[0]).toMatchObject({ nf: 1, s: 0 });
   });
 });
 

@@ -7,8 +7,8 @@ export type JsonTask = {
   model: string;
   system: string;
   user: string;
-  /** фото — только для шага распознавания */
-  image?: ImageInput;
+  /** фото — только для шага распознавания; длинный чек снимают в 2–3 кадра */
+  images?: ImageInput[];
   schemaName: string;
   schema: Record<string, unknown>;
   signal: AbortSignal;

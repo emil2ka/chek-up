@@ -111,7 +111,7 @@ describe('parseEnrichment', () => {
         { i: 1, sugar_g: 0, junk: false, swap_name: '', swap_price: 0, swap_sugar_g: 0 },
       ],
     }, 2);
-    expect(m.get(0)).toEqual({ sugar: 106, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: true, swap: { n: 'Минералка 1 л', p: 280, s: 0, t: 0, f: 0, k: 0, c: 0, b: 0 } });
+    expect(m.get(0)).toEqual({ name: '', food: true, sugar: 106, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: true, swap: { n: 'Минералка 1 л', p: 280, s: 0, t: 0, f: 0, k: 0, c: 0, b: 0 } });
     expect(m.get(1)?.swap).toBeNull();
   });
 
@@ -125,7 +125,7 @@ describe('parseEnrichment', () => {
       ],
     }, 2);
     expect([...m.keys()]).toEqual([1]);
-    expect(m.get(1)).toEqual({ sugar: 3, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: false, swap: null });
+    expect(m.get(1)).toEqual({ name: '', food: true, sugar: 3, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: false, swap: null });
   });
 
   it('мусор → пустая карта (чек соберётся по справочнику)', () => {
@@ -154,5 +154,20 @@ describe('normalizeDate', () => {
     expect(m.get(0)).toMatchObject({ salt: 9.2, fat: 36, kcal: 1160, flag: null, swap: { n: 'Грудка 400 г', t: 3.2, f: 1.2, k: 560 } });
     expect(m.get(1)).toMatchObject({ salt: 0, fat: 0, kcal: 0, flag: 'alcohol' });
     expect(m.get(2)).toMatchObject({ sugar: 10, flag: null });
+  });
+});
+
+describe('новые поля чека', () => {
+  const base = { is_receipt: true, store: 'Small', date: '2026-11-16', items: [{ name: 'Кола 1 л', qty: 1, price: 620 }] };
+  it('время, итог, уверенность', () => {
+    const x = parseExtraction({ ...base, time: '9:05:11', total: '1 270,00', items: [{ name: 'Кола 1 л', qty: 1, price: 620, sure: false }] });
+    expect(x).toMatchObject({ time: '09:05', total: 1270, refund: false });
+    expect(x.lines[0].unsure).toBe(true);
+    expect(parseExtraction({ ...base, time: '25:00' }).time).toBe('');
+  });
+  it('возврат с отрицательными суммами читается, в обычном чеке минус отбрасывается', () => {
+    const items = [{ name: 'Кола 1 л', qty: 1, price: -620 }];
+    expect(parseExtraction({ ...base, is_refund: true, items })).toMatchObject({ refund: true, lines: [{ price: 620 }] });
+    expect(() => parseExtraction({ ...base, items })).toThrow();
   });
 });

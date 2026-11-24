@@ -15,12 +15,14 @@ export function chatCompletions(opts: {
   extraHeaders?: Record<string, string>;
   /** max_completion_tokens (OpenAI-стиль) или max_tokens (Mistral, часть моделей OpenRouter) */
   maxTokensField?: 'max_completion_tokens' | 'max_tokens';
+  /** добавить в тело запроса (настройки конкретного шлюза) */
+  extraBody?: Record<string, unknown>;
 }): LlmProvider {
   return {
     id: opts.id,
     async generateJson(t: JsonTask) {
       const user: unknown[] = [{ type: 'text', text: t.user }];
-      if (t.image) user.push({ type: 'image_url', image_url: { url: `data:${t.image.mime};base64,${t.image.base64}` } });
+      for (const im of t.images ?? []) user.push({ type: 'image_url', image_url: { url: `data:${im.mime};base64,${im.base64}` } });
 
       const data = await postJson(
         `${opts.baseUrl}/chat/completions`,
@@ -33,6 +35,7 @@ export function chatCompletions(opts: {
           ],
           response_format: { type: 'json_schema', json_schema: { name: t.schemaName, strict: true, schema: t.schema } },
           [opts.maxTokensField ?? 'max_tokens']: t.maxTokens,
+          ...opts.extraBody,
         },
         t.signal,
         opts.id,

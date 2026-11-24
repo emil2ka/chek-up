@@ -14,14 +14,16 @@ export function mistral(apiKey: string): LlmProvider {
   return {
     id: 'mistral',
     async generateJson(t: JsonTask) {
-      if (!t.image) return text.generateJson(t);
+      const image = t.images?.[0];
+      if (!image) return text.generateJson(t);
+      if (t.images!.length > 1) throw new ScanError('bad_request', 'mistral: только один кадр');
 
       const data = await postJson(
         `${BASE}/ocr`,
         { authorization: `Bearer ${apiKey}` },
         {
           model: t.model,
-          document: { type: 'image_url', image_url: `data:${t.image.mime};base64,${t.image.base64}` },
+          document: { type: 'image_url', image_url: `data:${image.mime};base64,${image.base64}` },
           document_annotation_format: { type: 'json_schema', json_schema: { name: t.schemaName, strict: true, schema: t.schema } },
           document_annotation_prompt: t.system,
           include_image_base64: false,

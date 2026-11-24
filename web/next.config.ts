@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
     source: '/:path*',
     headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
+      // пока проверяем на знакомых, сайт не должен попасть в поиск; откроем — PUBLIC_INDEX=1
+      ...(process.env.PUBLIC_INDEX ? [] : [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]),
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
       { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },

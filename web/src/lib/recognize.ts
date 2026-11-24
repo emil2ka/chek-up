@@ -37,7 +37,7 @@ export async function recognize(photos: Blob[], qr: string | null): Promise<Scan
   try {
     data = await authed('/api/scan', { method: 'POST', body });
   } catch (e) {
-    if (e instanceof SyncError) throw new ScanError(isScanErrorCode(e.code) ? e.code : e.httpStatus === 429 ? 'rate_limit' : 'unavailable', e.code);
+    if (e instanceof SyncError) throw new ScanError(isScanErrorCode(e.code) ? e.code : e.httpStatus === 413 ? 'too_large' : e.httpStatus === 429 ? 'rate_limit' : 'unavailable', e.code);
     throw e;
   }
   const parsed = ScanResponseSchema.safeParse(data);

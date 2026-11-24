@@ -1,5 +1,5 @@
 // Подключение к БД. Одна и та же схема в двух режимах:
-//   • DATABASE_URL задан  → обычный Postgres (Supabase, Neon, свой сервер); миграции — `pnpm db:migrate`
+//   • DATABASE_URL (или POSTGRES_URL от интеграции Vercel × Supabase) задан  → обычный Postgres (Supabase, Neon, свой сервер); миграции — `pnpm db:migrate`
 //   • DATABASE_URL нет    → встроенный Postgres PGlite в папке .data/pglite (для разработки, без Docker),
 //                           миграции применяются сами.
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -46,8 +46,21 @@ function lockDir(dir: string): void {
   process.once('exit', () => { try { unlinkSync(lock); } catch { /* уже удалён */ } });
 }
 
+/** Строка подключения: своя или та, что кладёт интеграция Vercel × Supabase. Служебный параметр `supa` Postgres не понимает. */
+export function databaseUrl(env: Record<string, string | undefined> = process.env): string {
+  const raw = (env.DATABASE_URL ?? '').trim() || (env.POSTGRES_URL ?? '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    u.searchParams.delete('supa');
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
 async function open(): Promise<Db> {
-  const url = (process.env.DATABASE_URL ?? '').trim();
+  const url = databaseUrl();
   if (url) {
     const { drizzle } = await import('drizzle-orm/postgres-js');
     const { default: postgres } = await import('postgres');
@@ -55,7 +68,7 @@ async function open(): Promise<Db> {
     return drizzle(postgres(url, { max: 5, prepare: false }), { schema }) as unknown as Db;
   }
   // у облачного хостинга диск временный: без настоящей базы чеки людей пропали бы при первом же перезапуске
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) throw new Error('DATABASE_URL не задан: на хостинге нужна настоящая Postgres');
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) throw new Error('DATABASE_URL или POSTGRES_URL не задан: на хостинге нужна настоящая Postgres');
   // только для разработки: путь динамический, в серверный бандл тащить проект не нужно
   const dir = path.resolve(/*turbopackIgnore: true*/ process.env.PGLITE_DIR || '.data/pglite');
   mkdirSync(dir, { recursive: true });

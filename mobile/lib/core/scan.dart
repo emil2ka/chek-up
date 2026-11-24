@@ -58,9 +58,13 @@ Future<ScanResult> recognize(List<Uint8List> photos, String? qr) async {
     );
   } on ApiException catch (e) {
     throw ScanError(
-      e.status == 429 && !scanErrors.containsKey(e.code)
+      scanErrors.containsKey(e.code)
+          ? e.code
+          : e.status == 413
+          ? 'too_large'
+          : e.status == 429
           ? 'rate_limit'
-          : e.code,
+          : 'unavailable',
     );
   } on FormatException {
     throw ScanError('unavailable');

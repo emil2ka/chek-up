@@ -1,5 +1,6 @@
 // Схема БД «Чек-апа» (Postgres). Одна БД на веб-версию и мобильное приложение.
 // Данные принадлежат СЕМЬЕ: журнал, список покупок, недели стрика. У нового пользователя сразу есть своя семья из одного человека.
+// RLS включена везде и без политик: через публичный API Supabase таблицы недоступны, а наш сервер ходит владельцем таблиц.
 // Пользователь может быть анонимным (только устройства) или со входом (identities: почта, Google, Apple).
 import { bigint, bigserial, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import type { Receipt } from '@/lib/types';
@@ -16,7 +17,7 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull().default(''),
   createdAt: ts('created_at'),
-});
+}).enableRLS();
 
 /** Чем человек входит: почта или аккаунт Google/Apple. Одна личность — один пользователь. */
 export const identities = pgTable(
@@ -29,7 +30,7 @@ export const identities = pgTable(
     createdAt: ts('created_at'),
   },
   t => [primaryKey({ columns: [t.provider, t.subject] }), index('identities_user_idx').on(t.userId)],
-);
+).enableRLS();
 
 /** Токен устройства хранится только хешем: утечка БД не раскрывает рабочие токены. */
 export const devices = pgTable(
@@ -44,14 +45,14 @@ export const devices = pgTable(
     lastSeenAt: ts('last_seen_at'),
   },
   t => [index('devices_user_idx').on(t.userId)],
-);
+).enableRLS();
 
 /** Одноразовый короткий код, чтобы войти в тот же аккаунт с другого устройства. */
 export const linkCodes = pgTable('link_codes', {
   code: text('code').primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-});
+}).enableRLS();
 
 /** Коды входа по почте: хранится хеш кода, число попыток ограничено. */
 export const emailCodes = pgTable('email_codes', {
@@ -60,7 +61,7 @@ export const emailCodes = pgTable('email_codes', {
   attempts: integer('attempts').notNull().default(0),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: ts('created_at'),
-});
+}).enableRLS();
 
 // ── семья ──
 export const families = pgTable('families', {
@@ -74,7 +75,7 @@ export const families = pgTable('families', {
   /** счётчик изменений семьи, выдаёт номера rev */
   rev: rev(),
   createdAt: ts('created_at'),
-});
+}).enableRLS();
 
 /** Один человек — в одной семье. */
 export const members = pgTable(
@@ -86,7 +87,7 @@ export const members = pgTable(
     joinedAt: ts('joined_at'),
   },
   t => [index('members_family_idx').on(t.familyId)],
-);
+).enableRLS();
 
 /** Приглашение в семью: в БД хеш кода, код живёт двое суток и одноразовый. */
 export const invites = pgTable('invites', {
@@ -95,7 +96,7 @@ export const invites = pgTable('invites', {
   role: text('role').$type<Role>().notNull().default('adult'),
   createdBy: uuid('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-});
+}).enableRLS();
 
 /** Личное: не зависит от семьи. adults/kids — остались для старых клиентов, источник правды теперь families. */
 export const profiles = pgTable('profiles', {
@@ -106,7 +107,7 @@ export const profiles = pgTable('profiles', {
   seen: jsonb('seen').$type<string[]>().notNull().default([]),
   lang: text('lang').notNull().default('ru'),
   updatedAt: ms('updated_at'),
-});
+}).enableRLS();
 
 // Колонка исторически называется user_id: у старых аккаунтов id семьи равен id пользователя (см. миграцию 0002).
 export const history = pgTable(
@@ -134,7 +135,7 @@ export const history = pgTable(
     rev: rev(),
   },
   t => [primaryKey({ columns: [t.familyId, t.id] }), index('history_rev_idx').on(t.familyId, t.rev)],
-);
+).enableRLS();
 
 export const shopItems = pgTable(
   'shop_items',
@@ -148,7 +149,7 @@ export const shopItems = pgTable(
     rev: rev(),
   },
   t => [primaryKey({ columns: [t.familyId, t.name] })],
-);
+).enableRLS();
 
 /** Закрытые недели — из них сервер считает стрик. */
 export const weekMarks = pgTable(
@@ -161,7 +162,7 @@ export const weekMarks = pgTable(
     rev: rev(),
   },
   t => [primaryKey({ columns: [t.familyId, t.week] })],
-);
+).enableRLS();
 
 /**
  * Цены из отсканированных чеков для сравнения магазинов. Хранится только «категория товара + цена за кг/л + магазин + дата»;
@@ -184,7 +185,7 @@ export const pricePoints = pgTable(
     seenOn: text('seen_on').notNull(),
   },
   t => [primaryKey({ columns: [t.familyId, t.entryId, t.category] }), index('price_points_cat_idx').on(t.category, t.store)],
-);
+).enableRLS();
 
 /** Счётчики для достижений. Только растут, поэтому сливаются через max. */
 export const stats = pgTable('stats', {
@@ -193,7 +194,7 @@ export const stats = pgTable('stats', {
   shopDone: integer('shop_done').notNull().default(0),
   /** личный рекорд стрика: не пропадает при смене семьи */
   bestWeeks: integer('best_weeks').notNull().default(0),
-});
+}).enableRLS();
 
 /**
  * Исправления строк чека: «в этом магазине МОЛ ПРОСТ 3,2 — это Молоко Простоквашино». Запоминаем для семьи.
@@ -209,7 +210,7 @@ export const corrections = pgTable(
     updatedAt: ms('updated_at'),
   },
   t => [primaryKey({ columns: [t.familyId, t.store, t.raw] })],
-);
+).enableRLS();
 
 /** Сколько раз за день пользователь распознавал чеки: защита платного ключа, общая для всех экземпляров сервера. */
 export const usage = pgTable(
@@ -221,7 +222,7 @@ export const usage = pgTable(
     n: integer('n').notNull().default(0),
   },
   t => [primaryKey({ columns: [t.key, t.day] })],
-);
+).enableRLS();
 
 /** Журнал действий, важных для безопасности (входы, приглашения, удаление). Содержимого чеков нет. */
 export const audit = pgTable(
@@ -233,4 +234,4 @@ export const audit = pgTable(
     createdAt: ts('created_at'),
   },
   t => [index('audit_user_idx').on(t.userId)],
-);
+).enableRLS();

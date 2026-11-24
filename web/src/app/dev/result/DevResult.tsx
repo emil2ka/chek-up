@@ -3,7 +3,13 @@
 import { useSearchParams } from 'next/navigation';
 import { RECEIPTS } from '@/lib/data';
 import Result from '@/components/result/Result';
-import type { Analysis } from '@/lib/types';
+import type { Analysis, Receipt } from '@/lib/types';
+
+const baseReceipt = RECEIPTS[0];
+const saltSamples: Receipt[] = [
+  { ...baseReceipt, id: 'salt-small', title: 'Маленькая покупка', items: baseReceipt.items.slice(0, 3) },
+  { ...baseReceipt, id: 'salt-medium', title: 'Покупки на день', items: [0, 5, 6, 12].map(index => baseReceipt.items[index]) },
+];
 
 declare global {
   interface Window { __result?: { swaps: number[]; analysis: Analysis; calls: number } }
@@ -11,7 +17,7 @@ declare global {
 
 export default function DevResult() {
   const id = useSearchParams().get('r') ?? 'week';
-  const receipt = RECEIPTS.find(r => r.id === id) ?? RECEIPTS[0];
+  const receipt = [...RECEIPTS, ...saltSamples].find(r => r.id === id) ?? baseReceipt;
 
   return (
     <main className="relative isolate mx-auto h-dvh w-full max-w-[430px] overflow-hidden bg-blue-1">

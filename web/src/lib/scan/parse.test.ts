@@ -111,7 +111,7 @@ describe('parseEnrichment', () => {
         { i: 1, sugar_g: 0, junk: false, swap_name: '', swap_price: 0, swap_sugar_g: 0 },
       ],
     }, 2);
-    expect(m.get(0)).toEqual({ sugar: 106, salt: 0, fat: 0, kcal: 0, flag: null, junk: true, swap: { n: 'Минералка 1 л', p: 280, s: 0, t: 0, f: 0, k: 0 } });
+    expect(m.get(0)).toEqual({ sugar: 106, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: true, swap: { n: 'Минералка 1 л', p: 280, s: 0, t: 0, f: 0, k: 0, c: 0, b: 0 } });
     expect(m.get(1)?.swap).toBeNull();
   });
 
@@ -125,7 +125,7 @@ describe('parseEnrichment', () => {
       ],
     }, 2);
     expect([...m.keys()]).toEqual([1]);
-    expect(m.get(1)).toEqual({ sugar: 3, salt: 0, fat: 0, kcal: 0, flag: null, junk: false, swap: null });
+    expect(m.get(1)).toEqual({ sugar: 3, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: false, swap: null });
   });
 
   it('мусор → пустая карта (чек соберётся по справочнику)', () => {

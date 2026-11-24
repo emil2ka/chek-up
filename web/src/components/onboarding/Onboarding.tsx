@@ -8,10 +8,8 @@ import { IconArrow, IconCube } from '@/components/icons';
 import { Stepper } from '@/components/ui/Stepper';
 
 const STEPS = 3;
-const NORM = 10; // норма взрослого у каждого показателя — около 10 кубиков в день
-/** в литре колы 106 г сахара, а в 400 г докторской колбасы около 9 г соли */
+const NORM = 10;
 const COLA = Math.round(106 / METRICS.sugar.cubeG);
-const SAUSAGE = Math.round(8.8 / METRICS.salt.cubeG);
 
 export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): void }) {
   const reduce = useReducedMotion();
@@ -69,7 +67,7 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
                   Чек знает, что ты <span className="hl">ешь</span>
                 </h1>
                 <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  Сфоткай чек из магазина — покажем, сколько в корзине сахара, соли, насыщенных жиров и калорий и сколько на это ушло денег. И подскажем, что заменить.
+                  Сфоткай чек из магазина — покажем состав покупок: от сахара и соли до калорий, углеводов и белков. Подскажем, что заменить.
                 </p>
               </>
             )}
@@ -84,10 +82,10 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
                   ))}
                 </ul>
                 <h1 className="font-display text-[clamp(34px,10.6vw,44px)] leading-[.98] font-black tracking-[-.045em] text-balance">
-                  Всё считаем <span className="hl">кубиками</span>
+                  Сахар считаем <span className="hl">кубиками</span>
                 </h1>
                 <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  Кубик у каждого показателя свой: 5 г сахара, 0,5 г соли, 2 г жиров или 200 ккал. Норма взрослого — около {NORM} {pl(NORM, CUBES)} каждого в день. В литре колы {COLA} кубиков сахара, в докторской колбасе на 400 г — {SAUSAGE} кубиков соли.
+                  Один кубик — 5 г сахара. В литре колы около {COLA} кубиков, а дневной ориентир для взрослого — до {NORM} {pl(NORM, CUBES)}. У других показателей свои шкалы.
                 </p>
               </>
             )}

@@ -40,8 +40,8 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
     try {
       pile = new SugarPile(canvas, {
         floorRadius,
-        // кубики четырёх цветов вперемешку: сахар, соль, жиры, калории
-        palette: [PALETTES.sugar, PALETTES.salt, PALETTES.fat, PALETTES.kcal],
+        // кубики сахара и другие фигурки
+        palette: [PALETTES.sugar, PALETTES.fat, PALETTES.carbs, PALETTES.protein],
         onCount: n => { if (hintRef.current) hintRef.current.hidden = !(n > 0); },
       });
     } catch (err) {
@@ -102,14 +102,14 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
               <span className="rise block" style={{ '--d': '180ms' } as CSSProperties}>чеке?</span>
             </h1>
             <p className="rise mt-4.5 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
-              Сфоткай чек из магазина. Покажем сахар, соль, жиры и калории кубиками, во сколько тебе обошлось вредное, и подскажем, чем заменить.
+              Сфоткай чек из магазина. Покажем состав покупок, сколько они стоили и что можно заменить.
             </p>
             <p
               className="rise mt-4 inline-flex items-center gap-2 rounded-full bg-ink/18 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold text-white/92 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)]"
               style={{ '--d': '280ms' } as CSSProperties}
             >
               <IconCube className="size-6 text-white" />
-              <span>Норма — около <b className="font-display font-extrabold">10</b> кубиков в день по каждому показателю</span>
+              <span>Норма — около <b className="font-display font-extrabold">10</b> кубиков сахара в день для взрослого</span>
             </p>
           </div>
 

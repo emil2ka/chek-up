@@ -122,8 +122,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 Positioned.fill(
                   child: SugarPile(
                     key: _pile,
-                    // кубики четырёх цветов вперемешку: сахар, соль, жиры, калории
-                    palettes: const [pileSugar, pileSalt, pileFat, pileKcal],
+                    // кубики сахара и другие фигурки
+                    palettes: [
+                      pileSugar,
+                      pileFat,
+                      pilePalettes[MetricId.carbs]!,
+                      pilePalettes[MetricId.protein]!,
+                    ],
                     target: _homeCubes,
                     cubeSize: (_) => cube,
                     interactive: false,
@@ -173,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Rise(
                         delay: 220,
                         child: Text(
-                          'Сфоткай чек из магазина. Покажем сахар, соль, жиры и калории кубиками, во сколько тебе обошлось вредное, и подскажем, чем заменить.',
+                          'Сфоткай чек из магазина. Покажем состав покупок, сколько они стоили и что можно заменить.',
                           style: body(
                             short ? 16 : 17,
                             color: Colors.white.withValues(alpha: .9),
@@ -200,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  'Норма — около 10 кубиков в день по каждому показателю',
+                                  'Норма — около 10 кубиков сахара в день для взрослого',
                                   style: body(
                                     13,
                                     color: Colors.white.withValues(alpha: .92),

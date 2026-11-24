@@ -30,6 +30,7 @@ void main() {
           score: a.score,
           swaps: [1],
           savedAt: now,
+          receipt: r,
         ),
       );
       phone.addToShop([
@@ -52,6 +53,8 @@ void main() {
       expect(other.syncStatus.value, SyncStatus.idle, reason: other.syncError);
       expect(other.history.map((e) => e.id), contains(phone.history.first.id));
       expect(other.history.first.cubes, a.cubes);
+      expect(other.history.first.receipt?.items[1].c, 106);
+      expect(other.history.first.receipt?.items[1].swap?.b, 0);
       expect(other.shop.map((s) => s.name), contains('Минералка (live-тест)'));
       expect(other.profile.adults, 2);
       expect(other.profile.kids, 1);

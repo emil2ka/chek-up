@@ -1,7 +1,7 @@
 'use client';
 // «Профиль»: состав семьи и норма, достижения, установка на телефон, справка и очистка истории.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { amountTxt, cubeLabel, CUBES, METRIC_IDS, METRICS, pl, type Forms } from '@/lib/engine';
+import { amountTxt, bigNum, CUBES, isCubeMetric, METRIC_IDS, METRICS, pl, UNITS_NOTE, type Forms } from '@/lib/engine';
 import { badges } from '@/lib/insights';
 import { MAX_ADULTS, MAX_KIDS, familyDaily, familyDailyCubesOf, profile as profileStore, type Profile as ProfileData } from '@/lib/profile';
 import type { HistoryEntry } from '@/lib/types';
@@ -59,19 +59,19 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
         <div aria-hidden className="pointer-events-none absolute -top-24 -right-28 size-80 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--blue-3)_55%,transparent),transparent)]" />
         <h1 className="rise relative font-display text-[22px] font-extrabold tracking-[-.04em]">Профиль</h1>
         <div className="rise relative mt-5 flex items-end justify-between gap-4" style={{ animationDelay: '60ms' }}>
-          <div>
-            <p className="text-[15px] font-semibold text-white/85">Норма твоей семьи, кубиков в день</p>
-            <ul className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-white/85">Дневные ориентиры для семьи</p>
+            <ul className="mt-3 grid grid-cols-3 gap-2">
               {METRIC_IDS.map(m => (
-                <li key={m} className="flex items-baseline gap-2">
-                  <i aria-hidden className="size-2.5 flex-none translate-y-[-3px] rounded-full" style={{ background: METRICS[m].color, boxShadow: '0 0 0 1.5px rgba(255,255,255,.85)' }} />
-                  <b className="font-display text-[36px] leading-none font-black tracking-[-.05em] tabular-nums">{familyDailyCubesOf(profile, m)}</b>
-                  <span className="text-[13px] font-bold text-white/88">{METRICS[m].label}</span>
+                <li key={m} className="grid min-w-0 justify-items-start gap-0.5 rounded-2xl bg-white/12 p-2.5">
+                  <i aria-hidden className="size-2.5 rounded-full" style={{ background: METRICS[m].color, boxShadow: '0 0 0 1.5px rgba(255,255,255,.85)' }} />
+                  <b className="font-display text-[21px] leading-none font-black tracking-[-.05em] tabular-nums">{bigNum(familyDaily(profile, m), m)}</b>
+                  <span className="text-[13px] font-bold text-white/88">{METRICS[m].short} · {isCubeMetric(m) ? 'куб.' : METRICS[m].unit}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <IconCube className="mb-2 size-16 flex-none rotate-12 text-white drop-shadow-[0_14px_24px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
+          <IconCube className="mb-2 hidden size-16 flex-none sm:block rotate-12 text-white drop-shadow-[0_14px_24px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
         </div>
       </header>
 
@@ -84,7 +84,7 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
             <Stepper label="Дети" hint={`до ${METRICS.sugar.kid} г сахара, ${METRICS.salt.kid} г соли, ${METRICS.fat.kid} г жиров в день`} value={profile.kids} min={0} max={MAX_KIDS} onChange={v => profileStore.update({ kids: v })} />
           </div>
           <p className="mt-3 px-1 text-[14px] leading-snug font-semibold text-mute">
-            На всю семью в день выходит до <b className="text-ink">{amountTxt(familyDaily(profile, 'sugar'), 'sugar')}</b> сахара, <b className="text-ink">{amountTxt(familyDaily(profile, 'salt'), 'salt')}</b> соли, <b className="text-ink">{amountTxt(familyDaily(profile, 'fat'), 'fat')}</b> насыщенных жиров и около {Math.round(familyDaily(profile, 'kcal'))} ккал.
+            На всю семью в день выходит до <b className="text-ink">{amountTxt(familyDaily(profile, 'sugar'), 'sugar')}</b> сахара, <b className="text-ink">{amountTxt(familyDaily(profile, 'salt'), 'salt')}</b> соли, <b className="text-ink">{amountTxt(familyDaily(profile, 'fat'), 'fat')}</b> насыщенных жиров и ориентировочно {familyDaily(profile, 'kcal')} ккал, {familyDaily(profile, 'carbs')} г углеводов и {familyDaily(profile, 'protein')} г белка.
             Это {familyDailyCubesOf(profile, 'sugar') * 7} {pl(familyDailyCubesOf(profile, 'sugar') * 7, CUBES)} сахара в неделю; с нормами сравнивается раздел «Неделя».
           </p>
         </section>
@@ -171,7 +171,7 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
               {openRow === 'how' && (
                 <div className="rise px-3.5 pt-3 pb-1 text-[15px] leading-snug font-semibold" style={{ animationDuration: '320ms' }}>
                   <p>Оценка корзины — от 0 до 100. Её снижают доля вредных товаров в сумме чека, количество добавленного сахара, соли и насыщенных жиров, а ещё траты на алкоголь и энергетики. Калории в оценку не входят: еда должна быть калорийной, важно, откуда они.</p>
-                  <p className="mt-1.5">Всё показываем кубиками, у каждого показателя свой: {METRIC_IDS.map(cubeLabel).join(', ')}. Сахар — только добавленный: в целых фруктах, овощах и молоке он не считается. Норма взрослого — около 10 кубиков каждого в день (ориентир ВОЗ).</p>
+                  <p className="mt-1.5">{UNITS_NOTE} Сахар — только добавленный и другие свободные сахара; сахар в цельных фруктах не считается.</p>
                   <p className="mt-1.5 text-mute">Цифры примерные: это ориентир для покупок, а не медицинская рекомендация.</p>
                 </div>
               )}

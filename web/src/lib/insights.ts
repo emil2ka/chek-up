@@ -1,6 +1,6 @@
 // Неделя и достижения: чистые расчёты поверх истории чеков (без DOM).
 import { RECEIPTS } from './data';
-import { analyze, cubesOfValue, METRIC_IDS, METRICS, valueOf } from './engine';
+import { analyze, cubesOfValue, METRIC_IDS, valueOf } from './engine';
 import { familyDaily, type Profile } from './profile';
 import type { Analysis, HistoryEntry, MetricId, Receipt } from './types';
 
@@ -16,6 +16,7 @@ export type DayStat = {
   cubes: number;
   /** кубиков по каждому показателю */
   by: Record<MetricId, number>;
+  amounts: Record<MetricId, number>;
   today: boolean;
 };
 export type WeekReceipt = { entry: HistoryEntry; receipt: Receipt; analysis: Analysis; base: Analysis };
@@ -27,12 +28,14 @@ export type MetricWeek = {
   cubes: number;
   /** норма семьи на 7 дней, кубиков */
   normCubes: number;
+  norm: number;
   /** доля от недельной нормы, 0..∞ */
   ratio: number;
   /** главные источники: название и количество */
   sources: { name: string; value: number }[];
   /** на сколько кубиков заменами стало меньше */
   cubesSaved: number;
+  amountSaved: number;
 };
 
 export type WeekStats = {
@@ -62,17 +65,17 @@ export type WeekStats = {
 
 /** Последние 7 дней, включая сегодня; чек относится к дню своей даты. */
 export function weekStats(entries: HistoryEntry[], p: Pick<Profile, 'adults' | 'kids'>, now = new Date()): WeekStats {
-  const zero = (): Record<MetricId, number> => ({ sugar: 0, salt: 0, fat: 0, kcal: 0 });
+  const zero = (): Record<MetricId, number> => ({ sugar: 0, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0 });
   const days: DayStat[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    days.push({ iso: isoOf(d), label: DOW[d.getDay()], day: d.getDate(), cubes: 0, by: zero(), today: i === 0 });
+    days.push({ iso: isoOf(d), label: DOW[d.getDay()], day: d.getDate(), cubes: 0, by: zero(), amounts: zero(), today: i === 0 });
   }
   const byIso = new Map(days.map(d => [d.iso, d]));
 
   const receipts: WeekReceipt[] = [];
   const bySource = Object.fromEntries(METRIC_IDS.map(m => [m, new Map<string, number>()])) as Record<MetricId, Map<string, number>>;
-  const amount = zero(), cubesSavedBy = zero();
+  const amount = zero(), cubesSavedBy = zero(), amountSaved = zero();
   let junk = 0, total = 0, saved = 0, flagged = 0;
 
   for (const entry of entries) {
@@ -87,6 +90,8 @@ export function weekStats(entries: HistoryEntry[], p: Pick<Profile, 'adults' | '
     for (const m of METRIC_IDS) {
       amount[m] += analysis.totals[m];
       day.by[m] += analysis.cubesBy[m];
+      day.amounts[m] += analysis.totals[m];
+      amountSaved[m] += base.totals[m] - analysis.totals[m];
       cubesSavedBy[m] += base.cubesBy[m] - analysis.cubesBy[m];
       for (const it of analysis.items) {
         const v = valueOf(it.active, m);
@@ -97,10 +102,11 @@ export function weekStats(entries: HistoryEntry[], p: Pick<Profile, 'adults' | '
   }
 
   const metrics = Object.fromEntries(METRIC_IDS.map(m => {
-    const normCubes = Math.round(familyDaily(p, m) * 7 / METRICS[m].cubeG);
+    const norm = familyDaily(p, m) * 7;
+    const normCubes = cubesOfValue(norm, m);
     const cubes = cubesOfValue(amount[m], m);
     const sources = [...bySource[m]].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 4);
-    return [m, { total: Math.round(amount[m] * 10) / 10, cubes, normCubes, ratio: normCubes ? cubes / normCubes : 0, sources, cubesSaved: cubesSavedBy[m] } satisfies MetricWeek];
+    return [m, { total: Math.round(amount[m] * 10) / 10, cubes, normCubes, norm, ratio: norm ? amount[m] / norm : 0, sources, cubesSaved: cubesSavedBy[m], amountSaved: amountSaved[m] } satisfies MetricWeek];
   })) as Record<MetricId, MetricWeek>;
 
   const sugar = metrics.sugar;

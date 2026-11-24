@@ -16,7 +16,7 @@ class MetricDef {
   final String of;
   final String unit;
 
-  /// сколько в одном кубике; у каждого показателя так, чтобы норма взрослого была около 10 кубиков в день
+  /// Масштаб визуализации.
   final double cubeG;
 
   /// суточная норма взрослого и ребёнка (ориентир ВОЗ)
@@ -84,6 +84,28 @@ const metrics = <MetricId, MetricDef>{
     1500,
     0xFFF0792A,
     'ориентир: 2000 ккал в день взрослому, 1500 ребёнку',
+  ),
+  MetricId.carbs: MetricDef(
+    MetricId.carbs,
+    'Углеводы',
+    'углеводов',
+    'г',
+    10,
+    250,
+    190,
+    0xFF7B5CE5,
+    'ориентир: около 250 г в день взрослому, 190 г ребёнку',
+  ),
+  MetricId.protein: MetricDef(
+    MetricId.protein,
+    'Белки',
+    'белков',
+    'г',
+    6,
+    60,
+    40,
+    0xFF1FA891,
+    'ориентир: около 60 г в день взрослому, 40 г ребёнку',
   ),
 };
 
@@ -233,6 +255,42 @@ String cubesTxt(int n) => '$n ${pl(n, cubesF)}';
 String capOf(int n, [MetricId m = MetricId.sugar]) =>
     '${pl(n, cubesF)} ${metrics[m]!.of}';
 
+bool isCubeMetric(MetricId m) => m == MetricId.sugar;
+bool hasMetricData(Item item, MetricId m) => switch (m) {
+  MetricId.carbs => item.c != null,
+  MetricId.protein => item.b != null,
+  _ => true,
+};
+bool isHarmfulMetric(MetricId m) =>
+    isCubeMetric(m) || m == MetricId.salt || m == MetricId.fat;
+
+const pileHints = {
+  MetricId.sugar: 'Тапни, чтобы подбросить кубики',
+  MetricId.salt: 'Тапни, чтобы рассыпать крупинки',
+  MetricId.kcal: 'Тапни, чтобы разлетелись угольки',
+  MetricId.fat: 'Тапни, чтобы подбросить кусочки масла',
+  MetricId.carbs: 'Тапни, чтобы подбросить батоны',
+  MetricId.protein: 'Тапни, чтобы яйца покатились',
+};
+
+String bigNum(num value, MetricId m) => isCubeMetric(m)
+    ? '${cubesOfValue(value, m)}'
+    : m != MetricId.kcal && value != value.round()
+    ? num1(value)
+    : '${value.round()}';
+
+String bigCap(num value, MetricId m) => switch (m) {
+  MetricId.sugar => capOf(cubesOfValue(value, m), m),
+  MetricId.fat => 'г насыщенных жиров',
+  MetricId.salt => 'г соли',
+  MetricId.kcal => 'ккал',
+  MetricId.carbs => 'г углеводов',
+  MetricId.protein => 'г белка',
+};
+
+String metricTxt(num value, MetricId m) =>
+    '${bigNum(value, m)} ${bigCap(value, m)}';
+
 /// Число с одним знаком после запятой, без лишнего «,0»: 2,3 · 4
 String num1(num n) => ((n * 10).round() / 10)
     .toString()
@@ -243,10 +301,36 @@ String num1(num n) => ((n * 10).round() / 10)
 String amountTxt(num v, MetricId m) =>
     '${m == MetricId.kcal ? v.round() : num1(v)} ${metrics[m]!.unit}';
 
-/// Что в одном кубике: «5 г сахара», «0,5 г соли», «2 г жиров», «200 ккал»
-String cubeLabel(MetricId m) => m == MetricId.kcal
-    ? '${metrics[m]!.cubeG.round()} ккал'
-    : '${num1(metrics[m]!.cubeG)} г ${metrics[m]!.of}';
+String unitNote(MetricId m) => switch (m) {
+  MetricId.sugar => '1 кубик = 5 г добавленного сахара',
+  MetricId.salt => 'крупинки показывают количество соли, число — в граммах',
+  MetricId.fat => '1 фигурка масла = 2 г насыщенных жиров',
+  MetricId.kcal => '1 уголёк = 200 ккал',
+  MetricId.carbs => '1 фигурка батона = 10 г углеводов',
+  MetricId.protein => '1 яйцо = 6 г белка',
+};
+
+const unitsNote =
+    'Только сахар показываем кубиками по 5 г. Для соли — крупинки, для жиров — кусочки масла по 2 г, для калорий — угольки по 200 ккал, для углеводов — батоны по 10 г, для белка — яйца по 6 г.';
+
+int saltGrainCount(num grams) {
+  if (!grams.isFinite || grams <= 0) return 0;
+  final estimate = grams <= 14
+      ? grams * 12
+      : 168 + 74 * log(1 + (grams - 14) / 9);
+  return estimate.round().clamp(1, 248);
+}
+
+int pileCount(num value, MetricId metric, {int? limit}) =>
+    metric == MetricId.salt
+    ? min(saltGrainCount(value), limit ?? 248)
+    : min(limit ?? 220, cubesOfValue(value, metric));
+
+double metricPileSize(MetricId metric, double width, double space, int count) {
+  if (metric == MetricId.salt) return (width * .045).clamp(10.0, 18.0);
+  final fitted = cubeSize(width, space, count);
+  return metric == MetricId.carbs ? min(56.0, fitted * 1.22) : fitted;
+}
 
 int familyDaily(Profile p, MetricId m) =>
     (p.adults * metrics[m]!.adult + p.kids * metrics[m]!.kid).round();

@@ -31,6 +31,25 @@ describe('POST /api/scan', () => {
     expect((await res.json()).error.code).toBe('bad_request');
   });
 
+  it('OpenRouter возвращает углеводы и белки для позиции и замены', async () => {
+    vi.stubEnv('SCAN_PROVIDER', 'openrouter');
+    vi.stubEnv('OPENROUTER_API_KEY', 'router-test');
+    const output = (payload: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(payload) } }] });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(output({ is_receipt: true, store: 'Тест', date: '2026-11-16', items: [{ name: 'ORION XQ-17', qty: 1, price: 620 }] }))
+      .mockResolvedValueOnce(output({ items: [{ i: 0, junk: true, sugar_g: 25, salt_g: 1, sat_fat_g: 7, kcal: 300, carbs_g: 45, protein_g: 8, swap_name: 'Несладкий десерт', swap_price: 400, swap_sugar_g: 2, swap_salt_g: 0, swap_sat_fat_g: 1, swap_kcal: 140, swap_carbs_g: 11, swap_protein_g: 14 }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await send(jpeg);
+    expect(response.status).toBe(200);
+    expect((await response.json()).receipt.items[0]).toMatchObject({ c: 45, b: 8, swap: { c: 11, b: 14 } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+      expect(JSON.parse(init.body).model).toBe('z-ai/glm-5.3-flash');
+    }
+  });
+
   it('с ключом Gemini — распознанный чек; ключ уходит только в заголовке', async () => {
     vi.stubEnv('GEMINI_API_KEY', 'test-key');
     vi.stubEnv('OPENAI_API_KEY', 'sk-test'); // Gemini первый по порядку

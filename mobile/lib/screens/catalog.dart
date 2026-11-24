@@ -237,7 +237,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
                           child: Text(
-                            '${items.length} ${pl(items.length, productsF)} · ${const {MetricId.sugar: 'сначала самые сладкие', MetricId.salt: 'сначала самые солёные', MetricId.fat: 'сначала самые жирные', MetricId.kcal: 'сначала самые калорийные'}[_metric]}',
+                            '${items.length} ${pl(items.length, productsF)} · ${const {MetricId.sugar: 'сначала самые сладкие', MetricId.salt: 'сначала самые солёные', MetricId.fat: 'сначала самые жирные', MetricId.kcal: 'сначала самые калорийные', MetricId.carbs: 'сначала больше углеводов', MetricId.protein: 'сначала больше белка'}[_metric]}',
                             style: body(13, w: 700, color: mute),
                           ),
                         ),
@@ -269,7 +269,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            'Значения примерные, по типичным товарам в магазинах. 1 кубик ${mdef.of} = ${cubeLabel(_metric)}. Норма: ${mdef.norm}.',
+                            'Значения примерные, по типичным товарам в магазинах. ${unitNote(_metric)}. Норма: ${mdef.norm}.',
                             style: body(12, color: mute, h: 1.5),
                           ),
                         ),
@@ -323,13 +323,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    if (cubes > 0)
+                    if (val > 0 && (!isCubeMetric(_metric) || cubes > 0))
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('$cubes', style: disp(26, ls: -.05)),
+                          Text(bigNum(val, _metric), style: disp(26, ls: -.05)),
                           Text(
-                            pl(cubes, cubesF),
+                            bigCap(val, _metric),
                             style: body(12, w: 700, color: mute, h: 1.2),
                           ),
                         ],
@@ -355,7 +355,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       ),
                   ],
                 ),
-                if (cubes > 0) ...[
+                if (isCubeMetric(_metric) && cubes > 0) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 3,

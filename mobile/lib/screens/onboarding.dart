@@ -22,10 +22,8 @@ class _OnboardingState extends State<Onboarding> {
     final mq = MediaQuery.of(context);
     final p = store.profile;
     final last = _step == _steps - 1;
-    const norm =
-        10; // норма взрослого у каждого показателя — около 10 кубиков в день
-    final cola = (106 / cubeG).round(),
-        sausage = (8.8 / metrics[MetricId.salt]!.cubeG).round();
+    const norm = 10;
+    final cola = (106 / cubeG).round();
     final h1 = disp(
       (mq.size.width.clamp(0, 430) * .104).clamp(32.0, 44.0),
       color: Colors.white,
@@ -70,7 +68,7 @@ class _OnboardingState extends State<Onboarding> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Сфоткай чек из магазина — покажем, сколько в корзине сахара, соли, насыщенных жиров и калорий и сколько на это ушло денег. И подскажем, что заменить.',
+            'Сфоткай чек из магазина — покажем состав покупок: от сахара и соли до калорий, углеводов и белков. Подскажем, что заменить.',
             style: sub,
           ),
         ],
@@ -99,13 +97,13 @@ class _OnboardingState extends State<Onboarding> {
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Всё считаем ', style: h1),
+              Text('Сахар считаем ', style: h1),
               Hl('кубиками', h1),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'Кубик у каждого показателя свой: 5 г сахара, 0,5 г соли, 2 г жиров или 200 ккал. Норма взрослого — около $norm ${pl(norm, cubesF)} каждого в день. В литре колы $cola кубиков сахара, в докторской колбасе на 400 г — $sausage кубиков соли.',
+            'Один кубик — 5 г сахара. В литре колы около $cola кубиков, а дневной ориентир для взрослого — до $norm ${pl(norm, cubesF)}. У других показателей свои шкалы.',
             style: sub,
           ),
         ],

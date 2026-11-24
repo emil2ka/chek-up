@@ -9,8 +9,10 @@
 //   destroy()                           — остановить цикл и снять обработчики
 // Только в браузере: создавать в эффекте клиентского компонента.
 import Matter from 'matter-js';
+import { drawFoodPiece, FOOD_MATERIALS, foodVertices, type FoodShape } from './foodPiece';
+import { drawSaltCrystal, saltVertices } from './saltCrystal';
 
-const { Engine, Bodies, Body, Composite, Sleeping } = Matter;
+const { Engine, Bodies, Body, Composite, Sleeping, Events } = Matter;
 
 /** Цвета кубика: у каждого показателя свой материал. Тройки RGB — строкой «r, g, b» (для rgba(...)). */
 export type PilePalette = {
@@ -23,17 +25,22 @@ export type PilePalette = {
   grainC: string;
   edge: string;
   outline: string;
+  shape?: FoodShape | 'salt';
 };
 
-export const PALETTES: Record<'sugar' | 'salt' | 'fat' | 'kcal', PilePalette> = {
+export const PALETTES: Record<'sugar' | 'salt' | 'fat' | 'kcal' | 'carbs' | 'protein', PilePalette> = {
   // сахар — белый, чуть голубоватый (как раньше)
   sugar: { body: ['#FFFFFF', '#F3F6FF', '#C3CFF4'], base: '#C9D4F5', shade: '96, 120, 210', grainA: '128, 150, 220', grainC: '150, 170, 235', edge: '105, 130, 215', outline: '40, 70, 190' },
-  // соль — розовый кристалл
-  salt: { body: ['#FFFFFF', '#FFE9EF', '#F3A9C0'], base: '#F7C4D3', shade: '214, 96, 138', grainA: '222, 120, 150', grainC: '236, 150, 175', edge: '222, 105, 140', outline: '190, 60, 100' },
-  // жиры — сливочное масло
-  fat: { body: ['#FFFDF0', '#FFEFA8', '#EFBF3A'], base: '#F8DB7A', shade: '200, 140, 20', grainA: '210, 150, 30', grainC: '230, 175, 50', edge: '205, 140, 20', outline: '160, 100, 0' },
+  // цвет соли
+  salt: { shape: 'salt', body: ['#FFFFFF', '#CEE4FB', '#8FAEE1'], base: '#AEC6EC', shade: '60, 92, 156', grainA: '187, 214, 247', grainC: '154, 178, 221', edge: '141, 173, 226', outline: '60, 92, 156' },
+  // жиры — завитки сливочного масла
+  fat: { shape: 'butter', body: ['#FFFDF0', '#FFEFA8', '#EFBF3A'], base: '#F8DB7A', shade: '200, 140, 20', grainA: '210, 150, 30', grainC: '230, 175, 50', edge: '205, 140, 20', outline: '160, 100, 0' },
+  // углеводы — батоны
+  carbs: { shape: 'bread', body: ['#FFFFFF', '#F0EBFF', '#B9A6F2'], base: '#CFC3F7', shade: '120, 90, 220', grainA: '140, 110, 225', grainC: '165, 140, 235', edge: '130, 100, 220', outline: '90, 60, 190' },
+  // белки — яйца
+  protein: { shape: 'egg', body: ['#FFFFFF', '#E4FAF5', '#8FDCCB'], base: '#B5EBDD', shade: '40, 170, 150', grainA: '50, 175, 155', grainC: '90, 200, 180', edge: '45, 170, 150', outline: '20, 130, 115' },
   // калории — тёплый оранжевый
-  kcal: { body: ['#FFFAF2', '#FFD7AA', '#F28A3E'], base: '#FFC795', shade: '210, 100, 20', grainA: '220, 120, 40', grainC: '240, 150, 70', edge: '215, 105, 25', outline: '180, 80, 0' },
+  kcal: { shape: 'ember', body: ['#FFFAF2', '#FFD7AA', '#F28A3E'], base: '#FFC795', shade: '210, 100, 20', grainA: '220, 120, 40', grainC: '240, 150, 70', edge: '215, 105, 25', outline: '180, 80, 0' },
 };
 
 export type SugarPileOptions = {
@@ -43,7 +50,7 @@ export type SugarPileOptions = {
   palette?: PilePalette | readonly PilePalette[];
 };
 
-type Cube = Matter.Body & { v: number };
+type Cube = Matter.Body & { v: number; heat?: number };
 type Pop = { x: number; y: number; a: number; v: number; t: number; quiet: boolean };
 type Spark = { x: number; y: number; vx: number; vy: number; t: number; life: number; s: number; star: boolean; rot: number };
 type Down = { x: number; y: number; t: number };
@@ -60,6 +67,7 @@ const TAU = Math.PI * 2;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+const xForSalt = (width: number) => width * (.5 + (Math.random() + Math.random() - 1) * .23);
 function seeded(seed: number): () => number {
   let s = seed % 2147483647 || 1;
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -103,14 +111,17 @@ export class SugarPile {
   private D = 0;
   private sprites: HTMLCanvasElement[][] | null = null;
   private spark: HTMLCanvasElement | null = null;
+  private glow: HTMLCanvasElement | null = null;
 
   private readonly mq: MediaQueryList;
   private readonly io: IntersectionObserver | null = null;
 
   private readonly pals: readonly PilePalette[];
+  private readonly granular: boolean;
 
   constructor(canvas: HTMLCanvasElement, { onCount, floorRadius = 0, palette = PALETTES.sugar }: SugarPileOptions = {}) {
     this.pals = Array.isArray(palette) ? palette : [palette as PilePalette];
+    this.granular = this.pals.every(pal => pal.shape === 'salt');
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('SugarPile: canvas 2D недоступен');
     this.cv = canvas;
@@ -123,6 +134,7 @@ export class SugarPile {
     this.eng.positionIterations = 7;
     this.eng.velocityIterations = 5;
     this.world = this.eng.world;
+    if (this.pals.some(pal => pal.shape === 'ember')) Events.on(this.eng, 'collisionStart', this.onImpact);
 
     this.mq = matchMedia('(prefers-reduced-motion: reduce)');
     this.reduced = this.mq.matches;
@@ -132,6 +144,7 @@ export class SugarPile {
     canvas.addEventListener('pointerdown', this.onDown);
     canvas.addEventListener('pointerup', this.onUp);
     canvas.addEventListener('pointercancel', this.onCancel);
+    canvas.addEventListener('keydown', this.onKeyDown);
     addEventListener('deviceorientation', this.onTilt);
 
     if ('IntersectionObserver' in window) {
@@ -214,12 +227,14 @@ export class SugarPile {
   /** Подбросить кубики рядом с точкой (координаты холста, CSS-пиксели). */
   toss(x: number, y: number): void {
     if (this.reduced || !this.ready) return;
-    const S = this.size, R = Math.max(96, S * 3.4);
+    const S = this.size, R = this.granular ? Math.max(66, S * 4.8) : Math.max(96, S * 3.4);
     let hit = false;
     for (const b of this.cubes) {
       const dx = b.position.x - x, dy = b.position.y - y, d = Math.hypot(dx, dy) || 1;
       if (d > R) continue;
-      const k = 1 - d / R;
+      const shape = this.pals[b.v % this.pals.length].shape;
+      const k = (1 - d / R) * (this.granular || shape === 'butter' ? .74 : 1);
+      if (shape === 'ember') b.heat = Math.max(b.heat ?? 0, k);
       Sleeping.set(b, false);
       Body.setVelocity(b, { x: b.velocity.x + (dx / d) * 7.5 * k + rnd(-1, 1), y: b.velocity.y - (10 + S * 0.12) * k });
       Body.setAngularVelocity(b, rnd(-0.45, 0.45) * k);
@@ -236,14 +251,31 @@ export class SugarPile {
     this.cv.removeEventListener('pointerdown', this.onDown);
     this.cv.removeEventListener('pointerup', this.onUp);
     this.cv.removeEventListener('pointercancel', this.onCancel);
+    this.cv.removeEventListener('keydown', this.onKeyDown);
     this.mq.removeEventListener?.('change', this.onMq);
     this.io?.disconnect();
+    Events.off(this.eng, 'collisionStart', this.onImpact);
     Composite.clear(this.world, false);
     Engine.clear(this.eng);
     this.cubes = []; this.pops = []; this.sparks = []; this.sprites = null;
   }
 
   // ——— обработчики ———
+
+  private onImpact = ({ pairs }: Matter.IEventCollision<Matter.Engine>) => {
+    if (this.reduced) return;
+    for (const pair of pairs) {
+      const dx = pair.bodyA.velocity.x - pair.bodyB.velocity.x;
+      const dy = pair.bodyA.velocity.y - pair.bodyB.velocity.y;
+      const speed = Math.abs(dx * pair.collision.normal.x + dy * pair.collision.normal.y);
+      if (speed < 4.2) continue;
+      for (const body of [pair.bodyA, pair.bodyB] as Cube[]) {
+        if (this.pals[body.v % this.pals.length]?.shape === 'ember') {
+          body.heat = Math.max(body.heat ?? 0, Math.min(.86, speed / 15));
+        }
+      }
+    }
+  };
 
   private onMq = () => { this.reduced = this.mq.matches; };
 
@@ -264,6 +296,12 @@ export class SugarPile {
     this.toss(e.clientX - r.left, e.clientY - r.top);
   };
   private onCancel = () => { this.down = null; };
+  private onKeyDown = (event: KeyboardEvent) => {
+    if (![' ', 'Enter'].includes(event.key)) return;
+    event.preventDefault();
+    const body = this.cubes.find(candidate => candidate.position.y > this.floor - Math.max(75, this.size * 2));
+    if (body) this.toss(body.position.x, body.position.y);
+  };
 
   // наклон телефона меняет гравитацию по горизонтали
   private onTilt = (e: DeviceOrientationEvent) => {
@@ -319,8 +357,13 @@ export class SugarPile {
     const c = D / 2, h = S / 2, r = S * 0.2;
     this.D = D;
     const sprites: HTMLCanvasElement[][] = [];
+    const foodSprites = new Map<string, HTMLCanvasElement[]>();
     for (let v = 0; v < VARIANTS; v++) {
       const pal = this.pals[v % this.pals.length];
+      const food = pal.shape === 'salt' ? undefined : pal.shape;
+      const material = food === 'egg' || food === 'ember' ? `${food}-${v % 3}` : food;
+      const saved = material && foodSprites.get(material);
+      if (saved) { sprites.push(saved); continue; }
       const row: HTMLCanvasElement[] = [];
       const rand = seeded(7919 * (v + 3));
       const grains: Grain[] = [];
@@ -330,13 +373,25 @@ export class SugarPile {
       }
       const glints = Array.from({ length: 3 }, () => [(rand() - 0.5) * S * 0.7, (rand() - 0.5) * S * 0.7, 0.6 + rand() * 0.5] as const);
 
-      for (let k = 0; k < ANG; k++) {
+      for (let k = 0; k < (pal.shape ? ANG * 4 : ANG); k++) {
         const cv = document.createElement('canvas');
         cv.width = cv.height = px;
         const g = cv.getContext('2d');
         if (!g) continue;
         g.scale(dpr, dpr);
         const th = k * Q;
+        if (pal.shape === 'salt') {
+          g.translate(c, c);
+          drawSaltCrystal(g, v, S, th);
+          row.push(cv);
+          continue;
+        }
+        if (food) {
+          g.translate(c, c);
+          drawFoodPiece(g, food, S, v, th);
+          row.push(cv);
+          continue;
+        }
         const shape = (inset = 0) => {
           g.beginPath();
           g.save(); g.translate(c, c); g.rotate(th);
@@ -432,6 +487,7 @@ export class SugarPile {
         row.push(cv);
       }
       sprites.push(row);
+      if (material) foodSprites.set(material, row);
     }
     this.sprites = sprites;
 
@@ -453,6 +509,19 @@ export class SugarPile {
       g.fill();
     }
     this.spark = sp;
+    if (this.pals.some(pal => pal.shape === 'ember')) {
+      const glow = document.createElement('canvas');
+      glow.width = glow.height = 40;
+      const paint = glow.getContext('2d');
+      if (paint) {
+        const halo = paint.createRadialGradient(20, 20, 0, 20, 20, 20);
+        halo.addColorStop(0, 'rgba(255,219,143,.74)');
+        halo.addColorStop(.28, 'rgba(255,115,52,.61)');
+        halo.addColorStop(1, 'rgba(255,78,31,0)');
+        paint.fillStyle = halo; paint.fillRect(0, 0, 40, 40);
+        this.glow = glow;
+      }
+    }
   }
 
   // высота поверхности кучи по колонкам — сыплем туда, где пониже, с лёгким уклоном к центру
@@ -469,13 +538,14 @@ export class SugarPile {
 
   private pickX(bins: number[]): number {
     const S = this.size, W = this.w, n = bins.length;
+    const margin = this.granular ? W * .18 : S * .7;
     let best = 0, bestScore = -Infinity;
     for (let t = 0; t < 3; t++) {
       const x = t === 0
-        ? W / 2 + (Math.random() + Math.random() - 1) * (W / 2 - S * 0.7)
-        : rnd(S * 0.7, W - S * 0.7);
+        ? W / 2 + (Math.random() + Math.random() - 1) * (W / 2 - margin)
+        : rnd(margin, W - margin);
       const i = clamp(Math.floor(x / W * n), 0, n - 1);
-      const score = bins[i] - Math.abs(x - W / 2) * 0.22 + rnd(0, S * 0.6);
+      const score = bins[i] - Math.abs(x - W / 2) * (this.granular ? .56 : .22) + rnd(0, S * .6);
       if (score > bestScore) { bestScore = score; best = x; }
     }
     return best;
@@ -483,13 +553,22 @@ export class SugarPile {
 
   private makeCube(x: number, y: number): Cube {
     const S = this.size;
-    const b = Bodies.rectangle(x, y, S, S, {
-      chamfer: { radius: S * 0.2, qualityMin: 2, qualityMax: 3 },
-      friction: 0.5, frictionStatic: 0.85, frictionAir: 0.008,
-      restitution: 0.18, density: 0.002, sleepThreshold: 45,
-      angle: Math.random() * TAU,
-    }) as Cube;
-    b.v = (Math.random() * VARIANTS) | 0;
+    const variant = (Math.random() * VARIANTS) | 0;
+    const shape = this.pals[variant % this.pals.length].shape;
+    const b = (shape === 'salt'
+      ? Bodies.fromVertices(x, y, [saltVertices(variant, S)], {
+          friction: .63, frictionStatic: .95, frictionAir: .016,
+          restitution: .13, density: .0023, sleepThreshold: 34, angle: rnd(0, TAU),
+        })
+      : shape
+        ? Bodies.fromVertices(x, y, [foodVertices(shape, S)], { ...FOOD_MATERIALS[shape], sleepThreshold: 45, angle: rnd(0, TAU) })
+        : Bodies.rectangle(x, y, S, S, {
+          chamfer: { radius: S * 0.2, qualityMin: 2, qualityMax: 3 },
+          friction: 0.5, frictionStatic: 0.85, frictionAir: 0.008,
+          restitution: 0.18, density: 0.002, sleepThreshold: 45,
+          angle: Math.random() * TAU,
+        })) as Cube;
+    b.v = variant;
     Composite.add(this.world, b);
     this.cubes.push(b);
     return b;
@@ -498,9 +577,10 @@ export class SugarPile {
   private spawn(i: number) {
     const S = this.size;
     if (!this.bins) this.bins = this.surface();
-    const x = this.pickX(this.bins);
-    const b = this.makeCube(x, -S * (0.9 + i * 1.15) - rnd(0, S * 0.5));
-    Body.setVelocity(b, { x: rnd(-1, 1), y: rnd(4, 7) });
+    const x = this.granular ? clamp(xForSalt(this.w), S, this.w - S) : this.pickX(this.bins);
+    const y = -S * (0.9 + i * 1.15) - rnd(0, S * 0.5);
+    const b = this.makeCube(x, y);
+    Body.setVelocity(b, { x: this.granular ? rnd(-1.3, 1.3) : rnd(-1, 1), y: rnd(4, 7) });
     Body.setAngularVelocity(b, rnd(-0.22, 0.22));
     this.queue--;
     this.onCount(this.cubes.length);
@@ -537,8 +617,9 @@ export class SugarPile {
     Composite.remove(this.world, top);
     this.wakeAll();
     const { x, y } = top.position, S = this.size;
-    this.pops.push({ x, y, a: top.angle, v: top.v, t: 0, quiet });
-    if (!quiet) {
+    const fade = quiet || this.pals[top.v % this.pals.length].shape != null;
+    this.pops.push({ x, y, a: top.angle, v: top.v, t: 0, quiet: fade });
+    if (!fade) {
       for (let i = 0; i < 9; i++) {
         const a = rnd(0, TAU), sp = rnd(1.6, 4.8) * (S / 32 + 0.4);
         this.sparks.push({
@@ -558,7 +639,7 @@ export class SugarPile {
 
   private busy(): boolean {
     return this.queue > 0 || this.popQueue > 0 || this.pops.length > 0 || this.sparks.length > 0
-      || this.cubes.some(b => !b.isSleeping);
+      || this.cubes.some(b => !b.isSleeping || (b.heat ?? 0) > .01);
   }
 
   private kick() {
@@ -609,6 +690,7 @@ export class SugarPile {
     let maxV = 0;
     for (const b of this.cubes) {
       const p = b.position;
+      if (b.heat != null) b.heat *= Math.pow(.8, dt / STEP);
       if (p.y > this.floor + S * 3 || p.x < -S * 2 || p.x > this.w + S * 2) {
         Body.setPosition(b, { x: rnd(S, this.w - S), y: -S * 2 });
         Body.setVelocity(b, { x: 0, y: 4 });
@@ -634,7 +716,8 @@ export class SugarPile {
   private cube(x: number, y: number, a: number, v: number, scale: number, alpha: number) {
     if (!this.sprites) return;
     const t = a / Q, ki = Math.round(t), r = a - ki * Q;
-    const k = ((ki % ANG) + ANG) % ANG;
+    const frames = this.sprites[v]?.length || ANG;
+    const k = ((ki % frames) + frames) % frames;
     const spr = this.sprites[v]?.[k];
     if (!spr) return;
     const d = this.dpr * scale, cs = Math.cos(r) * d, sn = Math.sin(r) * d;
@@ -653,7 +736,16 @@ export class SugarPile {
 
     // снизу вверх: верхние кубики отбрасывают тень на нижние
     const list = this.cubes.slice().sort((a, b) => b.position.y - a.position.y);
-    for (const b of list) this.cube(b.position.x, b.position.y, b.angle, b.v, 1, 1);
+    for (const b of list) {
+      this.cube(b.position.x, b.position.y, b.angle, b.v, 1, 1);
+      if (this.glow && (b.heat ?? 0) > .01) {
+        ctx.setTransform(dpr, 0, 0, dpr, b.position.x * dpr, b.position.y * dpr);
+        ctx.globalAlpha = b.heat ?? 0;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(this.glow, -S * .67, -S * .67, S * 1.34, S * 1.34);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
 
     for (const p of this.pops) {
       const q = clamp(p.t / (p.quiet ? 200 : POP_MS), 0, 1);

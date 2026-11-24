@@ -1,13 +1,13 @@
 // Общие типы «Чек-апа» (перенос web/src/lib/types.ts).
 
-/// Показатели, которые считает «Чек-ап»: сахар, соль, насыщенные жиры, калории.
-enum MetricId { sugar, salt, fat, kcal }
+enum MetricId { sugar, salt, fat, kcal, carbs, protein }
 
 /// Позиция чека или замена. На всю позицию (с учётом количества): p — цена ₸, s — добавленный сахар, г,
-/// t — соль, г, f — насыщенные жиры, г, k — калории, ккал (у старых чеков t, f, k нет — считаем 0).
+/// t — соль, f — насыщенные жиры, k — ккал, c — углеводы, b — белки.
 class Item {
   final String n;
   final num p, s, t, f, k;
+  final num? c, b;
   final bool junk;
 
   /// алкоголь или энергетик: считаются отдельной строкой ('alcohol' | 'energy')
@@ -20,6 +20,8 @@ class Item {
     this.t = 0,
     this.f = 0,
     this.k = 0,
+    this.c,
+    this.b,
     this.junk = false,
     this.x,
     this.swap,
@@ -31,6 +33,8 @@ class Item {
     MetricId.salt => t,
     MetricId.fat => f,
     MetricId.kcal => k,
+    MetricId.carbs => c ?? 0,
+    MetricId.protein => b ?? 0,
   };
 
   Map<String, dynamic> toJson() => {
@@ -40,6 +44,8 @@ class Item {
     if (t != 0) 't': t,
     if (f != 0) 'f': f,
     if (k != 0) 'k': k,
+    if (c != null) 'c': c,
+    if (b != null) 'b': b,
     if (junk) 'junk': 1,
     if (x != null) 'x': x,
     if (swap != null) 'swap': swap!.toJson(),
@@ -52,14 +58,16 @@ class Item {
     if (n is! String || n.isEmpty || p is! num || s is! num || p < 0 || s < 0) {
       throw const FormatException('item');
     }
-    num opt(Object? v) => v is num && v >= 0 ? v : 0;
+    num? opt(Object? v) => v is num && v.isFinite && v >= 0 ? v : null;
     return Item(
       n: n,
       p: p,
       s: s,
-      t: opt(j['t']),
-      f: opt(j['f']),
-      k: opt(j['k']),
+      t: opt(j['t']) ?? 0,
+      f: opt(j['f']) ?? 0,
+      k: opt(j['k']) ?? 0,
+      c: opt(j['c']),
+      b: opt(j['b']),
       junk: j['junk'] == 1 || j['junk'] == true,
       x: j['x'] == 'alcohol' || j['x'] == 'energy' ? j['x'] as String : null,
       swap: j['swap'] == null ? null : Item.fromJson(j['swap']),

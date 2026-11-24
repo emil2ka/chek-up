@@ -9,6 +9,8 @@ export const SwapItemSchema = z.object({
   t: z.number().nonnegative().optional(),
   f: z.number().nonnegative().optional(),
   k: z.number().nonnegative().optional(),
+  c: z.number().nonnegative().optional(),
+  b: z.number().nonnegative().optional(),
 });
 
 export const ReceiptItemSchema = SwapItemSchema.extend({

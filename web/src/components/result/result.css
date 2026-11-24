@@ -100,7 +100,10 @@
   font-variant-numeric: tabular-nums;
   text-shadow: 0 10px 40px rgba(8, 22, 140, .35);
 }
-.rs-num.is-3 { font-size: clamp(80px, 15.5svh, 150px); }
+.rs-num.is-3 { font-size: clamp(68px, 15.5svh, 150px); }
+.rs-num.is-wide { font-size: clamp(48px, min(11svh, 13vw), 105px); }
+.rs-scene-hint { font: 800 11px/1.2 var(--font-t); color: #fff; text-align: center; letter-spacing: .02em; }
+.rs-pile-hint { margin-top: 6px; opacity: .8; }
 .rs-cap { font-weight: 500; font-size: 17px; letter-spacing: -.01em; }
 
 /* ——— белая карточка ——— */

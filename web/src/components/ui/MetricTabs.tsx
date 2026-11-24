@@ -1,5 +1,5 @@
 'use client';
-// Переключатель показателей: Сахар · Соль · Жиры · Калории. Общий для результата и недели.
+// Переключатель показателей для результата, недели и справочника.
 import { METRIC_IDS, METRICS } from '@/lib/engine';
 import type { MetricId } from '@/lib/types';
 
@@ -16,7 +16,7 @@ export function MetricTabs({ value, onChange, light = false, className = '' }: P
     <div
       role="tablist"
       aria-label="Показатель"
-      className={`flex gap-1 rounded-full p-1 ${light ? 'bg-tint' : 'bg-white/16 shadow-[inset_0_0_0_1px_rgba(255,255,255,.22)]'} ${className}`}
+      className={`grid grid-cols-3 gap-1 rounded-[22px] p-1 ${light ? 'bg-tint' : 'bg-white/16 shadow-[inset_0_0_0_1px_rgba(255,255,255,.22)]'} ${className}`}
     >
       {METRIC_IDS.map(m => {
         const on = m === value;
@@ -26,6 +26,7 @@ export function MetricTabs({ value, onChange, light = false, className = '' }: P
             type="button"
             role="tab"
             aria-selected={on}
+            aria-label={METRICS[m].label}
             onClick={() => onChange(m)}
             className={`flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-1 text-[13px] font-extrabold tracking-[-.01em] transition-[background,color,transform] duration-150 select-none active:scale-[.95] ${
               on ? 'bg-white text-ink shadow-[0_6px_16px_-6px_rgba(6,18,110,.45)]' : light ? 'text-mute' : 'text-white'

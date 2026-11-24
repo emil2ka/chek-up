@@ -14,8 +14,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import type { ResultProps } from '@/lib/types';
-import { capOf, CUBES, dateRu, METRICS, money, pl, verdict } from '@/lib/engine';
+import { bigCap, bigNum, dateRu, isCubeMetric, METRICS, metricTxt, money, PILE_HINTS, verdict } from '@/lib/engine';
 import { PALETTES } from '@/lib/pile';
+import { saltGrainCount } from '@/lib/saltCrystal';
 import { shareCard } from '@/lib/shareCard';
 import type { MetricId } from '@/lib/types';
 import { MetricTabs } from '@/components/ui/MetricTabs';
@@ -52,6 +53,11 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
   const maxCubes = useMemo(() => resultModel(receipt, [], metric).maxCubes, [receipt, metric]);
   const cubes = model.analysis.cubesBy[metric];
   const mdef = METRICS[metric];
+  const total = model.analysis.totals[metric];
+  const available = model.available.includes(metric);
+  const cubeMetric = isCubeMetric(metric);
+  const animatedCount = cubeMetric && maxCubes <= 220 && cubes <= 220;
+  const pileCount = metric === 'salt' ? saltGrainCount(total) : Math.min(cubes, 220);
 
   const [srcReady, setSrcReady] = useState(false);
   const [toast, setToast] = useState({ id: 0, text: '', on: false });
@@ -66,7 +72,13 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
   const pileRef = useRef<PileHandle | null>(null);
 
   // ——— куча: создаётся в эффекте и уничтожается при размонтировании (Strict Mode создаст её заново) ———
-  const target = useEffectEvent(() => cubes);
+  const target = useEffectEvent(() => pileCount);
+  const paintCount = useEffectEvent((n: number, num: HTMLElement, cap: HTMLParagraphElement) => {
+    if (!animatedCount) return;
+    num.textContent = String(n);
+    cap.textContent = bigCap(n * mdef.cubeG, metric);
+    num.classList.toggle('is-3', n >= 100);
+  });
   useEffect(() => {
     const hero = heroRef.current, head = headRef.current, sheet = sheetRef.current, canvas = canvasRef.current;
     const num = numRef.current, cap = capRef.current;
@@ -77,28 +89,26 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
     let shown = -1;
     const paint = (n: number) => {
       shown = n;
-      num.textContent = String(n);
-      cap.textContent = capOf(n, metric);
-      num.classList.toggle('is-3', n >= 100);
+      paintCount(n, num, cap);
     };
     paint(0);
     const onCount = (n: number) => {
       if (n === shown) return;
       paint(n);
-      if (!reduced) num.animate?.([{ transform: 'scale(1.045)' }, { transform: 'scale(1)' }], { duration: 160, easing: 'ease-out' });
+      if (!reduced && isCubeMetric(metric)) num.animate?.([{ transform: 'scale(1.045)' }, { transform: 'scale(1)' }], { duration: 160, easing: 'ease-out' });
     };
 
-    const pile = attachPile({ hero, head, sheet, canvas }, maxCubes, onCount, PALETTES[metric]);
+    const pile = attachPile({ hero, head, sheet, canvas }, Math.min(220, maxCubes), onCount, PALETTES[metric]);
     pileRef.current = pile;
     pile.set(target());
     return () => {
       pile.destroy();
       if (pileRef.current === pile) pileRef.current = null;
     };
-  }, [receipt, maxCubes, metric]);
+  }, [receipt, maxCubes, metric, available]);
 
   // замены → куча
-  useEffect(() => { pileRef.current?.set(cubes); }, [cubes]);
+  useEffect(() => { pileRef.current?.set(pileCount); }, [pileCount]);
 
   // onChange: один раз после монтирования и после каждого переключения (повтор эффекта в Strict Mode не дублирует)
   const emitChange = useEffectEvent((m: ResultModel) => onChange({ swaps: m.swaps, analysis: m.analysis }));
@@ -139,6 +149,8 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
       const how = await shareCard({
         metric,
         cubesBy: a.cubesBy,
+        totals: a.totals,
+        available: model.available,
         score: a.score,
         verdict: verdict(a.score).label.toLowerCase(),
         tone: model.tone,
@@ -175,16 +187,17 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
         <MetricTabs value={metric} onChange={setMetric} className="rs-tabs" />
         <div className="rs-head" ref={headRef}>
           <p className="rs-kick">В твоём чеке</p>
-          <b className="rs-num" aria-hidden="true" ref={numRef}>0</b>
-          <p className="rs-cap" aria-hidden="true" ref={capRef}>{capOf(0, metric)}</p>
+          <b key={metric} className={`rs-num${bigNum(total, metric).length >= 4 ? ' is-wide' : !animatedCount && bigNum(total, metric).length >= 3 ? ' is-3' : ''}`} aria-hidden="true" ref={numRef}>{!available ? '—' : animatedCount ? '0' : bigNum(total, metric)}</b>
+          <p key={`cap-${metric}`} className="rs-cap" aria-hidden="true" ref={capRef}>{available ? bigCap(animatedCount ? 0 : total, metric) : 'нет данных в этом чеке'}</p>
           <p className="rs-sr">{model.srLabel}</p>
+          {available && total > 0 && <p aria-hidden="true" className="rs-scene-hint rs-pile-hint">{PILE_HINTS[metric]}</p>}
         </div>
-        <canvas className="rs-pile" ref={canvasRef} role="img" aria-label="Куча кубиков сахара. Нажми, чтобы подбросить" />
+        {available && <canvas className="rs-pile" ref={canvasRef} role={total > 0 ? 'button' : undefined} tabIndex={total > 0 ? 0 : undefined} aria-label={total > 0 ? PILE_HINTS[metric] : undefined} />}
       </section>
 
       <div className="rs-sheet" ref={sheetRef}>
         <section className="rs-sec rs-swaps" aria-labelledby="rs-h-sw">
-          <h2 id="rs-h-sw" className="rs-h">Замени — и кубики исчезнут</h2>
+          <h2 id="rs-h-sw" className="rs-h">{cubeMetric ? 'Замени — и кубики исчезнут' : 'Что изменится с заменой'}</h2>
           {rows.length ? (
             <ul className="rs-sw-list">
               {rows.map(r => (
@@ -201,7 +214,7 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
               ))}
             </ul>
           ) : (
-            <p className="rs-empty">{`На этой вкладке заменять нечего: в чеке нет позиций с ${mdef.of} и понятной заменой.`}</p>
+            <p className="rs-empty">Нет замен, которые меняют этот показатель.</p>
           )}
           <p className="rs-sum" aria-live="polite" hidden={!summary}>
             {summary && (
@@ -227,24 +240,24 @@ export default function Result({ receipt, swaps, onBack, onScan, onChange }: Res
                 </div>
                 {s.off && <p className="rs-src-sw"><Icon name="arrow" className="rs-arr" /><span>{s.swapTo}</span></p>}
               </li>
-            )) : <li className="rs-empty">{`${mdef.label} в чеке не нашлись.`}</li>}
+            )) : <li className="rs-empty">Нет данных об этом показателе.</li>}
           </ul>
         </section>
 
         <section className="rs-sec rs-harm" aria-labelledby="rs-h-harm">
-          <h2 id="rs-h-harm" className="rs-h">Цена вреда</h2>
-          {harm.cubes ? (
+          <h2 id="rs-h-harm" className="rs-h">{mdef.harmful ? 'Цена вреда' : 'Сколько это стоит'}</h2>
+          {harm.total ? (
             <>
-              <p className="rs-harm-big"><b>{money(harm.perCube)}</b> за кубик {mdef.of}</p>
-              <p className="rs-harm-sub">{`На эти покупки ушло ${money(harm.spend)}, в них ${harm.cubes} ${pl(harm.cubes, CUBES)} ${mdef.of}.`}</p>
+              <p className="rs-harm-big"><b>{money(harm.perUnit)}</b> за {cubeMetric ? 'кубик' : metric === 'kcal' ? '100 ккал' : mdef.unit} {metric === 'kcal' ? '' : mdef.of}</p>
+              <p className="rs-harm-sub">{`На эти покупки ушло ${money(harm.spend)}, в них ${metricTxt(harm.total, metric)}.`}</p>
               <ul className="rs-harm-top">
-                {harm.top.map(t => (
-                  <li key={t.name}><span className="rs-harm-n">{t.name}</span><span className="rs-harm-v"><b>{money(t.price)}</b>{t.cubes}</span></li>
+                {harm.top.map((t, index) => (
+                  <li key={`${t.name}-${index}`}><span className="rs-harm-n">{t.name}</span><span className="rs-harm-v"><b>{money(t.price)}</b>{metricTxt(t.value, metric)}</span></li>
                 ))}
               </ul>
             </>
           ) : (
-            <p className="rs-empty">{`Продуктов с заметным количеством ${mdef.of} в чеке нет — платить за вред не пришлось.`}</p>
+            <p className="rs-empty">{`Нет позиций с учтённым количеством ${mdef.of}.`}</p>
           )}
         </section>
 

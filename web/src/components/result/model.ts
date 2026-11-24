@@ -1,14 +1,14 @@
 // Расчёты экрана результата: чистые функции без DOM (перенос prototype/src/result-model.js).
 // Все списки считаются для выбранного показателя: сахар, соль, жиры или калории.
 import {
-  analyze, amountTxt, cubeLabel, cubesOfValue, money, pl, valueOf, verdict,
-  CUBE_G, CUBES, DAILY_G, DAYS, METRICS, METRIC_IDS, type Forms,
+  analyze, amountTxt, cubesOfValue, hasMetricData, isCubeMetric, metricTxt, money, pl, valueOf, verdict,
+  CUBE_G, CUBES, DAYS, METRICS, METRIC_IDS, UNITS_NOTE, type Forms,
 } from '@/lib/engine';
 import type { Analysis, MetricId, Receipt, Tone } from '@/lib/types';
 
 export const POINTS: Forms = ['балл', 'балла', 'баллов'];
 export const JUNK: Forms = ['вредный товар', 'вредных товара', 'вредных товаров'];
-export const NOTE = `Кубик у каждого показателя свой: ${METRIC_IDS.map(cubeLabel).join(', ')}. Норма взрослого — около 10 кубиков в день по каждому (ориентир ВОЗ; сахар — до ${DAILY_G} г). Оценка примерная и не заменяет консультацию врача.`;
+export const NOTE = `${UNITS_NOTE} Оценка примерная и не заменяет консультацию врача.`;
 
 export const cubesTxt = (n: number) => `${n} ${pl(n, CUBES)}`;
 const signed = (n: number, f: (n: number) => string) => (n > 0 ? '−' : n < 0 ? '+' : '') + f(Math.abs(n));
@@ -21,14 +21,15 @@ export type SwapRow = { i: number; from: string; to: string; cubes: string; pric
 export function swapRows(receipt: Receipt, m: MetricId = 'sugar'): SwapRow[] {
   const rows: SwapRow[] = [];
   receipt.items.forEach((it, i) => {
-    if (!it.swap) return;
-    const delta = cubesOfValue(valueOf(it, m), m) - cubesOfValue(valueOf(it.swap, m), m);
+    if (!it.swap || !hasMetricData(it, m) || !hasMetricData(it.swap, m)) return;
+    const before = valueOf(it, m), after = valueOf(it.swap, m);
+    const delta = isCubeMetric(m) ? cubesOfValue(before, m) - cubesOfValue(after, m) : Math.round((before - after) * 10) / 10;
     if (!delta) return;
     rows.push({
       i,
       from: it.n,
       to: it.swap.n,
-      cubes: signed(delta, cubesTxt), // «−21 кубик»
+      cubes: signed(delta, v => isCubeMetric(m) ? cubesTxt(v) : amountTxt(v, m)),
       price: signed(it.p - it.swap.p, money), // «−340 ₸» или «+150 ₸»
     });
   });
@@ -50,22 +51,20 @@ export type SourceRow = {
 
 /** «Цена вреда»: сколько денег ушло на продукты с этим показателем и во сколько обошёлся кубик. */
 export type HarmPrice = {
-  /** ₸ на позиции, где есть хотя бы кубик показателя */
   spend: number;
-  cubes: number;
-  /** ₸ за один кубик */
-  perCube: number;
-  /** самые дорогие покупки */
-  top: { name: string; price: number; cubes: number }[];
+  total: number;
+  perUnit: number;
+  top: { name: string; price: number; value: number }[];
 };
 
 export function harmPrice(a: Analysis, m: MetricId): HarmPrice {
   const rows = a.items
-    .map(it => ({ name: it.active.n, price: it.active.p, cubes: cubesOfValue(valueOf(it.active, m), m) }))
-    .filter(r => r.cubes >= 1);
-  const spend = rows.reduce((s, r) => s + r.price, 0);
-  const cubes = rows.reduce((s, r) => s + r.cubes, 0);
-  return { spend, cubes, perCube: cubes ? spend / cubes : 0, top: [...rows].sort((x, y) => y.price - x.price).slice(0, 3) };
+    .map(it => ({ name: it.active.n, price: it.active.p, value: valueOf(it.active, m) }))
+    .filter(row => isCubeMetric(m) ? cubesOfValue(row.value, m) > 0 : row.value > 0);
+  const spend = rows.reduce((sum, row) => sum + row.price, 0);
+  const total = rows.reduce((sum, row) => sum + (isCubeMetric(m) ? cubesOfValue(row.value, m) * METRICS[m].cubeG : row.value), 0);
+  const units = isCubeMetric(m) ? cubesOfValue(total, m) : total;
+  return { spend, total, perUnit: units ? spend / units * (m === 'kcal' ? 100 : 1) : 0, top: [...rows].sort((x, y) => y.price - x.price).slice(0, 3) };
 }
 
 export type ResultModel = {
@@ -73,6 +72,7 @@ export type ResultModel = {
   base: Analysis;
   swaps: number[];
   metric: MetricId;
+  available: MetricId[];
   /** под это количество подбирается размер кубика */
   maxCubes: number;
   tone: Tone;
@@ -95,6 +95,7 @@ export function resultModel(receipt: Receipt, swaps: Iterable<number>, metric: M
   const v = verdict(a.score);
   const verdictLow = v.label.toLowerCase();
   const m = METRICS[metric];
+  const available = METRIC_IDS.filter(key => a.items.some(item => hasMetricData(item.active, key)));
 
   const save = base.total - a.total;
   const summary: ResultModel['summary'] = on.size ? {
@@ -112,9 +113,9 @@ export function resultModel(receipt: Receipt, swaps: Iterable<number>, metric: M
       i,
       name: it.n,
       amount: amountTxt(val, metric),
-      cubes: c ? cubesTxt(c) : 'меньше кубика',
+      cubes: isCubeMetric(metric) ? (c ? cubesTxt(c) : 'меньше кубика') : '',
       width: Math.max(4, val / maxV * 100),
-      cells: Math.max(1, c),
+      cells: isCubeMetric(metric) ? Math.max(1, c) : 1,
       off: a.items[i].swapped,
       swapTo: it.swap ? `${it.swap.n} — ${amountTxt(valueOf(it.swap, metric), metric)}` : '',
     };
@@ -142,7 +143,7 @@ export function resultModel(receipt: Receipt, swaps: Iterable<number>, metric: M
       }
     : null;
 
-  const parts = (['sugar', 'salt', 'fat'] as const).map(k => `${a.cubesBy[k]} ${pl(a.cubesBy[k], CUBES)} ${METRICS[k].of}`);
+  const parts = [...new Set<MetricId>(['sugar', 'salt', 'fat', metric])].filter(k => available.includes(k)).map(k => metricTxt(a.totals[k], k));
   let shareText = `Мой чек в «Чек-ап»: ${parts.join(', ')}, оценка ${a.score} из 100 — ${verdictLow}.`;
   if (on.size && base.score < a.score) shareText += ` С заменами оценка ${a.score}${save > 0 ? ` и ${money(save)} экономии` : ''}.`;
   shareText += ' А что в твоей корзине?';
@@ -152,10 +153,11 @@ export function resultModel(receipt: Receipt, swaps: Iterable<number>, metric: M
     base,
     swaps: [...on].sort((x, y) => x - y),
     metric,
+    available,
     maxCubes: Math.max(1, base.cubesBy[metric], a.cubesBy[metric]),
     tone: v.tone,
     pill: `${a.score} из 100 · ${verdictLow}`,
-    srLabel: `${a.cubesBy[metric]} ${pl(a.cubesBy[metric], CUBES)} ${m.of}, оценка ${a.score} из 100, ${verdictLow}`,
+    srLabel: `${available.includes(metric) ? metricTxt(a.totals[metric], metric) : 'Нет данных об этом показателе'}, оценка ${a.score} из 100, ${verdictLow}`,
     summary,
     sources,
     harm: harmPrice(a, metric),

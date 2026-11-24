@@ -723,74 +723,82 @@ class MetricTabs extends StatelessWidget {
           ? null
           : Border.all(color: Colors.white.withValues(alpha: .22)),
     ),
-    child: Row(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        for (final m in metricIds)
-          Expanded(
-            child: Semantics(
-              selected: m == value,
-              button: true,
-              label: metrics[m]!.label,
-              child: Press(
-                scale: .95,
-                onTap: () => onChange(m),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: m == value ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: m == value
-                        ? [
-                            BoxShadow(
-                              color: const Color(
-                                0xFF06126E,
-                              ).withValues(alpha: .35),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                              spreadRadius: -6,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
+        for (final row in [metricIds.take(3), metricIds.skip(3)])
+          Row(
+            children: [
+              for (final m in row)
+                Expanded(
+                  child: Semantics(
+                    selected: m == value,
+                    button: true,
+                    label: metrics[m]!.label,
+                    child: Press(
+                      scale: .95,
+                      onTap: () => onChange(m),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: Color(metrics[m]!.color),
-                          shape: BoxShape.circle,
-                          border: m == value
-                              ? null
-                              : Border.all(
-                                  color: Colors.white.withValues(alpha: .85),
-                                  width: 1.5,
+                          color: m == value ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: m == value
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF06126E,
+                                    ).withValues(alpha: .35),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
+                                    spreadRadius: -6,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: Color(metrics[m]!.color),
+                                shape: BoxShape.circle,
+                                border: m == value
+                                    ? null
+                                    : Border.all(
+                                        color: Colors.white.withValues(
+                                          alpha: .85,
+                                        ),
+                                        width: 1.5,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                metrics[m]!.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: body(
+                                  13,
+                                  w: 800,
+                                  color: m == value
+                                      ? ink
+                                      : (light ? mute : Colors.white),
+                                  h: 1.1,
                                 ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          metrics[m]!.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: body(
-                            13,
-                            w: 800,
-                            color: m == value
-                                ? ink
-                                : (light ? mute : Colors.white),
-                            h: 1.1,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+            ],
           ),
       ],
     ),

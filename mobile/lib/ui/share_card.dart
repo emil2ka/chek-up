@@ -8,11 +8,14 @@ import 'package:share_plus/share_plus.dart';
 import '../core/engine.dart';
 import '../core/models.dart';
 import 'kit.dart';
+import 'food_piece.dart';
 import 'pile.dart';
 
 Future<Uint8List> _render({
   required MetricId metric,
   required Map<MetricId, int> cubesBy,
+  required Map<MetricId, double> totals,
+  required Set<MetricId> available,
   required int score,
   required String verdictLow,
   required Tone tone,
@@ -62,19 +65,31 @@ Future<Uint8List> _render({
     body(46, w: 700, color: Colors.white.withValues(alpha: .88)),
     220,
   );
+  final number = available.contains(metric)
+      ? bigNum(totals[metric]!, metric)
+      : '—';
   final nh = text(
-    '$cubes',
-    disp(cubes >= 100 ? 330 : 400, color: Colors.white, ls: -.07),
+    number,
+    disp(
+      number.length >= 4
+          ? 210
+          : number.length >= 3
+          ? 290
+          : 400,
+      color: Colors.white,
+      ls: -.07,
+    ),
     270,
   );
   text(
-    capOf(cubes, metric),
+    available.contains(metric) ? bigCap(totals[metric]!, metric) : 'нет данных',
     disp(64, w: 500, color: Colors.white, ls: -.01),
     280 + nh,
   );
 
   // кубики своего цвета по низу
-  final n = cubes.clamp(0, 33);
+  final n = (metric == MetricId.salt ? saltGrainCount(totals[metric]!) : cubes)
+      .clamp(0, 33);
   const s = 78.0;
   for (var i = 0; i < n; i++) {
     final col = i % 11, row = i ~/ 11;
@@ -84,8 +99,21 @@ Future<Uint8List> _render({
       Rect.fromLTWH(x, y, s, s),
       const Radius.circular(13),
     );
-    c.drawRRect(rr.shift(const Offset(0, 10)), Paint()..color = pal.side);
-    c.drawRRect(rr, Paint()..color = pal.top);
+    final shape = pal.shape;
+    if (shape == null) {
+      c.drawRRect(rr.shift(const Offset(0, 10)), Paint()..color = pal.side);
+      c.drawRRect(rr, Paint()..color = pal.top);
+    } else {
+      c.save();
+      c.translate(rr.center.dx, rr.center.dy);
+      drawFoodPiece(
+        c,
+        shape,
+        shape == FoodShape.salt ? s * .66 : s,
+        variant: i % 4,
+      );
+      c.restore();
+    }
   }
 
   // белая карточка: оценка и четыре показателя
@@ -110,20 +138,21 @@ Future<Uint8List> _render({
   for (final (i, m) in metricIds.indexed) {
     final cx = 60 + colW * (i + .5);
     c.drawCircle(
-      Offset(cx - 62, h - 150),
+      Offset(cx, h - 188),
       10,
       Paint()..color = Color(metrics[m]!.color),
     );
     text(
-      '${cubesBy[m]}',
-      disp(50, w: 900, ls: -.04),
-      h - 178,
-      x: cx - 40,
+      available.contains(m) ? bigNum(totals[m]!, m) : '—',
+      disp(32, w: 900, ls: -.04),
+      h - 168,
+      x: cx - colW / 2,
       maxW: colW,
+      align: TextAlign.center,
     );
     text(
-      metrics[m]!.label,
-      body(30, w: 700, color: mute),
+      '${m == MetricId.carbs ? 'Углев.' : metrics[m]!.label} · ${isCubeMetric(m) ? 'куб.' : metrics[m]!.unit}',
+      body(23, w: 700, color: mute),
       h - 112,
       x: cx - colW / 2,
       maxW: colW,
@@ -148,6 +177,8 @@ Future<Uint8List> _render({
 Future<void> shareResult({
   required MetricId metric,
   required Map<MetricId, int> cubesBy,
+  required Map<MetricId, double> totals,
+  required Set<MetricId> available,
   required int score,
   required String where,
   required String text,
@@ -157,6 +188,8 @@ Future<void> shareResult({
     final png = await _render(
       metric: metric,
       cubesBy: cubesBy,
+      totals: totals,
+      available: available,
       score: score,
       verdictLow: v.label.toLowerCase(),
       tone: v.tone,

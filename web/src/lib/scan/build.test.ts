@@ -5,7 +5,7 @@ import { buildItem, buildReceipt } from './build';
 import type { Estimate } from './parse';
 import { amountFromName, findReference } from './reference';
 
-const est = (o: Partial<Estimate> & { sugar: number }): Estimate => ({ salt: 0, fat: 0, kcal: 0, flag: null, junk: false, swap: null, ...o });
+const est = (o: Partial<Estimate> & { sugar: number }): Estimate => ({ salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, flag: null, junk: false, swap: null, ...o });
 
 describe('справочник', () => {
   it.each([
@@ -79,12 +79,12 @@ describe('buildItem', () => {
   });
 
   it('неизвестный товар — оценка модели и её замена', () => {
-    const it3 = buildItem({ name: 'Батончик протеиновый X', qty: 1, price: 900 }, est({ sugar: 12, junk: true, swap: { n: 'Орехи 50 г', p: 600, s: 0, t: 0, f: 3, k: 300 } }));
+    const it3 = buildItem({ name: 'Батончик протеиновый X', qty: 1, price: 900 }, est({ sugar: 12, junk: true, swap: { n: 'Орехи 50 г', p: 600, s: 0, t: 0, f: 3, k: 300, c: 0, b: 0 } }));
     expect(it3).toMatchObject({ s: 12, junk: 1, swap: { n: 'Орехи 50 г', p: 600, s: 0 } });
   });
 
   it('замена, где сахара не меньше, отбрасывается', () => {
-    const it4 = buildItem({ name: 'Батончик X', qty: 1, price: 900 }, est({ sugar: 12, junk: true, swap: { n: 'Конфеты', p: 500, s: 40, t: 0, f: 0, k: 200 } }));
+    const it4 = buildItem({ name: 'Батончик X', qty: 1, price: 900 }, est({ sugar: 12, junk: true, swap: { n: 'Конфеты', p: 500, s: 40, t: 0, f: 0, k: 200, c: 0, b: 0 } }));
     expect(it4.swap).toBeUndefined();
   });
 
@@ -136,8 +136,23 @@ describe('соль, жиры, калории, алкоголь', () => {
   });
 
   it('замена, которая хуже по соли и жирам, отбрасывается', () => {
-    const it = buildItem({ name: 'Закуска Х', qty: 1, price: 900 }, est({ sugar: 0, salt: 4, fat: 10, kcal: 400, junk: true, swap: { n: 'Колбаса', p: 800, s: 0, t: 9, f: 20, k: 600 } }));
+    const it = buildItem({ name: 'Закуска Х', qty: 1, price: 900 }, est({ sugar: 0, salt: 4, fat: 10, kcal: 400, junk: true, swap: { n: 'Колбаса', p: 800, s: 0, t: 9, f: 20, k: 600, c: 0, b: 0 } }));
     expect(it.swap).toBeUndefined();
+  });
+
+  it('углеводы и белки считаются по справочнику и включают сахар', () => {
+    const cola = buildItem({ name: 'Напиток Coca-Cola 1 л', qty: 1, price: 620 }, undefined);
+    expect(cola).toMatchObject({ s: 106, c: 106, b: 0 });
+    const eggs = buildItem({ name: 'Яйцо С1 10 шт', qty: 1, price: 800 }, undefined);
+    expect(eggs.b).toBeGreaterThan(60);
+    const grechka = buildItem({ name: 'Гречка ядрица 800 г', qty: 1, price: 690 }, undefined);
+    expect(grechka).toMatchObject({ c: 560, b: 80 });
+    // неизвестный товар: оценка модели, углеводов не меньше сахара
+    const x = buildItem({ name: 'Закуска Х', qty: 1, price: 900 }, est({ sugar: 20, carbs: 5, protein: 12 }));
+    expect(x).toMatchObject({ c: 20, b: 12 });
+    // замена колбасы несёт больше белка и меньше соли
+    const sausage = buildItem({ name: 'Колбаса докторская 400 г', qty: 1, price: 1480 }, undefined);
+    expect(sausage.swap).toMatchObject({ b: 112 });
   });
 
   it('чек проходит схему и содержит все показатели', () => {

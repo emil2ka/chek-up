@@ -12,6 +12,7 @@ import 'package:forge2d/forge2d.dart' as f;
 import 'package:sensors_plus/sensors_plus.dart';
 
 import '../core/models.dart';
+import 'food_piece.dart';
 
 const _pourMs = 2400.0; // за сколько высыпается вся порция
 const _popMs = 340.0;
@@ -20,8 +21,10 @@ const _g = 26.0;
 
 class _Pop {
   final double x, y, a;
+  final FoodShape? shape;
+  final int variant;
   double t = 0;
-  _Pop(this.x, this.y, this.a);
+  _Pop(this.x, this.y, this.a, this.shape, this.variant);
 }
 
 class _Spark {
@@ -33,11 +36,13 @@ class _Spark {
 /// Цвета кубика: у каждого показателя свой материал.
 class PilePalette {
   final Color top, side, edge, grain;
+  final FoodShape? shape;
   const PilePalette({
     required this.top,
     required this.side,
     required this.edge,
     required this.grain,
+    this.shape,
   });
 }
 
@@ -49,18 +54,21 @@ const pileSugar = PilePalette(
   grain: Color(0x5590A4E6),
 );
 const pileSalt = PilePalette(
+  shape: FoodShape.salt,
   top: Color(0xFFFFF1F5),
   side: Color(0xFFF2A6BE),
   edge: Color(0xFFFAD2DE),
   grain: Color(0x66D9709A),
 );
 const pileFat = PilePalette(
+  shape: FoodShape.butter,
   top: Color(0xFFFFF6C9),
   side: Color(0xFFEBBB3A),
   edge: Color(0xFFFCE79A),
   grain: Color(0x66D29A14),
 );
 const pileKcal = PilePalette(
+  shape: FoodShape.ember,
   top: Color(0xFFFFE9D1),
   side: Color(0xFFF08A3E),
   edge: Color(0xFFFFCDA0),
@@ -71,6 +79,20 @@ const pilePalettes = <MetricId, PilePalette>{
   MetricId.salt: pileSalt,
   MetricId.fat: pileFat,
   MetricId.kcal: pileKcal,
+  MetricId.carbs: PilePalette(
+    top: Color(0xFFF0EBFF),
+    side: Color(0xFFB9A6F2),
+    edge: Color(0xFFCFC3F7),
+    grain: Color(0x668C6EE1),
+    shape: FoodShape.bread,
+  ),
+  MetricId.protein: PilePalette(
+    top: Color(0xFFE4FAF5),
+    side: Color(0xFF8FDCCB),
+    edge: Color(0xFFB5EBDD),
+    grain: Color(0x6632AF9B),
+    shape: FoodShape.egg,
+  ),
 };
 
 class SugarPile extends StatefulWidget {
@@ -87,7 +109,6 @@ class SugarPile extends StatefulWidget {
   final ValueChanged<int>? onCount;
 
   /// пол выше нижнего края области на столько пикселей
-  final double floorInset;
 
   /// сам ловит тапы (иначе их передают через tossAt)
   final bool interactive;
@@ -97,7 +118,6 @@ class SugarPile extends StatefulWidget {
     required this.target,
     required this.cubeSize,
     this.onCount,
-    this.floorInset = 0,
     this.interactive = true,
   });
 
@@ -126,9 +146,31 @@ class SugarPileState extends State<SugarPile>
   int _lastShake = 0;
   Offset? _downAt;
   int _downT = 0;
+  final _heat = <f.Body, double>{};
+  bool get _granular =>
+      widget.palettes.every((pal) => pal.shape == FoodShape.salt);
   StreamSubscription? _accSub, _shakeSub;
 
   int get count => _cubes.length + _queue - _popQueue;
+
+  void _listenContacts() {
+    if (widget.palettes.any((pal) => pal.shape == FoodShape.ember)) {
+      _world.setContactListener(
+        _PileContacts((contact) {
+          final speed =
+              (contact.bodyA.linearVelocity - contact.bodyB.linearVelocity)
+                  .length;
+          if (speed < 5) return;
+          for (final body in [contact.bodyA, contact.bodyB]) {
+            if (body.userData is int &&
+                _palette(body).shape == FoodShape.ember) {
+              _heat[body] = max(_heat[body] ?? 0, min(.86, speed / 18));
+            }
+          }
+        }),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -206,6 +248,8 @@ class SugarPileState extends State<SugarPile>
     if (fresh) {
       // другой размер кубика — начинаем заново
       _world = f.World(f.Vector2(_gx, _g));
+      _listenContacts();
+      _heat.clear();
       _walls = null;
       _cubes.clear();
       _pops.clear();
@@ -215,7 +259,7 @@ class SugarPileState extends State<SugarPile>
     }
     if (_walls != null) _world.destroyBody(_walls!);
     final w = size.width / _ppm,
-        floor = (size.height - widget.floorInset) / _ppm,
+        floor = size.height / _ppm,
         up = -size.height * 6 / _ppm;
     final walls = _world.createBody(f.BodyDef());
     for (final (a, b) in [
@@ -257,30 +301,47 @@ class SugarPileState extends State<SugarPile>
     final w = _size.width;
     final x =
         (w * .5 +
-                (_rnd.nextDouble() - .5) * w * .62 +
-                (_rnd.nextDouble() - .5) * w * .2)
+                (_rnd.nextDouble() - .5) * w * (_granular ? .42 : .62) +
+                (_rnd.nextDouble() - .5) * w * .22)
             .clamp(_s, w - _s);
+    final y = -_s * (1 + _rnd.nextDouble() * 2.5);
+    final variant = _rnd.nextInt(4);
+    final shape = widget.palettes[variant % widget.palettes.length].shape;
+    final (density, friction, restitution) = switch (shape) {
+      FoodShape.salt => (1.15, .68, .12),
+      FoodShape.butter => (2.05, .80, .06),
+      FoodShape.bread => (.95, .58, .24),
+      FoodShape.egg => (1.55, .24, .28),
+      FoodShape.ember => (1.1, .49, .24),
+      null => (1.0, .55, .14),
+    };
+    final collision = f.PolygonShape();
+    if (shape == null) {
+      collision.setAsBoxXY(_unit * .485, _unit * .485);
+    } else {
+      collision.set([
+        for (final point in foodHull(shape, variant))
+          f.Vector2(point.dx * _unit, point.dy * _unit),
+      ]);
+    }
     final body = _world.createBody(
       f.BodyDef(
         type: f.BodyType.dynamic,
-        position: f.Vector2(
-          x / _ppm,
-          (-_s * (1 + _rnd.nextDouble() * 2.5)) / _ppm,
-        ),
+        position: f.Vector2(x / _ppm, y / _ppm),
         angle: _rnd.nextDouble() * pi,
         angularVelocity: (_rnd.nextDouble() - .5) * 5,
-        linearVelocity: f.Vector2((_rnd.nextDouble() - .5) * 2, 4),
-        angularDamping: .7,
+        linearVelocity: f.Vector2((_rnd.nextDouble() - .5) * 3, 4),
+        angularDamping: shape == FoodShape.egg ? .36 : .7,
         linearDamping: .04,
-        userData: _rnd.nextInt(4),
+        userData: variant,
       ),
     );
     body.createFixture(
       f.FixtureDef(
-        f.PolygonShape()..setAsBoxXY(_unit * .485, _unit * .485),
-        density: 1,
-        friction: .55,
-        restitution: .14,
+        collision,
+        density: density,
+        friction: friction,
+        restitution: restitution,
       ),
     );
     _cubes.add(body);
@@ -296,8 +357,9 @@ class SugarPileState extends State<SugarPile>
     }
     final b = _cubes.removeAt(best);
     final x = b.position.x * _ppm, y = b.position.y * _ppm;
-    _pops.add(_Pop(x, y, b.angle));
-    for (var i = 0; i < 6; i++) {
+    final shape = _palette(b).shape;
+    _pops.add(_Pop(x, y, b.angle, shape, b.userData as int));
+    for (var i = 0; shape == null && i < 6; i++) {
       final a = _rnd.nextDouble() * pi * 2,
           v = _s * (3 + _rnd.nextDouble() * 5);
       _sparks.add(
@@ -311,6 +373,7 @@ class SugarPileState extends State<SugarPile>
         ),
       );
     }
+    _heat.remove(b);
     _world.destroyBody(b);
     _wake();
     widget.onCount?.call(_cubes.length);
@@ -320,13 +383,17 @@ class SugarPileState extends State<SugarPile>
   /// Подбросить кубики рядом с точкой (координаты области).
   void tossAt(Offset p) {
     var hit = false;
-    final r = _s * 3.2;
+    final r = _granular ? max(65.0, _s * 4.8) : max(80.0, _s * 3.2);
     for (final b in _cubes) {
       final dx = b.position.x * _ppm - p.dx, dy = b.position.y * _ppm - p.dy;
       final d = sqrt(dx * dx + dy * dy);
       if (d > r) continue;
       hit = true;
-      final k = (1 - d / r) * b.mass;
+      final shape = _palette(b).shape;
+      final strength =
+          (1 - d / r) * (_granular || shape == FoodShape.butter ? .74 : 1);
+      if (shape == FoodShape.ember) _heat[b] = max(_heat[b] ?? 0, strength);
+      final k = strength * b.mass;
       b.applyLinearImpulse(
         f.Vector2(
           dx / max(d, 1) * 5 * k + (_rnd.nextDouble() - .5) * 2 * k,
@@ -349,6 +416,9 @@ class SugarPileState extends State<SugarPile>
     }
     HapticFeedback.heavyImpact();
   }
+
+  PilePalette _palette(f.Body body) =>
+      widget.palettes[((body.userData as int?) ?? 0) % widget.palettes.length];
 
   // ── цикл ──
   void _tick(Duration now) {
@@ -374,7 +444,11 @@ class SugarPileState extends State<SugarPile>
     }
 
     var moving =
-        _queue > 0 || _popQueue > 0 || _pops.isNotEmpty || _sparks.isNotEmpty;
+        _heat.isNotEmpty ||
+        _queue > 0 ||
+        _popQueue > 0 ||
+        _pops.isNotEmpty ||
+        _sparks.isNotEmpty;
     if (!moving) {
       for (final b in _cubes) {
         if (b.isAwake) {
@@ -393,6 +467,9 @@ class SugarPileState extends State<SugarPile>
       steps++;
     }
     if (steps == 3) _acc = 0;
+    final cooling = pow(.8, dt / (1000 / 60));
+    _heat.updateAll((body, heat) => heat * cooling);
+    _heat.removeWhere((body, heat) => heat < .015);
 
     for (final p in _pops) {
       p.t += dt;
@@ -445,6 +522,14 @@ class SugarPileState extends State<SugarPile>
   }
 }
 
+class _PileContacts extends f.ContactListener {
+  final void Function(f.Contact) onContact;
+  _PileContacts(this.onContact);
+
+  @override
+  void beginContact(f.Contact contact) => onContact(contact);
+}
+
 class _PilePainter extends CustomPainter {
   final SugarPileState st;
   _PilePainter(this.st) : super(repaint: st._repaint);
@@ -483,13 +568,55 @@ class _PilePainter extends CustomPainter {
       }
     }
 
-    each(s * .26, (_) => canvas.drawRRect(rr, _shadow));
-    final pals = st.widget.palettes;
-    PilePalette palOf(f.Body b) =>
-        pals[((b.userData as int?) ?? 0) % pals.length];
-    each(s * .12, (b) => canvas.drawRRect(rr, _side..color = palOf(b).side));
+    each(s * .2, (b) {
+      final shape = st._palette(b).shape;
+      if (shape == null) {
+        canvas.drawRRect(rr, _shadow);
+      } else {
+        drawFoodPiece(
+          canvas,
+          shape,
+          s,
+          variant: b.userData as int,
+          shadow: true,
+        );
+      }
+    });
+    each(s * .12, (b) {
+      final pal = st._palette(b);
+      if (pal.shape == null) canvas.drawRRect(rr, _side..color = pal.side);
+    });
     each(0, (b) {
-      final pal = palOf(b);
+      final pal = st._palette(b);
+      final shape = pal.shape;
+      if (shape != null) {
+        drawFoodPiece(
+          canvas,
+          shape,
+          s,
+          variant: b.userData as int,
+          angle: b.angle,
+        );
+        final heat = st._heat[b];
+        if (heat != null) {
+          final glow = Rect.fromCircle(center: Offset.zero, radius: s * .67);
+          canvas.drawCircle(
+            Offset.zero,
+            glow.width / 2,
+            Paint()
+              ..blendMode = BlendMode.plus
+              ..shader = RadialGradient(
+                colors: [
+                  const Color(0xFFFFDB8F).withValues(alpha: heat * .74),
+                  const Color(0xFFFF7334).withValues(alpha: heat * .61),
+                  const Color(0x00FF4E1F),
+                ],
+                stops: const [0, .28, 1],
+              ).createShader(glow),
+          );
+        }
+        return;
+      }
       canvas.drawRRect(rr, _top..color = pal.top);
       canvas.drawRRect(
         rr.deflate(_edge.strokeWidth / 2),
@@ -519,6 +646,17 @@ class _PilePainter extends CustomPainter {
       canvas.save();
       canvas.translate(p.x, p.y);
       canvas.rotate(p.a);
+      final shape = p.shape;
+      if (shape != null) {
+        canvas.saveLayer(
+          Rect.fromCircle(center: Offset.zero, radius: s),
+          Paint()..color = Colors.white.withValues(alpha: 1 - q),
+        );
+        drawFoodPiece(canvas, shape, s, variant: p.variant, angle: p.a);
+        canvas.restore();
+        canvas.restore();
+        continue;
+      }
       canvas.scale(1 + q * .9);
       canvas.drawRRect(
         rr,
@@ -546,5 +684,5 @@ class _PilePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PilePainter old) => false;
+  bool shouldRepaint(_PilePainter oldDelegate) => false;
 }

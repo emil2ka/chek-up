@@ -1,6 +1,8 @@
 // Карточка для «Поделиться»: картинка 1080×1920 в стиле «Гора сахара». Только для клиента.
-import { capOf, METRIC_IDS, METRICS } from './engine';
+import { bigCap, bigNum, isCubeMetric, METRIC_IDS, METRICS } from './engine';
 import { PALETTES, type PilePalette } from './pile';
+import { drawFoodPiece } from './foodPiece';
+import { drawSaltCrystal, saltGrainCount } from './saltCrystal';
 import type { MetricId, Tone } from './types';
 
 export type ShareCardData = {
@@ -8,6 +10,8 @@ export type ShareCardData = {
   metric: MetricId;
   /** кубиков по каждому показателю */
   cubesBy: Record<MetricId, number>;
+  totals: Record<MetricId, number>;
+  available: readonly MetricId[];
   score: number;
   /** «так себе» */
   verdict: string;
@@ -37,6 +41,11 @@ function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number,
 function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, rnd: () => number, pal: PilePalette) {
   c.save();
   c.translate(x, y);
+  if (pal.shape === 'salt') {
+    drawSaltCrystal(c, Math.floor(rnd() * 4), s, angle);
+    c.restore();
+    return;
+  }
   c.rotate(angle);
   c.shadowColor = 'rgba(6, 16, 90, .38)';
   c.shadowBlur = s * 0.3;
@@ -45,9 +54,15 @@ function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angl
   g.addColorStop(0, pal.body[0]);
   g.addColorStop(1, pal.body[2]);
   c.fillStyle = g;
+  if (pal.shape) {
+    drawFoodPiece(c, pal.shape, s, Math.floor(rnd() * 4));
+    c.restore();
+    return;
+  }
   roundRect(c, -s / 2, -s / 2, s, s, s * 0.17);
   c.fill();
   c.shadowColor = 'transparent';
+  c.clip();
   c.fillStyle = `rgba(${pal.grainA}, .5)`;
   for (let i = 0; i < 6; i++) {
     const d = Math.max(2, s * 0.045);
@@ -139,8 +154,9 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillStyle = '#fff';
   c.font = `500 56px ${FONT_D}`;
   c.fillText('В моём чеке', W / 2, 510);
-  const cubes = d.cubesBy[d.metric];
-  const num = String(cubes);
+  const cubes = d.metric === 'salt' ? saltGrainCount(d.totals.salt) : d.cubesBy[d.metric];
+  const available = d.available.includes(d.metric);
+  const num = available ? bigNum(d.totals[d.metric], d.metric) : '—';
   let size = num.length >= 3 ? 400 : 480;
   c.font = `900 ${size}px ${FONT_D}`;
   while (c.measureText(num).width > W - 140 && size > 200) { size -= 20; c.font = `900 ${size}px ${FONT_D}`; }
@@ -148,7 +164,7 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillText(num, W / 2, 530 + size * 0.78);
   c.shadowColor = 'transparent';
   c.font = `500 56px ${FONT_D}`;
-  c.fillText(capOf(cubes, d.metric), W / 2, 530 + size * 0.78 + 96);
+  c.fillText(available ? bigCap(d.totals[d.metric], d.metric) : 'нет данных', W / 2, 530 + size * 0.78 + 96);
 
   // куча и белая карточка
   const sheetTop = H - 330;
@@ -160,18 +176,18 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillStyle = '#0D1440';
   c.font = `800 50px ${FONT_D}`;
   c.fillText('А сколько в твоей корзине?', W / 2, sheetTop + 104);
-  // четыре показателя в ряд: цветная точка, число и название
+  // сводка по показателям
   const colW = (W - 120) / METRIC_IDS.length;
   METRIC_IDS.forEach((m, i) => {
     const cx = 60 + colW * (i + 0.5);
     c.fillStyle = METRICS[m].color;
-    c.beginPath(); c.arc(cx - 70, sheetTop + 168, 11, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(cx, sheetTop + 140, 8, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#0D1440';
-    c.font = `900 56px ${FONT_D}`;
-    c.fillText(String(d.cubesBy[m]), cx + 10, sheetTop + 186);
+    c.font = `800 34px ${FONT_D}`;
+    c.fillText(d.available.includes(m) ? bigNum(d.totals[m], m) : '—', cx, sheetTop + 192, colW - 10);
     c.fillStyle = '#6B76A8';
     c.font = `700 32px ${FONT_T}`;
-    c.fillText(METRICS[m].label, cx, sheetTop + 232);
+    c.fillText(`${METRICS[m].short} · ${isCubeMetric(m) ? 'куб.' : METRICS[m].unit}`, cx, sheetTop + 232, colW - 10);
   });
   c.fillStyle = '#6B76A8';
   c.font = `700 36px ${FONT_T}`;

@@ -109,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Норма твоей семьи, кубиков в день',
+                                    'Дневные ориентиры для семьи',
                                     style: body(
                                       15,
                                       color: Colors.white.withValues(
@@ -127,9 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           width: 110,
                                           child: Row(
                                             crossAxisAlignment:
-                                                CrossAxisAlignment.baseline,
-                                            textBaseline:
-                                                TextBaseline.alphabetic,
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Container(
                                                 width: 10,
@@ -148,9 +146,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
-                                                '${familyDailyCubesOf(p, m)}',
+                                                bigNum(familyDaily(p, m), m),
                                                 style: disp(
-                                                  34,
+                                                  23,
                                                   color: Colors.white,
                                                   h: 1,
                                                   ls: -.05,
@@ -159,10 +157,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               const SizedBox(width: 6),
                                               Flexible(
                                                 child: Text(
-                                                  metrics[m]!.label,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  '${metrics[m]!.label} · ${isCubeMetric(m) ? 'куб.' : metrics[m]!.unit}',
+                                                  maxLines: 2,
                                                   style: body(
                                                     13,
                                                     w: 700,
@@ -221,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
                   child: Text(
-                    'На всю семью в день выходит до ${amountTxt(familyDaily(p, MetricId.sugar), MetricId.sugar)} сахара, ${amountTxt(familyDaily(p, MetricId.salt), MetricId.salt)} соли, ${amountTxt(familyDaily(p, MetricId.fat), MetricId.fat)} насыщенных жиров и около ${familyDaily(p, MetricId.kcal)} ккал. Это ${normCubes * 7} ${pl(normCubes * 7, cubesF)} сахара в неделю; с нормами сравнивается раздел «Неделя».',
+                    'На всю семью в день выходит до ${amountTxt(familyDaily(p, MetricId.sugar), MetricId.sugar)} сахара, ${amountTxt(familyDaily(p, MetricId.salt), MetricId.salt)} соли, ${amountTxt(familyDaily(p, MetricId.fat), MetricId.fat)} насыщенных жиров и около ${familyDaily(p, MetricId.kcal)} ккал, ${familyDaily(p, MetricId.carbs)} г углеводов и ${familyDaily(p, MetricId.protein)} г белка. Это ${normCubes * 7} ${pl(normCubes * 7, cubesF)} сахара в неделю; с нормами сравнивается раздел «Неделя».',
                     style: body(14, color: mute),
                   ),
                 ),
@@ -393,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Всё показываем кубиками, у каждого показателя свой: ${metricIds.map(cubeLabel).join(', ')}. Сахар — только добавленный: в целых фруктах, овощах и молоке он не считается. Норма взрослого — около 10 кубиков каждого в день (ориентир ВОЗ).',
+                                '$unitsNote Сахар в цельных фруктах не считается.',
                                 style: body(15),
                               ),
                               const SizedBox(height: 6),

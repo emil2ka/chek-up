@@ -317,15 +317,16 @@ class _ProductSheetState extends State<_ProductSheet> {
   Widget build(BuildContext context) {
     final p = widget.p, mdef = metrics[_metric]!;
     final val = p.valueOf(_metric);
-    final cubes = val == null ? 0 : cubesOfValue(val, _metric);
-    final shown = min(cubes, 80);
+    final shown = pileCount(val ?? 0, _metric, limit: 80);
     final share = val == null ? 0.0 : val / mdef.adult;
-    final tone = share <= .1
+    final tone = !isHarmfulMetric(_metric) || share <= .1
         ? Tone.good
         : share <= .5
         ? Tone.mid
         : Tone.bad;
-    final say = _metric == MetricId.kcal
+    final say = _metric == MetricId.carbs || _metric == MetricId.protein
+        ? 'На этикетке'
+        : _metric == MetricId.kcal
         ? switch (tone) {
             Tone.good => 'Лёгкий продукт',
             Tone.mid => 'Заметная порция калорий',
@@ -387,15 +388,20 @@ class _ProductSheetState extends State<_ProductSheet> {
             ),
             child: Stack(
               children: [
-                Positioned.fill(
-                  child: SugarPile(
-                    key: ValueKey(_metric),
-                    palettes: [pilePalettes[_metric]!],
-                    target: shown,
-                    cubeSize: (s) =>
-                        cubeSize(s.width, s.height - 60, max(1, shown)),
+                if (val != null)
+                  Positioned.fill(
+                    child: SugarPile(
+                      key: ValueKey(_metric),
+                      palettes: [pilePalettes[_metric]!],
+                      target: shown,
+                      cubeSize: (s) => metricPileSize(
+                        _metric,
+                        s.width,
+                        s.height - 60,
+                        max(1, shown),
+                      ),
+                    ),
                   ),
-                ),
                 Positioned(
                   left: 18,
                   top: 14,
@@ -404,14 +410,14 @@ class _ProductSheetState extends State<_ProductSheet> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          val == null ? '—' : '$cubes',
+                          val == null ? '—' : bigNum(val, _metric),
                           style: disp(54, color: Colors.white, ls: -.06),
                         ),
                         const SizedBox(width: 8),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Text(
-                            '${capOf(cubes, _metric)}\n${p.basis}',
+                            '${bigCap(val ?? 0, _metric)}\n${p.basis}',
                             style: body(
                               13,
                               w: 700,

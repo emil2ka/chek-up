@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RECEIPTS } from './data';
-import { METRIC_IDS, METRICS, amountTxt, analyze, capOf, cubesOfValue, money, num1, pl, CUBES, valueOf, verdict } from './engine';
+import { METRICS, amountTxt, analyze, bigCap, bigNum, cubesOfValue, isCubeMetric, METRIC_IDS, money, num1, pl, CUBES, valueOf, verdict } from './engine';
 import { ReceiptSchema } from './schema';
 import type { Receipt } from './types';
 
@@ -8,12 +8,14 @@ const byId = (id: string) => RECEIPTS.find(r => r.id === id)!;
 const allSwaps = (r: Receipt) => r.items.flatMap((x, i) => (x.swap ? [i] : []));
 
 describe('показатели', () => {
-  it('норма взрослого у каждого показателя — около 10 кубиков в день', () => {
-    for (const m of METRIC_IDS) expect(METRICS[m].adult / METRICS[m].cubeG).toBe(10);
+  it('кубиками отображается только сахар', () => {
+    expect(METRIC_IDS.filter(isCubeMetric)).toEqual(['sugar']);
+    expect(bigNum(METRICS.fat.adult, 'fat')).toBe('20');
   });
 
   it('подписи под цифрой', () => {
-    expect([capOf(1, 'sugar'), capOf(3, 'salt'), capOf(11, 'fat'), capOf(5, 'kcal')]).toEqual(['кубик сахара', 'кубика соли', 'кубиков жиров', 'кубиков калорий']);
+    expect([bigCap(5, 'sugar'), bigCap(3, 'salt'), bigCap(22, 'fat'), bigCap(5, 'kcal'), bigCap(5, 'carbs'), bigCap(5, 'protein')]).toEqual(['кубик сахара', 'г соли', 'г насыщенных жиров', 'ккал', 'г углеводов', 'г белка']);
+    expect([bigNum(10, 'sugar'), bigNum(0.5, 'salt'), bigNum(18, 'protein')]).toEqual(['2', '0,5', '18']);
   });
 
   it('количества с единицами', () => {
@@ -24,7 +26,7 @@ describe('показатели', () => {
   it('у старых чеков без соли и жиров показатели равны нулю', () => {
     const old: Receipt = { id: 'old', title: '', store: '', date: '2026-01-01', items: [{ n: 'Кола, 1 л', p: 620, s: 106, junk: 1 }] };
     const a = analyze(old);
-    expect(a.totals).toEqual({ sugar: 106, salt: 0, fat: 0, kcal: 0 });
+    expect(a.totals).toEqual({ sugar: 106, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0 });
     expect(valueOf(old.items[0], 'salt')).toBe(0);
     expect(cubesOfValue(106, 'sugar')).toBe(21);
   });
@@ -33,7 +35,8 @@ describe('показатели', () => {
 describe('analyze на демо-чеках', () => {
   it('обычная неделя', () => {
     const a = analyze(byId('week'));
-    expect(a.cubesBy).toEqual({ sugar: 73, salt: 41, fat: 50, kcal: 54 });
+    expect(a.cubesBy).toEqual({ sugar: 73, salt: 41, fat: 50, kcal: 54, carbs: 136, protein: 91 });
+    expect(a.totals).toMatchObject({ carbs: 1363, protein: 545 });
     expect(a.cubes).toBe(a.cubesBy.sugar);
     expect(a.sugar).toBe(a.totals.sugar);
     expect(a.flagged).toMatchObject({ count: 2, sum: 1240, alcohol: 650, energy: 590 });

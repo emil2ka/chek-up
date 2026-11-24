@@ -12,7 +12,6 @@ import '../ui/pile_hero.dart';
 import 'shell.dart';
 
 /// больше кубиков на экране не рисуем — счётчик всё равно показывает настоящее число
-const _pileCap = 220;
 
 class WeekScreen extends StatefulWidget {
   final VoidCallback onProfile;
@@ -32,26 +31,33 @@ class _WeekScreenState extends State<WeekScreen> {
     final st = weekStats(store.history, p);
     final mdef = metrics[_metric]!;
     final mw = st.metrics[_metric]!;
-    final cubes = mw.cubes, norm = mw.normCubes;
+    final norm = mw.norm;
     final ratio = mw.ratio;
     final pct = (ratio * 100).round();
-    final tone = ratio <= .7
+    final tone = !isHarmfulMetric(_metric) || ratio <= .7
         ? Tone.good
         : ratio <= 1
         ? Tone.mid
         : Tone.bad;
-    final maxDay = st.days.map((d) => d.by[_metric]!).fold(1, max);
+    final maxDay = st.days.map((d) => d.amounts[_metric]!).fold<double>(1, max);
     final empty = st.receipts.isEmpty;
-    final shown = min(cubes, _pileCap);
-    final over = cubes - norm;
+    final incomplete = st.receipts.any(
+      (receipt) => receipt.analysis.items.any(
+        (item) => !hasMetricData(item.active, _metric),
+      ),
+    );
+    final shown = pileCount(mw.total, _metric);
+    final over = mw.total - norm;
     final family =
         '${p.adults} ${pl(p.adults, adultsF)}${p.kids > 0 ? ' и ${p.kids} ${pl(p.kids, kidsF)}' : ''}';
-    final normLine = empty
-        ? 'Отсканируй чек — и здесь появится гора за неделю.'
-        : over > 0
-        ? 'Это на $over ${pl(over, cubesF)} больше недельной нормы семьи.'
-        : ratio <= .7
-        ? 'Отличная неделя: ${mdef.of} заметно меньше нормы.'
+    final normLine = incomplete
+        ? 'Сумма по доступным данным: в части чеков этого показателя нет.'
+        : empty
+        ? 'Отсканируй чек — и здесь появятся данные за неделю.'
+        : !isHarmfulMetric(_metric)
+        ? 'По чекам: $pct% недельного ориентира семьи.'
+        : over > .05
+        ? 'Это на ${metricTxt(over, _metric)} больше недельной нормы семьи.'
         : 'В пределах недельной нормы семьи.';
 
     Widget card({
@@ -76,7 +82,7 @@ class _WeekScreenState extends State<WeekScreen> {
               kick: 'В чеках за неделю',
               target: shown,
               maxCubes: max(1, shown),
-              real: (n) => shown > 0 ? (n * cubes / shown).round() : 0,
+              value: mw.total,
               capSuffix: ' за 7 дней',
               metric: _metric,
               onMetric: (m) => setState(() => _metric = m),
@@ -123,12 +129,15 @@ class _WeekScreenState extends State<WeekScreen> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text('$cubes', style: disp(46, ls: -.05)),
+                                    Text(
+                                      bigNum(mw.total, _metric),
+                                      style: disp(46, ls: -.05),
+                                    ),
                                     const SizedBox(width: 8),
                                     Padding(
                                       padding: const EdgeInsets.only(bottom: 5),
                                       child: Text(
-                                        'из $norm',
+                                        'из ${bigNum(norm, _metric)}',
                                         style: disp(18, color: mute, ls: -.03),
                                       ),
                                     ),
@@ -138,7 +147,7 @@ class _WeekScreenState extends State<WeekScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              '${pl(norm, cubesF)}\nв неделю',
+                              '${bigCap(norm, _metric)}\nв неделю',
                               textAlign: TextAlign.right,
                               style: body(13, w: 700, color: mute, h: 1.2),
                             ),
@@ -153,10 +162,8 @@ class _WeekScreenState extends State<WeekScreen> {
                             alignment: Alignment.centerLeft,
                             child: FractionallySizedBox(
                               widthFactor:
-                                  (cubes > 0 ? max(.04, pct / 100) : 0.0).clamp(
-                                    0.0,
-                                    1.0,
-                                  ),
+                                  (mw.total > 0 ? max(.04, pct / 100) : 0.0)
+                                      .clamp(0.0, 1.0),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: toneColor(tone),
@@ -203,13 +210,13 @@ class _WeekScreenState extends State<WeekScreen> {
                           Expanded(
                             child: Semantics(
                               label:
-                                  '${d.day}-е число: ${d.by[_metric]!} ${pl(d.by[_metric]!, cubesF)}',
+                                  '${d.day}-е число: ${metricTxt(d.amounts[_metric]!, _metric)}',
                               excludeSemantics: true,
                               child: Column(
                                 children: [
                                   Text(
-                                    d.by[_metric]! > 0
-                                        ? '${d.by[_metric]!}'
+                                    d.amounts[_metric]! > 0
+                                        ? bigNum(d.amounts[_metric]!, _metric)
                                         : '',
                                     style: disp(13, w: 800, ls: 0),
                                   ),
@@ -221,10 +228,12 @@ class _WeekScreenState extends State<WeekScreen> {
                                       child: TweenAnimationBuilder<double>(
                                         tween: Tween(
                                           begin: 6,
-                                          end: d.by[_metric]! > 0
+                                          end: d.amounts[_metric]! > 0
                                               ? max(
                                                   10.0,
-                                                  d.by[_metric]! / maxDay * 96,
+                                                  d.amounts[_metric]! /
+                                                      maxDay *
+                                                      96,
                                                 )
                                               : 6,
                                         ),
@@ -241,7 +250,7 @@ class _WeekScreenState extends State<WeekScreen> {
                                             maxWidth: 32,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: d.by[_metric]! > 0
+                                            color: d.amounts[_metric]! > 0
                                                 ? (d.today ? blue1 : blue3)
                                                 : line,
                                             borderRadius: BorderRadius.circular(
@@ -354,7 +363,7 @@ class _WeekScreenState extends State<WeekScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Столько ${_metric == MetricId.sugar ? 'добавленного сахара' : mdef.of} семья купит за год, если каждая неделя будет как эта. Это ${group((mw.total * 52 / mdef.cubeG).round())} кубиков.',
+                            'Столько ${_metric == MetricId.sugar ? 'добавленного сахара' : mdef.of} семья купит за год, если каждая неделя будет как эта.',
                             style: body(
                               14,
                               color: Colors.white.withValues(alpha: .82),
@@ -443,12 +452,12 @@ class _WeekScreenState extends State<WeekScreen> {
                                 ),
                               ),
                               Text(
-                                '${cubesOfValue(s.$2, _metric)}',
+                                bigNum(s.$2, _metric),
                                 style: disp(17, ls: -.03),
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                pl(cubesOfValue(s.$2, _metric), cubesF),
+                                bigCap(s.$2, _metric),
                                 style: body(12, w: 700, color: mute),
                               ),
                             ],
@@ -480,8 +489,8 @@ class _WeekScreenState extends State<WeekScreen> {
                               child: _money(
                                 'Замены экономят',
                                 money(st.saved),
-                                mw.cubesSaved > 0
-                                    ? 'и минус ${mw.cubesSaved} ${pl(mw.cubesSaved, cubesF)} ${mdef.of}'
+                                mw.amountSaved > .05
+                                    ? 'и минус ${metricTxt(mw.amountSaved, _metric)}'
                                     : 'включи замены в чеке',
                               ),
                             ),
@@ -542,7 +551,10 @@ class _WeekScreenState extends State<WeekScreen> {
                                       ),
                                       const SizedBox(width: 10),
                                       Text(
-                                        '${r.analysis.cubesBy[_metric]}',
+                                        bigNum(
+                                          r.analysis.totals[_metric]!,
+                                          _metric,
+                                        ),
                                         style: disp(20),
                                       ),
                                       const SizedBox(width: 9),
@@ -576,7 +588,7 @@ class _WeekScreenState extends State<WeekScreen> {
                   ],
                   const SizedBox(height: 14),
                   Text(
-                    'Неделя считается по датам чеков. Это купленное, а не съеденное: часть продуктов останется на потом. 1 кубик ${mdef.of} = ${cubeLabel(_metric)}. Норма: ${mdef.norm}.',
+                    'Неделя считается по датам чеков. Это купленное, а не съеденное: часть продуктов останется на потом. ${unitNote(_metric)}. Норма: ${mdef.norm}.',
                     style: body(12, color: mute, h: 1.5),
                   ),
                 ],

@@ -14,6 +14,7 @@ import 'package:chek_up/screens/result.dart';
 import 'package:chek_up/screens/shop_list.dart';
 import 'package:chek_up/screens/week.dart';
 import 'package:chek_up/ui/kit.dart';
+import 'package:chek_up/ui/pile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,12 +66,14 @@ void main() {
     final a = analyze(demoReceipts[0]);
     expect((a.cubes, a.score, a.total, a.junk), (73, 45, 12590, 6210));
     expect(verdict(a.score).label, 'Так себе');
-    expect(a.cubesBy, {
-      MetricId.sugar: 73,
-      MetricId.salt: 41,
-      MetricId.fat: 50,
-      MetricId.kcal: 54,
-    });
+    expect(metricIds.where(isCubeMetric), [MetricId.sugar]);
+    expect(bigCap(a.totals[MetricId.fat]!, MetricId.fat), 'г насыщенных жиров');
+    expect(
+      [saltGrainCount(1.1), saltGrainCount(8), saltGrainCount(1e6)],
+      [13, 96, 248],
+    );
+    expect(a.totals[MetricId.carbs], 1363);
+    expect(a.totals[MetricId.protein], 545);
     expect(
       (a.flaggedCount, a.flaggedSum, a.alcoholSum, a.energySum),
       (2, 1240, 650, 590),
@@ -93,6 +96,8 @@ void main() {
           MetricId.salt: 41,
           MetricId.fat: 50,
           MetricId.kcal: 54,
+          MetricId.carbs: 136,
+          MetricId.protein: 91,
         },
       ),
       'party': (
@@ -102,6 +107,8 @@ void main() {
           MetricId.salt: 53,
           MetricId.fat: 129,
           MetricId.kcal: 76,
+          MetricId.carbs: 212,
+          MetricId.protein: 52,
         },
       ),
       'fit': (
@@ -111,6 +118,8 @@ void main() {
           MetricId.salt: 8,
           MetricId.fat: 35,
           MetricId.kcal: 48,
+          MetricId.carbs: 105,
+          MetricId.protein: 96,
         },
       ),
     };
@@ -120,15 +129,20 @@ void main() {
       expect(a.cubesBy, sheet[r.id]!.$2, reason: r.id);
     }
     final h = harmPrice(analyze(demoReceipts[0]), MetricId.salt);
-    expect((h.spend, h.cubes, h.perCube.round()), (6980, 39, 179));
+    expect((h.spend, h.perUnit.round()), (10030, 494));
+    expect(h.total, closeTo(20.3, 0.001));
     expect(
       [for (final t in h.top) t.name],
       ['Филе куриное, 1 кг', 'Колбаса варёная, 400 г', 'Чипсы, 150 г'],
     );
     expect(
-      Receipt.fromJson(demoReceipts[1].toJson()).items.length,
-      demoReceipts[1].items.length,
+      Receipt.fromJson(demoReceipts[1].toJson()).toJson(),
+      demoReceipts[1].toJson(),
     );
+    final old = Item.fromJson({'n': 'Кола', 'p': 620, 's': 106});
+    expect(old.valueOf(MetricId.protein), 0);
+    expect(old.toJson().containsKey('b'), isFalse);
+    expect(swapRows(demoReceipts[0], MetricId.carbs).first.cubes, '−106 г');
   });
 
   for (final size in const [Size(375, 812), Size(320, 568), Size(430, 932)]) {
@@ -167,6 +181,31 @@ void main() {
           await t.pump(const Duration(milliseconds: 100));
         }
         expect(t.takeException(), isNull);
+        if (['неделя', 'результат', 'продукты'].contains(e.key)) {
+          for (final label in [
+            'Белки',
+            'Углеводы',
+            'Соль',
+            'Калории',
+            'Жиры',
+            'Сахар',
+          ]) {
+            final tab = find.text(label).first;
+            await t.ensureVisible(tab);
+            await t.tap(tab);
+            await t.pump(const Duration(milliseconds: 100));
+            if (e.key == 'результат') {
+              final pile = find.byType(SugarPile);
+              expect(pile, findsOneWidget);
+              for (var frame = 0; frame < 27; frame++) {
+                await t.pump(const Duration(milliseconds: 100));
+              }
+              await t.tapAt(t.getRect(pile).bottomCenter - const Offset(0, 30));
+              await t.pump(const Duration(milliseconds: 100));
+            }
+            expect(t.takeException(), isNull, reason: label);
+          }
+        }
         await t.pumpWidget(const SizedBox());
         await t.pump(const Duration(seconds: 6));
       });

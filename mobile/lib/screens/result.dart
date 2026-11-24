@@ -81,6 +81,11 @@ class _ResultPageState extends State<ResultPage> {
     shareResult(
       metric: _metric,
       cubesBy: a.cubesBy,
+      totals: a.totals,
+      available: {
+        for (final metric in metricIds)
+          if (a.items.any((item) => hasMetricData(item.active, metric))) metric,
+      },
       score: a.score,
       where: '${widget.receipt.store} · ${dateRu(widget.receipt.date)}',
       text: _m.shareText,
@@ -120,8 +125,12 @@ class _ResultPageState extends State<ResultPage> {
                 PileHero(
                   height: max(440.0, box.maxHeight * .62),
                   kick: 'В твоём чеке',
-                  target: a.cubesBy[_metric]!,
-                  maxCubes: _maxCubes,
+                  target: pileCount(a.totals[_metric]!, _metric),
+                  maxCubes: min(220, _maxCubes),
+                  value:
+                      a.items.any((item) => hasMetricData(item.active, _metric))
+                      ? a.totals[_metric]!
+                      : null,
                   metric: _metric,
                   onMetric: _setMetric,
                   bar: Row(
@@ -164,17 +173,19 @@ class _ResultPageState extends State<ResultPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Чек распознан по фото: сахар и замены оценены приблизительно, по типичным товарам.',
+                            'Чек распознан по фото: состав и замены оценены приблизительно, по типичным товарам.',
                             style: body(14),
                           ),
                         ),
                       ],
                       // ── замены ──
-                      const SecTitle('Замени — и кубики исчезнут'),
+                      SecTitle(
+                        isCubeMetric(_metric)
+                            ? 'Замени — и кубики исчезнут'
+                            : 'Что изменится с заменой',
+                      ),
                       if (_rows.isEmpty)
-                        _empty(
-                          'На этой вкладке заменять нечего: в чеке нет позиций с ${mdef.of} и понятной заменой.',
-                        )
+                        _empty('Нет замен, которые меняют этот показатель.')
                       else
                         for (final r in _rows)
                           Padding(
@@ -301,17 +312,19 @@ class _ResultPageState extends State<ResultPage> {
                       const SizedBox(height: 30),
                       SecTitle('Откуда ${mdef.label.toLowerCase()}'),
                       if (_m.sources.isEmpty)
-                        _empty('${mdef.label} в чеке не нашлись.')
+                        _empty('Нет данных об этом показателе.')
                       else
                         for (final s in _m.sources) _source(s),
                       // ── вредное ──
                       // ── цена вреда ──
                       const SizedBox(height: 22),
-                      const SecTitle('Цена вреда'),
-                      if (_m.harm.cubes == 0)
-                        _empty(
-                          'Продуктов с заметным количеством ${mdef.of} в чеке нет — платить за вред не пришлось.',
-                        )
+                      SecTitle(
+                        isHarmfulMetric(_metric)
+                            ? 'Цена вреда'
+                            : 'Сколько это стоит',
+                      ),
+                      if (_m.harm.total == 0)
+                        _empty('Нет позиций с учтённым количеством ${mdef.of}.')
                       else
                         _harm(_m.harm, mdef),
                       const SizedBox(height: 22),
@@ -448,7 +461,7 @@ class _ResultPageState extends State<ResultPage> {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        'Кубик у каждого показателя свой: ${metricIds.map(cubeLabel).join(', ')}. Норма взрослого — около 10 кубиков в день по каждому (ориентир ВОЗ; сахар — до $dailyG г). Оценка примерная и не заменяет консультацию врача.',
+                        '$unitsNote Оценка примерная и не заменяет консультацию врача.',
                         style: body(12, color: mute, h: 1.5),
                       ),
                     ],
@@ -470,11 +483,18 @@ class _ResultPageState extends State<ResultPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(money(h.perCube), style: disp(34, ls: -.04)),
-            Text('за кубик ${mdef.of}', style: body(15, color: mute)),
+            Text(money(h.perUnit), style: disp(34, ls: -.04)),
+            Text(
+              'за ${isCubeMetric(mdef.id)
+                  ? 'кубик'
+                  : mdef.id == MetricId.kcal
+                  ? '100 ккал'
+                  : mdef.unit}${mdef.id == MetricId.kcal ? '' : ' ${mdef.of}'}',
+              style: body(15, color: mute),
+            ),
             const SizedBox(height: 8),
             Text(
-              'На эти покупки ушло ${money(h.spend)}, в них ${h.cubes} ${pl(h.cubes, cubesF)} ${mdef.of}.',
+              'На эти покупки ушло ${money(h.spend)}, в них ${metricTxt(h.total, mdef.id)}.',
               style: body(14, color: mute, h: 1.4),
             ),
           ],
@@ -497,7 +517,10 @@ class _ResultPageState extends State<ResultPage> {
               const SizedBox(width: 12),
               Text(money(t.price), style: disp(14, w: 800, ls: -.02)),
               const SizedBox(width: 6),
-              Text('${t.cubes} куб.', style: body(13, w: 700, color: mute)),
+              Text(
+                metricTxt(t.value, mdef.id),
+                style: body(13, w: 700, color: mute),
+              ),
             ],
           ),
         ),

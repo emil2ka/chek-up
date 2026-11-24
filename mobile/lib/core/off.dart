@@ -78,6 +78,8 @@ Future<ShelfProduct> lookupBarcode(String code) async {
     MetricId.salt: _num(nu['salt_100g']),
     MetricId.fat: _num(nu['saturated-fat_100g']),
     MetricId.kcal: _num(nu['energy-kcal_100g']),
+    MetricId.carbs: _num(nu['carbohydrates_100g']),
+    MetricId.protein: _num(nu['proteins_100g']),
   };
   if (per100.values.every((v) => v == null)) {
     throw const ShelfError(

@@ -5,9 +5,9 @@ import { EnrichmentSchema, ExtractionSchema } from './model';
 
 export type Line = { name: string; qty: number; price: number };
 export type Extracted = { store: string; date: string; lines: Line[] };
-export type EstimateSwap = { n: string; p: number; s: number; t: number; f: number; k: number };
+export type EstimateSwap = { n: string; p: number; s: number; t: number; f: number; k: number; c: number; b: number };
 /** Оценка модели по позиции: сахар, соль, насыщенные жиры (г), калории (ккал) и замена. */
-export type Estimate = { sugar: number; salt: number; fat: number; kcal: number; flag: 'alcohol' | 'energy' | null; junk: boolean; swap: EstimateSwap | null };
+export type Estimate = { sugar: number; salt: number; fat: number; kcal: number; carbs: number; protein: number; flag: 'alcohol' | 'energy' | null; junk: boolean; swap: EstimateSwap | null };
 
 const nonNeg = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0);
 
@@ -74,9 +74,11 @@ export function parseEnrichment(raw: unknown, count: number): Map<number, Estima
       salt: nonNeg(it.salt_g),
       fat: nonNeg(it.sat_fat_g),
       kcal: nonNeg(it.kcal),
+      carbs: nonNeg(it.carbs_g),
+      protein: nonNeg(it.protein_g),
       flag: it.flag === 'alcohol' || it.flag === 'energy' ? it.flag : null,
       junk: it.junk,
-      swap: swapOk ? { n: swapName, p: Math.round(it.swap_price), s: it.swap_sugar_g, t: nonNeg(it.swap_salt_g), f: nonNeg(it.swap_sat_fat_g), k: nonNeg(it.swap_kcal) } : null,
+      swap: swapOk ? { n: swapName, p: Math.round(it.swap_price), s: it.swap_sugar_g, t: nonNeg(it.swap_salt_g), f: nonNeg(it.swap_sat_fat_g), k: nonNeg(it.swap_kcal), c: nonNeg(it.swap_carbs_g), b: nonNeg(it.swap_protein_g) } : null,
     });
   }
   return out;

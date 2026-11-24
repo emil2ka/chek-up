@@ -53,12 +53,14 @@ describe('weekStats', () => {
     expect(w.cubesSaved).toBe(47);
   });
 
-  it('считает все четыре показателя: итог, кубики, норму и источники', () => {
+  it('считает все показатели: итог, норму, количество по дням и источники', () => {
     const w = weekStats([entry('week'), entry('fit')], solo, NOW);
     const a = analyze(RECEIPTS[0]), b = analyze(RECEIPTS[2]);
-    for (const m of ['sugar', 'salt', 'fat', 'kcal'] as const) {
+    for (const m of ['sugar', 'salt', 'fat', 'kcal', 'carbs', 'protein'] as const) {
       expect(w.metrics[m].total).toBeCloseTo(a.totals[m] + b.totals[m], 1);
-      expect(w.metrics[m].normCubes).toBe(70); // у каждого показателя норма взрослого — 10 кубиков в день
+      expect(w.metrics[m].norm).toBe(familyDaily(solo, m) * 7);
+      expect(w.days[6].amounts[m]).toBe(a.totals[m]);
+      expect(w.metrics[m].ratio).toBeCloseTo(w.metrics[m].total / w.metrics[m].norm);
     }
     expect(w.metrics.salt.sources[0].name).toMatch(/Колбаса/);   // больше всего соли — в колбасе
     expect(w.metrics.fat.sources[0].name).toMatch(/Сыр|Яйцо|Колбаса|Молоко|Шоколад|Лосось/);

@@ -7,7 +7,7 @@ import 'kit.dart';
 import 'pile.dart';
 
 const heroHeadH =
-    296.0; // место под шапку, вкладки показателей, подпись и цифру
+    320.0; // место под шапку, вкладки показателей, подпись и цифру
 
 class PileHero extends StatefulWidget {
   final double height;
@@ -20,9 +20,8 @@ class PileHero extends StatefulWidget {
   /// под это количество подбирается размер кубика
   final int maxCubes;
 
-  /// настоящее число для показа, если кубиков рисуется меньше (неделя)
-  final int Function(int shown)? real;
   final String capSuffix;
+  final num? value;
 
   /// выбранный показатель: от него цвет кубиков и подпись под цифрой
   final MetricId metric;
@@ -36,7 +35,7 @@ class PileHero extends StatefulWidget {
     required this.kick,
     required this.target,
     required this.maxCubes,
-    this.real,
+    required this.value,
     this.capSuffix = '',
     this.metric = MetricId.sugar,
     this.onMetric,
@@ -47,7 +46,7 @@ class PileHero extends StatefulWidget {
 }
 
 class _PileHeroState extends State<PileHero> {
-  final _n = ValueNotifier(0);
+  final _n = ValueNotifier((MetricId.sugar, 0));
 
   @override
   void dispose() {
@@ -58,39 +57,52 @@ class _PileHeroState extends State<PileHero> {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
+    final amount = widget.value;
+    final metric = widget.metric;
     return SizedBox(
       height: widget.height,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           const Glow(),
-          Positioned.fill(
-            child: Semantics(
-              label:
-                  'Гора кубиков ${metrics[widget.metric]!.of}. Нажми, чтобы подбросить',
-              child: SugarPile(
-                // новая куча, когда меняется размер кубика или показатель
-                key: ValueKey('${widget.maxCubes}-${widget.metric.name}'),
-                palettes: [pilePalettes[widget.metric]!],
-                target: widget.target,
-                cubeSize: (s) => cubeSize(
-                  s.width,
-                  s.height - top - heroHeadH,
-                  widget.maxCubes,
+          if (amount != null)
+            Positioned.fill(
+              child: Semantics(
+                label: pileHints[metric],
+                child: SugarPile(
+                  key: ValueKey(metric),
+                  palettes: [pilePalettes[metric]!],
+                  target: widget.target,
+                  cubeSize: (size) => metricPileSize(
+                    metric,
+                    size.width,
+                    size.height - top - heroHeadH,
+                    widget.maxCubes,
+                  ),
+                  onCount: (count) => _n.value = (metric, count),
                 ),
-                onCount: (n) => _n.value = n,
               ),
             ),
-          ),
           Positioned(
-            left: 0,
-            right: 0,
-            top: top + 62 + (widget.onMetric != null ? 56 : 0),
+            left: 10,
+            right: 10,
+            top: top + 62 + (widget.onMetric != null ? 94 : 0),
             child: IgnorePointer(
               child: ValueListenableBuilder(
                 valueListenable: _n,
-                builder: (_, n, __) {
-                  final shown = widget.real?.call(n) ?? n;
+                builder: (_, n, _) {
+                  final (countedMetric, count) = n;
+                  final value =
+                      amount != null &&
+                          isCubeMetric(widget.metric) &&
+                          widget.target == cubesOfValue(amount, widget.metric)
+                      ? (countedMetric == metric ? count : 0) *
+                            metrics[metric]!.cubeG
+                      : amount;
+                  final number = value == null
+                      ? '—'
+                      : bigNum(value, widget.metric);
+                  final hint = pileHints[widget.metric];
                   return Column(
                     children: [
                       Text(
@@ -103,31 +115,36 @@ class _PileHeroState extends State<PileHero> {
                       ),
                       const SizedBox(height: 2),
                       TweenAnimationBuilder<double>(
-                        key: ValueKey(shown),
+                        key: ValueKey(number),
                         tween: Tween(begin: 1.045, end: 1),
                         duration: const Duration(milliseconds: 160),
                         builder: (_, s, child) =>
                             Transform.scale(scale: s, child: child),
-                        child: Text(
-                          '$shown',
-                          style:
-                              disp(
-                                shown >= 100 ? 104 : 124,
-                                color: Colors.white,
-                                h: 1,
-                                ls: -.07,
-                              ).copyWith(
-                                shadows: [
-                                  Shadow(
-                                    color: blue1.withValues(alpha: .5),
-                                    blurRadius: 24,
-                                  ),
-                                ],
-                              ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            number,
+                            style:
+                                disp(
+                                  number.length >= 4 ? 74 : 100,
+                                  color: Colors.white,
+                                  h: 1,
+                                  ls: -.07,
+                                ).copyWith(
+                                  shadows: [
+                                    Shadow(
+                                      color: blue1.withValues(alpha: .5),
+                                      blurRadius: 24,
+                                    ),
+                                  ],
+                                ),
+                          ),
                         ),
                       ),
                       Text(
-                        '${capOf(shown, widget.metric)}${widget.capSuffix}',
+                        value == null
+                            ? 'нет данных в этом чеке'
+                            : '${bigCap(value, widget.metric)}${widget.capSuffix}',
                         style: disp(
                           17,
                           w: 500,
@@ -136,6 +153,20 @@ class _PileHeroState extends State<PileHero> {
                           h: 1.2,
                         ),
                       ),
+                      if (hint != null && amount != null && amount > 0)
+                        ExcludeSemantics(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 5),
+                            child: Text(
+                              hint,
+                              style: body(
+                                11,
+                                w: 800,
+                                color: Colors.white.withValues(alpha: .82),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },

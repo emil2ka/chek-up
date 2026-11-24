@@ -2,7 +2,7 @@
 // «Продукты»: справочник «Что внутри» с поиском, разделами и выбором показателя (сахар, соль, жиры, калории).
 import { useMemo, useState } from 'react';
 import { CATS, catalogValue, searchCatalog, type Cat } from '@/lib/catalog';
-import { amountTxt, cubeLabel, CUBES, cubesOfValue, METRICS, pl, type Forms } from '@/lib/engine';
+import { amountTxt, bigCap, bigNum, cubesOfValue, isCubeMetric, METRICS, pl, unitNote, type Forms } from '@/lib/engine';
 import type { MetricId } from '@/lib/types';
 import { MetricTabs } from '@/components/ui/MetricTabs';
 import { IconArrow, IconClose, IconSearch } from '@/components/icons';
@@ -13,6 +13,8 @@ const SORT_HINT: Record<MetricId, string> = {
   salt: 'сначала самые солёные',
   fat: 'сначала самые жирные',
   kcal: 'сначала самые калорийные',
+  carbs: 'сначала больше углеводов',
+  protein: 'сначала больше белка',
 };
 /** столько клеточек-кубиков рисуем в строке, остальное — «+N» */
 const STRIP = 24;
@@ -106,17 +108,17 @@ export function Catalog() {
                       <span className="font-display text-base leading-tight font-bold tracking-[-.02em]">{it.name}</span>
                       <span className="text-[13px] font-semibold text-mute">{it.portion}</span>
                     </span>
-                    {cubes > 0 ? (
+                    {val > 0 && (!isCubeMetric(metric) || cubes > 0) ? (
                       <span className="grid justify-items-end leading-none">
-                        <b className="font-display text-[26px] font-black tracking-[-.05em] tabular-nums">{cubes}</b>
-                        <small className="mt-0.5 text-xs font-bold text-mute">{pl(cubes, CUBES)}</small>
+                        <b className="font-display text-[26px] font-black tracking-[-.05em] tabular-nums">{bigNum(val, metric)}</b>
+                        <small className="mt-0.5 text-xs font-bold text-mute">{bigCap(val, metric)}</small>
                       </span>
                     ) : (
                       <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-extrabold text-good">
                         <i className="dot good" />{val > 0 ? 'почти нет' : `без ${mdef.of}`}
                       </span>
                     )}
-                    {cubes > 0 && (
+                    {isCubeMetric(metric) && cubes > 0 && (
                       <span className="col-span-2 flex flex-wrap items-center gap-[3px]" aria-hidden="true">
                         {Array.from({ length: cells }, (_, i) => (
                           <i key={i} className="size-2.75 rounded-[3px] shadow-[inset_-1.5px_-1.5px_0_color-mix(in_srgb,var(--ink)_28%,transparent)]" style={{ background: mdef.color }} />
@@ -148,7 +150,7 @@ export function Catalog() {
         )}
 
         <p className="mt-5 px-2 text-xs leading-relaxed font-semibold text-mute">
-          Значения примерные, по типичным товарам в магазинах. 1 кубик {mdef.of} = {cubeLabel(metric)}. Норма: {mdef.norm}.
+          Значения примерные, по типичным товарам в магазинах. {unitNote(metric)}. Норма: {mdef.norm}.
         </p>
       </section>
     </div>

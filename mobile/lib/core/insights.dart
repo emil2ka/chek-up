@@ -23,6 +23,7 @@ class DayStat {
 
   /// кубиков по каждому показателю за день
   final Map<MetricId, int> by = {for (final m in metricIds) m: 0};
+  final Map<MetricId, double> amounts = {for (final m in metricIds) m: 0};
   final bool today;
   DayStat(this.iso, this.label, this.day, this.today);
   int get cubes => by[MetricId.sugar]!;
@@ -39,7 +40,8 @@ class WeekReceipt {
 class MetricWeek {
   /// всего за неделю: г (сахар, соль, жиры) или ккал
   final double total;
-  final int cubes, normCubes, cubesSaved;
+  final int cubes, normCubes, cubesSaved, norm;
+  final double amountSaved;
   final double ratio;
 
   /// главные источники: название и количество
@@ -48,6 +50,8 @@ class MetricWeek {
     required this.total,
     required this.cubes,
     required this.normCubes,
+    required this.norm,
+    required this.amountSaved,
     required this.ratio,
     required this.sources,
     required this.cubesSaved,
@@ -90,6 +94,7 @@ WeekStats weekStats(List<HistoryEntry> entries, Profile p, [DateTime? now]) {
   final bySource = {for (final m in metricIds) m: <String, num>{}};
   final amount = {for (final m in metricIds) m: 0.0};
   final saved = {for (final m in metricIds) m: 0};
+  final amountSaved = {for (final m in metricIds) m: 0.0};
   num junk = 0, total = 0, money = 0, flagged = 0;
 
   for (final entry in entries) {
@@ -105,6 +110,8 @@ WeekStats weekStats(List<HistoryEntry> entries, Profile p, [DateTime? now]) {
     for (final m in metricIds) {
       amount[m] = amount[m]! + a.totals[m]!;
       day.by[m] = day.by[m]! + a.cubesBy[m]!;
+      day.amounts[m] = day.amounts[m]! + a.totals[m]!;
+      amountSaved[m] = amountSaved[m]! + base.totals[m]! - a.totals[m]!;
       saved[m] = saved[m]! + base.cubesBy[m]! - a.cubesBy[m]!;
       for (final it in a.items) {
         final v = it.active.valueOf(m);
@@ -116,7 +123,8 @@ WeekStats weekStats(List<HistoryEntry> entries, Profile p, [DateTime? now]) {
 
   final result = <MetricId, MetricWeek>{};
   for (final m in metricIds) {
-    final normCubes = (familyDaily(p, m) * 7 / metrics[m]!.cubeG).round();
+    final norm = familyDaily(p, m) * 7;
+    final normCubes = cubesOfValue(norm, m);
     final cubes = cubesOfValue(amount[m]!, m);
     final src = [for (final e in bySource[m]!.entries) (e.key, e.value)]
       ..sort((a, b) => b.$2.compareTo(a.$2));
@@ -124,7 +132,9 @@ WeekStats weekStats(List<HistoryEntry> entries, Profile p, [DateTime? now]) {
       total: (amount[m]! * 10).round() / 10,
       cubes: cubes,
       normCubes: normCubes,
-      ratio: normCubes > 0 ? cubes / normCubes : 0,
+      norm: norm,
+      amountSaved: amountSaved[m]!,
+      ratio: norm > 0 ? amount[m]! / norm : 0,
       sources: src.take(4).toList(),
       cubesSaved: saved[m]!,
     );
@@ -274,16 +284,25 @@ List<SwapRow> swapRows(Receipt r, [MetricId m = MetricId.sugar]) {
   final rows = <SwapRow>[];
   for (var i = 0; i < r.items.length; i++) {
     final it = r.items[i];
-    if (it.swap == null) continue;
-    final delta =
-        cubesOfValue(it.valueOf(m), m) - cubesOfValue(it.swap!.valueOf(m), m);
+    if (it.swap == null ||
+        !hasMetricData(it, m) ||
+        !hasMetricData(it.swap!, m)) {
+      continue;
+    }
+    final before = it.valueOf(m), after = it.swap!.valueOf(m);
+    final delta = isCubeMetric(m)
+        ? cubesOfValue(before, m) - cubesOfValue(after, m)
+        : ((before - after) * 10).round() / 10;
     if (delta == 0) continue;
     rows.add(
       SwapRow(
         i,
         it.n,
         it.swap!.n,
-        _signed(delta, (n) => cubesTxt(n.round())),
+        _signed(
+          delta,
+          (n) => isCubeMetric(m) ? cubesTxt(n.round()) : amountTxt(n, m),
+        ),
         _signed(it.p - it.swap!.p, money),
       ),
     );
@@ -310,29 +329,41 @@ class SourceRow {
 
 /// «Цена вреда»: сколько денег ушло на продукты с этим показателем и во сколько обошёлся кубик.
 class HarmPrice {
-  final num spend;
-  final int cubes;
-  final double perCube;
-  final List<({String name, num price, int cubes})> top;
-  const HarmPrice(this.spend, this.cubes, this.perCube, this.top);
+  final num spend, total;
+  final double perUnit;
+  final List<({String name, num price, num value})> top;
+  const HarmPrice(this.spend, this.total, this.perUnit, this.top);
 }
 
 HarmPrice harmPrice(Analysis a, MetricId m) {
-  final rows = [
-    for (final it in a.items)
-      (
-        name: it.active.n,
-        price: it.active.p,
-        cubes: cubesOfValue(it.active.valueOf(m), m),
-      ),
-  ].where((r) => r.cubes >= 1).toList();
+  final rows =
+      [
+            for (final it in a.items)
+              (
+                name: it.active.n,
+                price: it.active.p,
+                value: it.active.valueOf(m),
+              ),
+          ]
+          .where(
+            (r) => isCubeMetric(m) ? cubesOfValue(r.value, m) > 0 : r.value > 0,
+          )
+          .toList();
   final spend = rows.fold<num>(0, (s, r) => s + r.price);
-  final cubes = rows.fold<int>(0, (s, r) => s + r.cubes);
+  final total = rows.fold<num>(
+    0,
+    (s, r) =>
+        s +
+        (isCubeMetric(m)
+            ? cubesOfValue(r.value, m) * metrics[m]!.cubeG
+            : r.value),
+  );
+  final units = isCubeMetric(m) ? cubesOfValue(total, m) : total;
   rows.sort((x, y) => y.price.compareTo(x.price));
   return HarmPrice(
     spend,
-    cubes,
-    cubes > 0 ? spend / cubes : 0,
+    total,
+    units > 0 ? spend / units * (m == MetricId.kcal ? 100 : 1) : 0,
     rows.take(3).toList(),
   );
 }
@@ -394,6 +425,9 @@ List<Equivalent> equivalents(double v, MetricId m) {
         ),
         Equivalent('burger', _fix1(v / 6), 'чизбургеров по сумме жиров'),
       ];
+    case MetricId.carbs:
+    case MetricId.protein:
+      return const [];
     case MetricId.kcal:
       return [
         Equivalent(
@@ -485,9 +519,9 @@ ResultModel resultModel(
           i,
           it.n,
           amountTxt(val, metric),
-          c > 0 ? cubesTxt(c) : 'меньше кубика',
+          !isCubeMetric(metric) ? '' : (c > 0 ? cubesTxt(c) : 'меньше кубика'),
           max(4.0, val / maxV * 100),
-          max(1, c),
+          isCubeMetric(metric) ? max(1, c) : 1,
           a.items[i].swapped,
           it.swap != null
               ? '${it.swap!.n} — ${amountTxt(it.swap!.valueOf(metric), metric)}'
@@ -498,8 +532,9 @@ ResultModel resultModel(
 
   final d = (a.totals[metric]! / metrics[metric]!.adult).round();
   final parts = [
-    for (final k in [MetricId.sugar, MetricId.salt, MetricId.fat])
-      '${a.cubesBy[k]} ${pl(a.cubesBy[k]!, cubesF)} ${metrics[k]!.of}',
+    for (final k in {MetricId.sugar, MetricId.salt, MetricId.fat, metric})
+      if (a.items.any((item) => hasMetricData(item.active, k)))
+        metricTxt(a.totals[k]!, k),
   ];
   var share =
       'Мой чек в «Чек-ап»: ${parts.join(', ')}, оценка ${a.score} из 100 — $low.';

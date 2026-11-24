@@ -8,12 +8,13 @@ import type { MetricId, ResultProps } from '@/lib/types';
 import { bigCap, bigNum, dateRu, isCubeMetric, METRICS, metricTxt, money, PILE_HINTS, pl, UNITS_NOTE, type Forms } from '@/lib/engine';
 import { t } from '@/lib/i18n';
 import { PALETTES, skinFor } from '@/lib/pile';
-import { saltGrainCount } from '@/lib/saltCrystal';
+import { saltGrainCount } from '@/lib/saltGrains';
 import { shareCard } from '@/lib/shareCard';
 import { IconChevron, IconEdit } from '@/components/icons';
 import { MetricTabs } from '@/components/ui/MetricTabs';
+import { SixGrid } from '@/components/ui/SixMetrics';
 import { rowCls, iconCls, Switch } from '@/components/ui/kit';
-import { conclusion, resultModel, swapRows } from './model';
+import { conclusion, metricPhrase, resultModel, swapRows } from './model';
 import { Prices } from './Prices';
 import { attachPile, type PileHandle } from './attachPile';
 import './result.css';
@@ -45,7 +46,7 @@ export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score,
   const [metric, setMetric] = useState<MetricId>('sugar');
   const model = useMemo(() => resultModel(receipt, swaps, metric, off, score), [receipt, swaps, metric, off, score]);
   const rows = useMemo(() => swapRows(receipt, metric, off), [receipt, metric, off]);
-  const phrase = useMemo(() => conclusion(receipt, model.base, tag), [receipt, model.base, tag]);
+  const phrase = useMemo(() => (metric === 'sugar' ? conclusion(receipt, model.base, tag) : metricPhrase(model.base, metric)), [receipt, model.base, tag, metric]);
   const { maxCubes } = model;
   const cubes = model.analysis.cubesBy[metric];
   const mdef = METRICS[metric];
@@ -204,6 +205,11 @@ export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score,
             {receipt.store} · {dateRu(receipt.date)}{receipt.masked ? '' : ` · ${money(model.base.total)}`}
             {author ? ` · ${t('внесено: {n}', { n: author })}` : ''}{demo ? ` · ${t('пример, в учёт не идёт')}` : ''}{other ? ` · ${t('не считаем: {n}', { n: other })}` : ''}
           </p>
+        </section>
+
+        <section className="rs-sec" aria-labelledby="rs-h-all">
+          <h2 id="rs-h-all" className="rs-h">{t('Всё, что в чеке')}</h2>
+          <SixGrid totals={model.base.totals} available={model.available} value={metric} onChange={setMetric} />
         </section>
 
         {!receipt.refund && (

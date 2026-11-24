@@ -25,8 +25,8 @@ export function attachPile({ hero, head, sheet, canvas }: PileEls, maxCubes: num
     // холст чуть выше пола: кубики в скруглённых углах карточки не обрезаются
     const shape = palette && 'shape' in palette ? palette.shape : undefined;
     const fitted = cubeSize(W, H - top, maxCubes);
-    const size = shape === 'salt' ? Math.max(10, Math.min(18, W * .045))
-      : shape === 'bread' ? Math.min(56, fitted * 1.22) : fitted;
+    const size = shape === 'crystal' ? Math.max(10, Math.min(18, W * .045))
+      : shape === 'grain' ? Math.min(60, fitted * 1.2) : fitted;
     pile.layout(W, H + radius, H, size);
   };
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(relayout) : null;

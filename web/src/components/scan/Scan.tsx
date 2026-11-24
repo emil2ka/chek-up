@@ -3,16 +3,18 @@
 // быстро сменяющиеся позиции с сахаром и растущий счётчик кубиков.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { amountTxt, analyze, cubesOfValue, dateRu, METRICS, pl, SUGAR_CUBES, valueOf } from '@/lib/engine';
+import { amountTxt, analyze, cubesOfValue, dateRu, METRICS, pl, valueOf, type Forms } from '@/lib/engine';
 import { t } from '@/lib/i18n';
 import { outboxServerSnapshot, outboxSnapshot, subscribeOutbox, waitFor, type Outcome } from '@/lib/outbox';
 import type { MetricId, Receipt } from '@/lib/types';
 import { IconClose } from '@/components/icons';
+import { MetricIcon } from '@/components/ui/MetricIcon';
 
 const DURATION = 2600; // мс — минимум; настоящее распознавание может идти дольше
-const WAIT = ['Ищу сладкое, солёное и жирное', 'Разбираю сокращения кассы', 'Сверяю со справочником', 'Считаю сахар, соль и жиры', 'Ещё немного'];
+const WAIT = ['Читаю позиции', 'Разбираю сокращения кассы', 'Сверяю со справочником', 'Считаю шесть показателей', 'Ещё немного'];
 /** по этим показателям ищем «вредное» в ленте сканера (калории — не вред сами по себе) */
 const SCANNED: MetricId[] = ['sugar', 'salt', 'fat'];
+const ITEMS: Forms = ['позиция', 'позиции', 'позиций'];
 const LINES = [92, 64, 80, 48, 86, 70, 58, 90, 44, 76, 66, 84, 52, 72];
 const nb = (s: string) => s.replace(/(\d) (?=\S)/g, '$1 '); // «270 г» не разрывать
 
@@ -32,7 +34,7 @@ type Props = {
   onMore(): void;
 };
 
-type Tick = { k: number; name: string; grams: string } | null;
+type Tick = { k: number; m: MetricId; name: string; grams: string } | null;
 
 export function Scan({ files, jobId, receipt, onDone, onCancel, onBackground, onMore }: Props) {
   const reduce = useReducedMotion();
@@ -76,8 +78,8 @@ export function Scan({ files, jobId, receipt, onDone, onCancel, onBackground, on
       const step = sweet.length ? span / sweet.length : span;
       sweet.forEach((it, k) => later(() => {
         const w = worst(it);
-        setTick({ k, name: nb(it.active.n), grams: `${amountTxt(w.v, w.m).replace(' ', '\u00A0')} ${t(METRICS[w.m].of)}` });
-        setCount(Math.round(a.cubes * (k + 1) / sweet.length));
+        setTick({ k, m: w.m, name: nb(it.active.n), grams: `${amountTxt(w.v, w.m).replace(' ', '\u00A0')} ${t(METRICS[w.m].of)}` });
+        setCount(Math.round(a.items.length * (k + 1) / sweet.length));
       }, k * step));
       later(() => cb.current.onDone(o), Math.max(DURATION - startAt, span + 250));
     };
@@ -172,7 +174,7 @@ export function Scan({ files, jobId, receipt, onDone, onCancel, onBackground, on
                 transition={{ type: 'spring', stiffness: 520, damping: 30 }}
                 className="absolute inset-0 m-auto flex h-fit min-h-11.5 w-fit max-w-full items-center gap-2.25 rounded-[23px] bg-white/18 px-4.5 py-2.5 text-left text-[15px] leading-[1.3] font-bold text-balance shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_25%,transparent)]"
               >
-                <i aria-hidden className="size-2.25 flex-none rounded-[3px] bg-white shadow-[0_0_10px_var(--white)]" />
+                <MetricIcon m={tick.m} className="size-6" />
                 <span>{tick.name} — <b className="font-display font-extrabold whitespace-nowrap">{tick.grams}</b></span>
               </motion.p>
             ) : (
@@ -199,7 +201,7 @@ export function Scan({ files, jobId, receipt, onDone, onCancel, onBackground, on
           >
             {count}
           </motion.b>
-          <span className="mt-1.5 text-sm font-bold text-white/86">{pl(count, SUGAR_CUBES)}</span>
+          <span className="mt-1.5 text-sm font-bold text-white/86">{pl(count, ITEMS)}</span>
         </p>
       </div>
 

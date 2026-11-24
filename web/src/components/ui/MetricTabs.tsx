@@ -3,6 +3,7 @@
 import { METRIC_IDS, METRICS } from '@/lib/engine';
 import { t } from '@/lib/i18n';
 import type { MetricId } from '@/lib/types';
+import { MetricIcon } from './MetricIcon';
 
 type Props = {
   value: MetricId;
@@ -29,11 +30,11 @@ export function MetricTabs({ value, onChange, light = false, className = '' }: P
             aria-selected={on}
             aria-label={t(METRICS[m].label)}
             onClick={e => { onChange(m); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }}
-            className={`flex min-h-11 flex-none items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-extrabold tracking-[-.01em] transition-[background,color,transform] duration-150 select-none active:scale-[.95] ${
+            className={`flex min-h-11 flex-none items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-extrabold tracking-[-.01em] transition-[background,color,transform] duration-150 select-none active:scale-[.95] ${
               on ? 'bg-white text-ink shadow-[0_6px_16px_-6px_rgba(6,18,110,.45)]' : light ? 'text-mute' : 'text-white'
             }`}
           >
-            <i aria-hidden className="size-2 flex-none rounded-full" style={{ background: METRICS[m].color, boxShadow: on ? 'none' : '0 0 0 1.5px rgba(255,255,255,.85)' }} />
+            <MetricIcon m={m} className="size-5" />
             <span className="truncate">{t(METRICS[m].label)}</span>
           </button>
         );

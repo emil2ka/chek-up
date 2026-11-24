@@ -2,7 +2,7 @@
 // Журнал: календарь месяца, итоги, поиск и все чеки без ограничения по времени.
 import { useMemo, useState } from 'react';
 import { addMonths, dayTxt, daysInMonth, dowOf, DOW_SHORT, monthOf, monthTxt, todayIso } from '@/lib/calendar';
-import { CUBES, money, pl, verdict } from '@/lib/engine';
+import { money, pl, verdict } from '@/lib/engine';
 import { t } from '@/lib/i18n';
 import { isDemo, monthDays, monthStats, receiptOf } from '@/lib/insights';
 import { factOf } from '@/lib/plan';
@@ -10,6 +10,7 @@ import type { HistoryEntry } from '@/lib/types';
 import { IconChevron, IconLock, IconSearch } from '@/components/icons';
 import { RECEIPTS_F } from '@/components/streak/Streak';
 import { H2, inputCls } from '@/components/ui/kit';
+import { MetricLine, SixGrid } from '@/components/ui/SixMetrics';
 
 type Props = { entries: HistoryEntry[]; names: Map<string, string>; hideMoney: boolean; onOpen(id: string): void };
 const PAGE = 30;
@@ -36,9 +37,8 @@ export function Journal({ entries, names, hideMoney, onOpen }: Props) {
     .sort((a, b) => b.date.localeCompare(a.date) || b.savedAt - a.savedAt), [entries, q, day, ym]);
 
   const first = dowOf(`${ym}-01`), n = daysInMonth(ym);
-  const max = Math.max(1, ...[...days.values()].map(d => d.cubes));
   const go = (d: number) => { setYm(addMonths(ym, d)); setDay(null); setLimit(PAGE); };
-  const diff = prev.cubes ? Math.round((sum.cubes - prev.cubes) / prev.cubes * 100) : 0;
+  const diff = prev.food ? Math.round((sum.food - prev.food) / prev.food * 100) : 0;
 
   return (
     <>
@@ -56,11 +56,10 @@ export function Journal({ entries, names, hideMoney, onOpen }: Props) {
             return (
               <button
                 key={iso} type="button" disabled={!d} aria-pressed={on}
-                aria-label={`${dayTxt(iso)}: ${d ? `${d.n} ${pl(d.n, RECEIPTS_F)}, ${d.cubes} ${pl(d.cubes, CUBES)}` : t('чеков нет')}`}
+                aria-label={`${dayTxt(iso)}: ${d ? `${d.n} ${pl(d.n, RECEIPTS_F)}, ${t('оценка')} ${d.score}` : t('чеков нет')}`}
                 onClick={() => setDay(on ? null : iso)}
-                className={`grid aspect-square min-w-0 place-items-center rounded-xl text-[14px] font-extrabold tabular-nums ${on ? 'ring-3 ring-ink' : ''} ${d ? 'text-white active:scale-[.93]' : iso === today ? 'text-blue-1' : 'text-mute'}`}
-                style={d ? { background: `color-mix(in srgb, var(--blue-1) ${Math.round(45 + 55 * d.cubes / max)}%, var(--blue-3))` } : undefined}
-              >{i + 1}</button>
+                className={`relative grid aspect-square min-w-0 place-items-center rounded-xl text-[14px] font-extrabold tabular-nums ${on ? 'ring-3 ring-ink' : ''} ${d ? 'bg-blue-1 text-white active:scale-[.93]' : iso === today ? 'text-blue-1' : 'text-mute'}`}
+              >{i + 1}{d && <i aria-hidden className="absolute bottom-1 left-1/2 size-1.75 -translate-x-1/2 rounded-full ring-2 ring-blue-1" style={{ background: `var(--${verdict(d.score).tone})` }} />}</button>
             );
           })}
         </div>
@@ -68,25 +67,21 @@ export function Journal({ entries, names, hideMoney, onOpen }: Props) {
 
       <section className="rs-sec" aria-labelledby="jr-sum">
         <H2 id="jr-sum">{t('Итог месяца')}</H2>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-3xl bg-tint p-4">
-            <p className="text-[13px] font-bold text-mute">{t('Сахар куплен')}</p>
-            <p className="mt-1 font-display text-[26px] leading-none font-black tracking-[-.04em] tabular-nums">{sum.cubes}</p>
-            <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">{pl(sum.cubes, CUBES)}{prev.cubes ? ` · ${diff > 0 ? '+' : diff < 0 ? '−' : ''}${Math.abs(diff)}% ${t('к прошлому')}` : ''}</p>
-          </div>
-          <div className="rounded-3xl bg-tint p-4">
+        <SixGrid totals={sum.totals} />
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className={`rounded-3xl bg-tint p-4 ${hideMoney ? 'col-span-2' : ''}`}>
             <p className="text-[13px] font-bold text-mute">{hideMoney ? t('Чеков') : t('На продукты')}</p>
             <p className="mt-1 font-display text-[22px] leading-none font-black tracking-[-.04em] tabular-nums">{hideMoney ? sum.receipts : money(sum.food)}</p>
-            <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">{sum.receipts} {pl(sum.receipts, RECEIPTS_F)}</p>
+            <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">{sum.receipts} {pl(sum.receipts, RECEIPTS_F)}{diff && !hideMoney ? ` · ${diff > 0 ? '+' : '−'}${Math.abs(diff)}% ${t('к прошлому')}` : ''}</p>
           </div>
-          {!hideMoney && (
+          {hideMoney ? null : (
             <>
               <div className="rounded-3xl bg-tint p-4">
                 <p className="text-[13px] font-bold text-mute">{t('На вредное')}</p>
                 <p className="mt-1 font-display text-[20px] leading-none font-black tracking-[-.04em] tabular-nums">{money(sum.junk)}</p>
                 <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">{sum.food ? t('{n}% еды', { n: Math.round(sum.junk / sum.food * 100) }) : '—'}</p>
               </div>
-              <div className="rounded-3xl bg-[color-mix(in_srgb,var(--good)_12%,var(--white))] p-4">
+              <div className="col-span-2 rounded-3xl bg-[color-mix(in_srgb,var(--good)_12%,var(--white))] p-4">
                 <p className="text-[13px] font-bold text-mute">{t('Замены сработали')}</p>
                 <p className="mt-1 font-display text-[20px] leading-none font-black tracking-[-.04em] tabular-nums">{sum.saved < 0 ? `−${money(-sum.saved)}` : money(sum.saved)}</p>
                 <p className="mt-2 text-[13px] leading-tight font-semibold text-mute">{t('подтверждено чеками')}</p>
@@ -119,8 +114,9 @@ export function Journal({ entries, names, hideMoney, onOpen }: Props) {
                     <span className="grid min-w-0 gap-0.5">
                       <span className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-bold tracking-[-.02em]"><span className="truncate">{e.store}</span>{e.priv && <IconLock className="size-4 flex-none text-mute" aria-label={t('Личный чек')} />}</span>
                       <span className="text-[13px] leading-snug font-semibold text-mute">{dayTxt(e.date)}{r.refund ? ` · ${t('возврат')}` : ''}{e.tag === 'guests' ? ` · ${t('гости')}` : ''}{isDemo(e) ? ` · ${t('пример')}` : ''}{who ? ` · ${who}` : ''}{hideMoney || r.masked ? '' : ` · ${money(a.total)}`}</span>
+                      <MetricLine totals={a.totals} />
                     </span>
-                    <span className="inline-flex items-center gap-2"><b className="font-display text-xl font-black tracking-[-.04em] tabular-nums">{a.cubes}</b><i className={`dot ${v.tone}`} /><span className="sr-only">{pl(a.cubes, CUBES)}, {t('оценка')} {score}</span></span>
+                    <span className="inline-flex items-center gap-2"><i className={`dot ${v.tone}`} /><b className="font-display text-xl font-black tracking-[-.04em] tabular-nums">{score}</b><span className="sr-only">{t('из 100')}</span></span>
                   </button>
                 </li>
               );

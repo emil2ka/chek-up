@@ -2,14 +2,14 @@
 // «Неделя»: гора за календарную неделю по факту, стрик и закрытие недели, норма и цель, дни, источники, деньги. Вторая вкладка — журнал.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, dayTxt, todayIso, weekOf, weekTxt } from '@/lib/calendar';
-import { bigCap, bigNum, CUBES, hasMetricData, isCubeMetric, METRICS, metricTxt, money, PILE_HINTS, pl, unitNote, verdict, type Forms } from '@/lib/engine';
+import { bigCap, bigNum, CUBES, hasMetricData, isCubeMetric, METRIC_IDS, METRICS, metricTxt, money, PILE_HINTS, pl, unitNote, verdict, type Forms } from '@/lib/engine';
 import type { FamilyState } from '@/lib/family';
 import { t } from '@/lib/i18n';
 import { completeness, goalState, GOALS, weekFacts, weekStats } from '@/lib/insights';
 import { useNow } from '@/lib/now';
 import { PALETTES, skinFor } from '@/lib/pile';
 import { profile as profileStore, type Profile } from '@/lib/profile';
-import { saltGrainCount } from '@/lib/saltCrystal';
+import { saltGrainCount } from '@/lib/saltGrains';
 import { weekToClose, type Streak, type WeekMark } from '@/lib/streak';
 import type { HistoryEntry, MetricId, Tone } from '@/lib/types';
 import { attachPile } from '@/components/result/attachPile';
@@ -17,6 +17,7 @@ import { IconCamera, IconChevron } from '@/components/icons';
 import { Journal } from '@/components/journal/Journal';
 import { RECEIPTS_F, StreakCard } from '@/components/streak/Streak';
 import { MetricTabs } from '@/components/ui/MetricTabs';
+import { SixGrid } from '@/components/ui/SixMetrics';
 import { Segmented } from '@/components/ui/kit';
 import '@/components/result/result.css';
 
@@ -170,10 +171,21 @@ export function Week({ ready, entries, profile, family, marks, streak, onOpen, o
               </div>
             </section>
 
+            {!empty && (
+              <section className="rs-sec" aria-labelledby="wk-h-all">
+                <h2 id="wk-h-all" className="rs-h flex items-baseline justify-between gap-3">{t('Всё за неделю')}<small className="font-sans text-[13px] font-bold tracking-normal text-mute">{t('% от нормы')}</small></h2>
+                <SixGrid
+                  totals={Object.fromEntries(METRIC_IDS.map(m => [m, stats.metrics[m].total])) as Record<MetricId, number>}
+                  ratio={Object.fromEntries(METRIC_IDS.map(m => [m, stats.metrics[m].ratio])) as Record<MetricId, number>}
+                  value={metric} onChange={setMetric}
+                />
+              </section>
+            )}
+
             {/* ── личная цель ── */}
             {cubeMetric && (
               <section className="rs-sec" aria-labelledby="wk-h-goal">
-                <h2 id="wk-h-goal" className="rs-h">{t('Цель')}</h2>
+                <h2 id="wk-h-goal" className="rs-h">{t('Цель по сахару')}</h2>
                 <div className="rounded-3xl bg-tint p-4">
                   {goal.base < 2
                     ? <p className="text-[15px] leading-snug font-semibold">{t('Закрой две недели: посчитаем обычное количество сахара и предложим цель.')}</p>

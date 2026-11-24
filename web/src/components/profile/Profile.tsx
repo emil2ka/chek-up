@@ -12,6 +12,7 @@ import { Account } from '@/components/account/Account';
 import { IconBadge, IconChevron, IconCube, IconDownload, IconInfo, IconTrash } from '@/components/icons';
 import { RECEIPTS_F } from '@/components/streak/Streak';
 import { dangerCls, H2, iconCls, quietCls, rowCls, Segmented } from '@/components/ui/kit';
+import { MetricIcon } from '@/components/ui/MetricIcon';
 import { Stepper } from '@/components/ui/Stepper';
 
 type InstallEvent = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
@@ -70,7 +71,7 @@ export function Profile({ ready, entries, profile, family, marks, best, onClear,
           {METRIC_IDS.map(m => (
             <li key={m} className="grid min-w-0 justify-items-start gap-0.5 rounded-2xl bg-white/12 p-2.5">
               <b className="font-display text-[20px] leading-none font-black tracking-[-.05em] tabular-nums">{bigNum(familyDaily(profile, m), m)}</b>
-              <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-bold text-white/88"><i aria-hidden className="size-2 flex-none rounded-full" style={{ background: METRICS[m].color, boxShadow: '0 0 0 1.5px rgba(255,255,255,.85)' }} /><span className="truncate">{m === 'kcal' ? t('Ккал') : `${t(METRICS[m].short)}, ${isCubeMetric(m) ? t('куб.') : t(METRICS[m].unit)}`}</span></span>
+              <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-bold text-white/88"><MetricIcon m={m} className="size-5" /><span className="truncate">{m === 'kcal' ? t('Ккал') : `${t(METRICS[m].short)}, ${isCubeMetric(m) ? t('куб.') : t(METRICS[m].unit)}`}</span></span>
             </li>
           ))}
         </ul>

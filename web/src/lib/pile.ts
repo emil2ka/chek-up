@@ -9,8 +9,8 @@
 //   destroy()                           — остановить цикл и снять обработчики
 // Только в браузере: создавать в эффекте клиентского компонента.
 import Matter from 'matter-js';
-import { drawFoodPiece, FOOD_MATERIALS, foodVertices, type FoodShape } from './foodPiece';
-import { drawSaltCrystal, saltVertices } from './saltCrystal';
+import type { MetricId } from './types';
+import { drawPiece, PIECES, pieceVertices, SHAPE_OF, type PieceShape } from './pieces';
 
 const { Engine, Bodies, Body, Composite, Sleeping, Events } = Matter;
 
@@ -25,22 +25,19 @@ export type PilePalette = {
   grainC: string;
   edge: string;
   outline: string;
-  shape?: FoodShape | 'salt';
+  /** фигурка вместо кубика */
+  shape?: PieceShape;
 };
 
-export const PALETTES: Record<'sugar' | 'salt' | 'fat' | 'kcal' | 'carbs' | 'protein', PilePalette> = {
-  // сахар — белый, чуть голубоватый (как раньше)
-  sugar: { body: ['#FFFFFF', '#F3F6FF', '#C3CFF4'], base: '#C9D4F5', shade: '96, 120, 210', grainA: '128, 150, 220', grainC: '150, 170, 235', edge: '105, 130, 215', outline: '40, 70, 190' },
-  // цвет соли
-  salt: { shape: 'salt', body: ['#FFFFFF', '#CEE4FB', '#8FAEE1'], base: '#AEC6EC', shade: '60, 92, 156', grainA: '187, 214, 247', grainC: '154, 178, 221', edge: '141, 173, 226', outline: '60, 92, 156' },
-  // жиры — завитки сливочного масла
-  fat: { shape: 'butter', body: ['#FFFDF0', '#FFEFA8', '#EFBF3A'], base: '#F8DB7A', shade: '200, 140, 20', grainA: '210, 150, 30', grainC: '230, 175, 50', edge: '205, 140, 20', outline: '160, 100, 0' },
-  // углеводы — батоны
-  carbs: { shape: 'bread', body: ['#FFFFFF', '#F0EBFF', '#B9A6F2'], base: '#CFC3F7', shade: '120, 90, 220', grainA: '140, 110, 225', grainC: '165, 140, 235', edge: '130, 100, 220', outline: '90, 60, 190' },
-  // белки — яйца
-  protein: { shape: 'egg', body: ['#FFFFFF', '#E4FAF5', '#8FDCCB'], base: '#B5EBDD', shade: '40, 170, 150', grainA: '50, 175, 155', grainC: '90, 200, 180', edge: '45, 170, 150', outline: '20, 130, 115' },
-  // калории — тёплый оранжевый
-  kcal: { shape: 'ember', body: ['#FFFAF2', '#FFD7AA', '#F28A3E'], base: '#FFC795', shade: '210, 100, 20', grainA: '220, 120, 40', grainC: '240, 150, 70', edge: '215, 105, 25', outline: '180, 80, 0' },
+const CUBE: PilePalette = { body: ['#FFFFFF', '#F3F6FF', '#C3CFF4'], base: '#C9D4F5', shade: '96, 120, 210', grainA: '128, 150, 220', grainC: '150, 170, 235', edge: '105, 130, 215', outline: '40, 70, 190' };
+/** Сахар — кубик, остальное — фигурки (pieces.ts). */
+export const PALETTES: Record<MetricId, PilePalette> = {
+  sugar: CUBE,
+  salt: { ...CUBE, shape: SHAPE_OF.salt },
+  fat: { ...CUBE, shape: SHAPE_OF.fat },
+  kcal: { ...CUBE, shape: SHAPE_OF.kcal },
+  carbs: { ...CUBE, shape: SHAPE_OF.carbs },
+  protein: { ...CUBE, shape: SHAPE_OF.protein },
 };
 
 /** Вид кубиков за стрик: рафинад → тростниковый → нават → кристалл. */
@@ -70,7 +67,7 @@ const STEP = 1000 / 60;          // фиксированный шаг физик
 const ANG = 12;                  // сколько поворотов «запекаем» на четверть оборота (свет не крутится с кубиком)
 const QUARTER = Math.PI / 2;
 const Q = QUARTER / ANG;
-const VARIANTS = 4;              // разных рисунков крупинок
+const VARIANTS = 6;              // разных рисунков крупинок; с разными фигурками — по одной на показатель
 const POUR_MS = 2400;            // за сколько высыпается вся порция
 const POP_MS = 340;
 const TAU = Math.PI * 2;
@@ -131,7 +128,7 @@ export class SugarPile {
 
   constructor(canvas: HTMLCanvasElement, { onCount, floorRadius = 0, palette = PALETTES.sugar }: SugarPileOptions = {}) {
     this.pals = Array.isArray(palette) ? palette : [palette as PilePalette];
-    this.granular = this.pals.every(pal => pal.shape === 'salt');
+    this.granular = this.pals.every(pal => pal.shape === 'crystal');
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('SugarPile: canvas 2D недоступен');
     this.cv = canvas;
@@ -144,7 +141,7 @@ export class SugarPile {
     this.eng.positionIterations = 7;
     this.eng.velocityIterations = 5;
     this.world = this.eng.world;
-    if (this.pals.some(pal => pal.shape === 'ember')) Events.on(this.eng, 'collisionStart', this.onImpact);
+    if (this.pals.some(pal => pal.shape === 'flame')) Events.on(this.eng, 'collisionStart', this.onImpact);
 
     this.mq = matchMedia('(prefers-reduced-motion: reduce)');
     this.reduced = this.mq.matches;
@@ -243,8 +240,8 @@ export class SugarPile {
       const dx = b.position.x - x, dy = b.position.y - y, d = Math.hypot(dx, dy) || 1;
       if (d > R) continue;
       const shape = this.pals[b.v % this.pals.length].shape;
-      const k = (1 - d / R) * (this.granular || shape === 'butter' ? .74 : 1);
-      if (shape === 'ember') b.heat = Math.max(b.heat ?? 0, k);
+      const k = (1 - d / R) * (this.granular || shape === 'drop' ? .74 : 1);
+      if (shape === 'flame') b.heat = Math.max(b.heat ?? 0, k);
       Sleeping.set(b, false);
       Body.setVelocity(b, { x: b.velocity.x + (dx / d) * 7.5 * k + rnd(-1, 1), y: b.velocity.y - (10 + S * 0.12) * k });
       Body.setAngularVelocity(b, rnd(-0.45, 0.45) * k);
@@ -280,7 +277,7 @@ export class SugarPile {
       const speed = Math.abs(dx * pair.collision.normal.x + dy * pair.collision.normal.y);
       if (speed < 4.2) continue;
       for (const body of [pair.bodyA, pair.bodyB] as Cube[]) {
-        if (this.pals[body.v % this.pals.length]?.shape === 'ember') {
+        if (this.pals[body.v % this.pals.length]?.shape === 'flame') {
           body.heat = Math.max(body.heat ?? 0, Math.min(.86, speed / 15));
         }
       }
@@ -367,12 +364,12 @@ export class SugarPile {
     const c = D / 2, h = S / 2, r = S * 0.2;
     this.D = D;
     const sprites: HTMLCanvasElement[][] = [];
-    const foodSprites = new Map<string, HTMLCanvasElement[]>();
+    const pieceSprites = new Map<string, HTMLCanvasElement[]>();
     for (let v = 0; v < VARIANTS; v++) {
       const pal = this.pals[v % this.pals.length];
-      const food = pal.shape === 'salt' ? undefined : pal.shape;
-      const material = food === 'egg' || food === 'ember' ? `${food}-${v % 3}` : food;
-      const saved = material && foodSprites.get(material);
+      const piece = pal.shape;
+      const material = piece === 'crystal' ? `crystal-${v % 4}` : piece;
+      const saved = material && pieceSprites.get(material);
       if (saved) { sprites.push(saved); continue; }
       const row: HTMLCanvasElement[] = [];
       const rand = seeded(7919 * (v + 3));
@@ -390,15 +387,9 @@ export class SugarPile {
         if (!g) continue;
         g.scale(dpr, dpr);
         const th = k * Q;
-        if (pal.shape === 'salt') {
+        if (piece) {
           g.translate(c, c);
-          drawSaltCrystal(g, v, S, th);
-          row.push(cv);
-          continue;
-        }
-        if (food) {
-          g.translate(c, c);
-          drawFoodPiece(g, food, S, v, th);
+          drawPiece(g, piece, S, v, th);
           row.push(cv);
           continue;
         }
@@ -497,7 +488,7 @@ export class SugarPile {
         row.push(cv);
       }
       sprites.push(row);
-      if (material) foodSprites.set(material, row);
+      if (material) pieceSprites.set(material, row);
     }
     this.sprites = sprites;
 
@@ -519,7 +510,7 @@ export class SugarPile {
       g.fill();
     }
     this.spark = sp;
-    if (this.pals.some(pal => pal.shape === 'ember')) {
+    if (this.pals.some(pal => pal.shape === 'flame')) {
       const glow = document.createElement('canvas');
       glow.width = glow.height = 40;
       const paint = glow.getContext('2d');
@@ -565,13 +556,8 @@ export class SugarPile {
     const S = this.size;
     const variant = (Math.random() * VARIANTS) | 0;
     const shape = this.pals[variant % this.pals.length].shape;
-    const b = (shape === 'salt'
-      ? Bodies.fromVertices(x, y, [saltVertices(variant, S)], {
-          friction: .63, frictionStatic: .95, frictionAir: .016,
-          restitution: .13, density: .0023, sleepThreshold: 34, angle: rnd(0, TAU),
-        })
-      : shape
-        ? Bodies.fromVertices(x, y, [foodVertices(shape, S)], { ...FOOD_MATERIALS[shape], sleepThreshold: 45, angle: rnd(0, TAU) })
+    const b = (shape
+        ? Bodies.fromVertices(x, y, [pieceVertices(shape, S, variant)], { ...PIECES[shape].material, sleepThreshold: shape === 'crystal' ? 34 : 45, angle: rnd(0, TAU) })
         : Bodies.rectangle(x, y, S, S, {
           chamfer: { radius: S * 0.2, qualityMin: 2, qualityMax: 3 },
           friction: 0.5, frictionStatic: 0.85, frictionAir: 0.008,

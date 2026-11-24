@@ -212,6 +212,7 @@ export type PeriodStats = {
   junk: number;
   flagged: number;
   cubes: number;
+  totals: Record<MetricId, number>;
   /** сэкономлено подтверждёнными заменами */
   saved: number;
   stores: { name: string; total: number; n: number }[];
@@ -219,9 +220,8 @@ export type PeriodStats = {
 
 /** Итог за произвольный период (включительно). Показатели — по дате покупки, без растягивания запасов. */
 export function periodStats(entries: HistoryEntry[], from: string, to: string): PeriodStats {
-  const out: PeriodStats = { receipts: 0, total: 0, food: 0, junk: 0, flagged: 0, cubes: 0, saved: 0, stores: [] };
+  const out: PeriodStats = { receipts: 0, total: 0, food: 0, junk: 0, flagged: 0, cubes: 0, totals: zero(), saved: 0, stores: [] };
   const stores = new Map<string, { total: number; n: number }>();
-  let sugar = 0;
   for (const e of entries) {
     if (e.date < from || e.date > to) continue;
     const r = receiptOf(e);
@@ -229,11 +229,12 @@ export function periodStats(entries: HistoryEntry[], from: string, to: string): 
     const a = factOf(e, r), sign = r.refund ? -1 : 1;
     if (!r.refund) out.receipts++;
     out.total += sign * a.total; out.food += sign * a.food; out.junk += sign * a.junk; out.flagged += sign * a.flagged.sum;
-    if (e.tag !== 'guests') sugar += sign * a.sugar;
+    if (e.tag !== 'guests') for (const m of METRIC_IDS) out.totals[m] += sign * a.totals[m];
     const s = stores.get(r.store) ?? { total: 0, n: 0 };
     stores.set(r.store, { total: s.total + sign * a.total, n: s.n + (r.refund ? 0 : 1) });
   }
-  out.cubes = Math.max(0, cubesOfValue(sugar, 'sugar'));
+  for (const m of METRIC_IDS) out.totals[m] = Math.max(0, round1(out.totals[m]));
+  out.cubes = cubesOfValue(out.totals.sugar, 'sugar');
   out.total = Math.round(out.total); out.food = Math.round(out.food); out.junk = Math.max(0, Math.round(out.junk)); out.flagged = Math.max(0, Math.round(out.flagged));
   out.saved = Math.round(confirmedSwaps(entries.filter(e => !isDemo(e)), receiptOf).filter(c => c.date >= from && c.date <= to).reduce((n, c) => n + c.money, 0));
   out.stores = [...stores].map(([name, v]) => ({ name, ...v, total: Math.round(v.total) })).sort((a, b) => b.total - a.total).slice(0, 5);
@@ -241,17 +242,17 @@ export function periodStats(entries: HistoryEntry[], from: string, to: string): 
 }
 export const monthStats = (entries: HistoryEntry[], ym: string): PeriodStats => periodStats(entries, `${ym}-01`, `${ym}-31`);
 
-/** Журнал по дням для календаря месяца. */
-export function monthDays(entries: HistoryEntry[], ym: string): Map<string, { n: number; cubes: number }> {
-  const out = new Map<string, { n: number; cubes: number }>();
+/** Журнал по дням для календаря месяца: сколько чеков и средняя оценка. */
+export function monthDays(entries: HistoryEntry[], ym: string): Map<string, { n: number; score: number }> {
+  const sums = new Map<string, { n: number; sum: number }>();
   for (const e of entries) {
     if (monthOf(e.date) !== ym) continue;
     const r = receiptOf(e);
     if (!r || r.refund) continue;
-    const d = out.get(e.date) ?? { n: 0, cubes: 0 };
-    out.set(e.date, { n: d.n + 1, cubes: d.cubes + factOf(e, r).cubes });
+    const d = sums.get(e.date) ?? { n: 0, sum: 0 };
+    sums.set(e.date, { n: d.n + 1, sum: d.sum + (r.masked ? e.score : factOf(e, r).score) });
   }
-  return out;
+  return new Map([...sums].map(([iso, d]) => [iso, { n: d.n, score: Math.round(d.sum / d.n) }]));
 }
 
 // ── достижения ──

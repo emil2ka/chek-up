@@ -1,9 +1,9 @@
 // Карточка для «Поделиться»: картинка 1080×1920 в стиле «Гора сахара». Только для клиента.
 import { bigCap, bigNum, isCubeMetric, METRIC_IDS, METRICS } from './engine';
 import { t } from './i18n';
-import { PALETTES, skinFor, type PilePalette } from './pile';
-import { drawFoodPiece } from './foodPiece';
-import { drawSaltCrystal, saltGrainCount } from './saltCrystal';
+import { CUBE_SKINS, PALETTES, skinFor, type PilePalette } from './pile';
+import { drawPiece, SHAPE_OF } from './pieces';
+import { saltGrainCount } from './saltGrains';
 import type { MetricId, Tone } from './types';
 
 export type ShareCardData = {
@@ -45,8 +45,8 @@ function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number,
 function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angle: number, rnd: () => number, pal: PilePalette) {
   c.save();
   c.translate(x, y);
-  if (pal.shape === 'salt') {
-    drawSaltCrystal(c, Math.floor(rnd() * 4), s, angle);
+  if (pal.shape) {
+    drawPiece(c, pal.shape, s, Math.floor(rnd() * 4), angle);
     c.restore();
     return;
   }
@@ -58,11 +58,6 @@ function cube(c: CanvasRenderingContext2D, x: number, y: number, s: number, angl
   g.addColorStop(0, pal.body[0]);
   g.addColorStop(1, pal.body[2]);
   c.fillStyle = g;
-  if (pal.shape) {
-    drawFoodPiece(c, pal.shape, s, Math.floor(rnd() * 4));
-    c.restore();
-    return;
-  }
   roundRect(c, -s / 2, -s / 2, s, s, s * 0.17);
   c.fill();
   c.shadowColor = 'transparent';
@@ -181,23 +176,26 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.shadowColor = 'transparent';
   c.fillStyle = '#0D1440';
   c.font = `800 50px ${FONT_D}`;
-  c.fillText(d.question ?? t('А сколько в твоей корзине?'), W / 2, sheetTop + 104);
+  c.fillText(d.question ?? t('А что в твоей корзине?'), W / 2, sheetTop + 92);
   // сводка по показателям
   const colW = (W - 120) / METRIC_IDS.length;
   METRIC_IDS.forEach((m, i) => {
     const cx = 60 + colW * (i + 0.5);
-    c.fillStyle = METRICS[m].color;
-    c.beginPath(); c.arc(cx, sheetTop + 140, 8, 0, Math.PI * 2); c.fill();
+    c.save();
+    c.translate(cx, sheetTop + 146);
+    if (m === 'sugar') cube(c, 0, 0, 36, -0.14, seeded(7), CUBE_SKINS[0]);
+    else drawPiece(c, SHAPE_OF[m], 44, 0, 0.12);
+    c.restore();
     c.fillStyle = '#0D1440';
     c.font = `800 34px ${FONT_D}`;
-    c.fillText(d.available.includes(m) ? bigNum(d.totals[m], m) : '—', cx, sheetTop + 192, colW - 10);
+    c.fillText(d.available.includes(m) ? bigNum(d.totals[m], m) : '—', cx, sheetTop + 210, colW - 10);
     c.fillStyle = '#6B76A8';
     c.font = `700 32px ${FONT_T}`;
-    c.fillText(m === 'kcal' ? t('Ккал') : `${t(METRICS[m].short)} · ${isCubeMetric(m) ? t('куб.') : t(METRICS[m].unit)}`, cx, sheetTop + 232, colW - 10);
+    c.fillText(m === 'kcal' ? t('Ккал') : `${t(METRICS[m].short)} · ${isCubeMetric(m) ? t('куб.') : t(METRICS[m].unit)}`, cx, sheetTop + 250, colW - 10);
   });
   c.fillStyle = '#6B76A8';
   c.font = `700 36px ${FONT_T}`;
-  c.fillText(d.where, W / 2, sheetTop + 296);
+  c.fillText(d.where, W / 2, sheetTop + 308);
 
   return new Promise<Blob>((resolve, reject) =>
     cv.toBlob(b => (b ? resolve(b) : reject(new Error('не удалось собрать картинку'))), 'image/png'),

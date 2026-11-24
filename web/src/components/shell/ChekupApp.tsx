@@ -7,7 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { weekOf, weekTxt, todayIso } from '@/lib/calendar';
 import { RECEIPTS } from '@/lib/data';
 import { dirty } from '@/lib/dirty';
-import { analyze, METRIC_IDS } from '@/lib/engine';
+import { analyze, METRIC_IDS, metricTxt } from '@/lib/engine';
 import { familyStore, weekMarks } from '@/lib/family';
 import { setLang, t } from '@/lib/i18n';
 import { badges, completeness, isDemo, receiptOf, weekFacts, weekStats } from '@/lib/insights';
@@ -21,7 +21,7 @@ import { shareCard } from '@/lib/shareCard';
 import { history as store, historyServerSnapshot, historySnapshot, subscribeHistory } from '@/lib/store';
 import { computeStreak, weekToClose, type WeekMark } from '@/lib/streak';
 import { authProviders, postAuthed, startSync } from '@/lib/sync';
-import type { HistoryEntry, Receipt } from '@/lib/types';
+import type { HistoryEntry, MetricId, Receipt } from '@/lib/types';
 import { JoinSheet, SignInSheet } from '@/components/account/Account';
 import { Catalog } from '@/components/catalog/Catalog';
 import { EditReceipt, type EditResult } from '@/components/edit/EditReceipt';
@@ -92,6 +92,10 @@ export default function ChekupApp() {
   const best = Math.max(family.bestWeeks, streak.best);
   const closing = weekToClose(marks, facts, now);
   const done = useMemo(() => completeness(real, marks, closing), [real, marks, closing]);
+  const week = useMemo(() => {
+    const w = weekStats(real, prof, { now });
+    return METRIC_IDS.some(m => w.metrics[m].total > 0) ? (Object.fromEntries(METRIC_IDS.map(m => [m, w.metrics[m].total])) as Record<MetricId, number>) : null;
+  }, [real, prof, now]);
   const names = useMemo(() => new Map(family.members.map(m => [m.id, m.name || t('участник')])), [family.members]);
   const child = family.me.role === 'child';
 
@@ -314,7 +318,7 @@ export default function ChekupApp() {
 
   const shareWeek = async (week: string) => {
     const w = weekStats(real, prof, { week });
-    const text = t('{s} в «Чек-ап»: за неделю {n} кубиков сахара, {p}% нормы семьи.', { s: streakTitle(streak), n: w.cubes, p: Math.round(w.ratio * 100) });
+    const text = t('{s} в «Чек-ап». За неделю в наших чеках: {list}.', { s: streakTitle(streak), list: (['sugar', 'salt', 'fat'] as const).map(m => metricTxt(w.metrics[m].total, m)).join(', ') });
     try {
       const how = await shareCard({
         metric: 'sugar',
@@ -347,6 +351,7 @@ export default function ChekupApp() {
             jobs={jobs}
             streak={streak}
             done={done}
+            week={week}
             hideMoney={child}
             onScan={openCamera}
             onGallery={openGallery}

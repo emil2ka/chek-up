@@ -1,12 +1,13 @@
 'use client';
 // Блок «Мои чеки»: белая карточка под первым экраном. На её верхнем крае лежат кубики. Здесь последние чеки, все — в журнале.
 import { motion, useReducedMotion } from 'motion/react';
-import { CUBES, dateRu, money, pl, SUGAR_CUBES, verdict } from '@/lib/engine';
+import { dateRu, money, verdict } from '@/lib/engine';
 import { t } from '@/lib/i18n';
 import { isDemo, receiptOf } from '@/lib/insights';
 import { factOf } from '@/lib/plan';
 import type { HistoryEntry } from '@/lib/types';
 import { IconChevron, IconLock } from '@/components/icons';
+import { MetricLine } from '@/components/ui/SixMetrics';
 
 const LIMIT = 6;
 
@@ -31,24 +32,21 @@ export function MyChecks({ entries, hideMoney, onOpen, onAll }: { entries: Histo
         {list.map(rec => {
           const r = receiptOf(rec);
           const a = r ? factOf(rec, r) : null;
-          const cubes = a?.cubes ?? rec.cubes, score = !a || r?.masked ? rec.score : a.score;
+          const score = !a || r?.masked ? rec.score : a.score;
           const v = verdict(score);
           return (
             <li key={rec.id} className="border-line [&+&]:border-t">
               <button
                 type="button"
                 onClick={() => onOpen(rec.id)}
-                className="grid min-h-17 w-full grid-cols-[minmax(0,1fr)_auto_auto_18px] items-center gap-3 rounded-2xl px-1.5 py-3 text-left transition hover:bg-tint active:scale-[.985] active:bg-tint"
+                className="grid min-h-17 w-full grid-cols-[minmax(0,1fr)_auto_18px] items-center gap-3 rounded-2xl px-1.5 py-3 text-left transition hover:bg-tint active:scale-[.985] active:bg-tint"
               >
                 <span className="grid min-w-0 gap-0.5">
                   <span className="flex min-w-0 items-center gap-1.5 font-display text-base font-bold tracking-[-.02em]"><span className="truncate">{rec.store}</span>{rec.priv && <IconLock className="size-4 flex-none text-mute" aria-label={t('Личный чек')} />}</span>
                   <span className="text-[13px] leading-[1.3] font-semibold text-mute">
                     {dateRu(rec.date)}{isDemo(rec) ? ` · ${t('пример')}` : r?.refund ? ` · ${t('возврат')}` : a && !hideMoney && !r?.masked ? ` · ${money(a.total)}` : ''}
                   </span>
-                </span>
-                <span className="grid justify-items-end leading-none">
-                  <b className="font-display text-[22px] font-black tracking-[-.04em]">{cubes}</b>
-                  <small className="mt-0.75 text-xs font-bold text-mute"><span aria-hidden>{pl(cubes, CUBES)}</span><span className="sr-only">{pl(cubes, SUGAR_CUBES)}</span></small>
+                  {a && <MetricLine totals={a.totals} />}
                 </span>
                 <span className="inline-flex h-8 items-center gap-1.75 rounded-full bg-tint pr-2.75 pl-2.5">
                   <i className={`dot ${v.tone}`} />

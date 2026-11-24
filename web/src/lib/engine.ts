@@ -6,7 +6,7 @@ import type { Analysis, AnalyzedItem, MetricId, Receipt, ReceiptItem, SwapItem, 
 export const METRIC_IDS: readonly MetricId[] = ['sugar', 'salt', 'fat', 'kcal', 'carbs', 'protein'];
 
 /** Сцена для каждого показателя. */
-export type Viz = 'cubes' | 'crystals' | 'butter' | 'embers' | 'loaves' | 'eggs';
+export type Viz = 'cubes' | 'crystals' | 'drops' | 'flames' | 'grains' | 'eggs';
 
 export type MetricDef = {
   id: MetricId;
@@ -25,7 +25,7 @@ export type MetricDef = {
   kid: number;
   /** поле позиции чека */
   field: 's' | 't' | 'f' | 'k' | 'c' | 'b';
-  /** цвет акцента в интерфейсе (точки, полосы) */
+  /** цвет акцента в интерфейсе (полосы) */
   color: string;
   /** откуда норма */
   norm: string;
@@ -36,10 +36,10 @@ export type MetricDef = {
 export const METRICS: Record<MetricId, MetricDef> = {
   sugar: { id: 'sugar', label: 'Сахар', short: 'Сахар', of: 'сахара', unit: 'г', cubeG: 5, viz: 'cubes', adult: 50, kid: 30, field: 's', color: '#4F73FF', norm: 'ВОЗ: до 50 г добавленного сахара в день', harmful: true },
   salt: { id: 'salt', label: 'Соль', short: 'Соль', of: 'соли', unit: 'г', cubeG: 0.5, viz: 'crystals', adult: 5, kid: 3, field: 't', color: '#E8587F', norm: 'ВОЗ: до 5 г соли в день', harmful: true },
-  fat: { id: 'fat', label: 'Жиры', short: 'Жиры', of: 'жиров', unit: 'г', cubeG: 2, viz: 'butter', adult: 20, kid: 16, field: 'f', color: '#E0A400', norm: 'ВОЗ: насыщенных жиров меньше 10% калорий, около 20 г в день', harmful: true },
-  kcal: { id: 'kcal', label: 'Калории', short: 'Ккал', of: 'калорий', unit: 'ккал', cubeG: 200, viz: 'embers', adult: 2000, kid: 1500, field: 'k', color: '#F0792A', norm: 'ориентир: 2000 ккал в день взрослому, 1500 ребёнку', harmful: false },
-  carbs: { id: 'carbs', label: 'Углеводы', short: 'Углев.', of: 'углеводов', unit: 'г', cubeG: 10, viz: 'loaves', adult: 250, kid: 190, field: 'c', color: '#7B5CE5', norm: 'ориентир: около 250 г углеводов в день взрослому (половина калорий), 190 г ребёнку', harmful: false },
-  protein: { id: 'protein', label: 'Белки', short: 'Белки', of: 'белков', unit: 'г', cubeG: 6, viz: 'eggs', adult: 60, kid: 40, field: 'b', color: '#1FA891', norm: 'ориентир: около 60 г белка в день взрослому, 40 г ребёнку', harmful: false },
+  fat: { id: 'fat', label: 'Жиры', short: 'Жиры', of: 'жиров', unit: 'г', cubeG: 2, viz: 'drops', adult: 20, kid: 16, field: 'f', color: '#F3B21B', norm: 'ВОЗ: насыщенных жиров меньше 10% калорий, около 20 г в день', harmful: true },
+  kcal: { id: 'kcal', label: 'Калории', short: 'Ккал', of: 'калорий', unit: 'ккал', cubeG: 200, viz: 'flames', adult: 2000, kid: 1500, field: 'k', color: '#EE5A32', norm: 'ориентир: 2000 ккал в день взрослому, 1500 ребёнку', harmful: false },
+  carbs: { id: 'carbs', label: 'Углеводы', short: 'Углев.', of: 'углеводов', unit: 'г', cubeG: 10, viz: 'grains', adult: 250, kid: 190, field: 'c', color: '#C9812F', norm: 'ориентир: около 250 г углеводов в день взрослому (половина калорий), 190 г ребёнку', harmful: false },
+  protein: { id: 'protein', label: 'Белки', short: 'Белки', of: 'белков', unit: 'г', cubeG: 6, viz: 'eggs', adult: 60, kid: 40, field: 'b', color: '#F0A21E', norm: 'ориентир: около 60 г белка в день взрослому, 40 г ребёнку', harmful: false },
 };
 
 // Сахар — исторически главный показатель, его константы используют многие экраны.
@@ -52,9 +52,9 @@ export const isCubeMetric = (m: MetricId): boolean => m === 'sugar';
 export const PILE_HINTS: Record<MetricId, string> = {
   sugar: 'Тапни, чтобы подбросить кубики',
   salt: 'Тапни, чтобы рассыпать крупинки',
-  fat: 'Тапни, чтобы подбросить кусочки масла',
-  kcal: 'Тапни, чтобы разлетелись угольки',
-  carbs: 'Тапни, чтобы подбросить батоны',
+  fat: 'Тапни, чтобы подбросить капли',
+  kcal: 'Тапни, чтобы разлетелись огоньки',
+  carbs: 'Тапни, чтобы подбросить зёрна',
   protein: 'Тапни, чтобы яйца покатились',
 };
 
@@ -171,7 +171,8 @@ export const pieceValue = (n: number, m: MetricId): number => n * METRICS[m].cub
 /** Большое число на экране для значения показателя: у сахара — кубики, у остальных — граммы или ккал. */
 export function bigNum(v: number, m: MetricId): string {
   if (isCubeMetric(m)) return String(cubesOfValue(v, m));
-  return m !== 'kcal' && !Number.isInteger(v) ? num1(v) : String(Math.round(v));
+  // десятые важны у соли и небольших чисел; у сотен они только мешают
+  return m !== 'kcal' && v < 100 && !Number.isInteger(v) ? num1(v) : String(Math.round(v));
 }
 /** Подпись под большим числом для значения: «кубика сахара», «г соли», «ккал». */
 export const bigCap = (v: number, m: MetricId): string => capOf(isCubeMetric(m) ? cubesOfValue(v, m) : v, m);
@@ -182,14 +183,14 @@ export const num1 = (n: number): string => (Math.round(n * 10) / 10).toString().
 export function unitNote(m: MetricId): string {
   switch (m) {
     case 'sugar': return t('1 кубик = 5 г добавленного сахара');
-    case 'salt': return t('крупинки показывают количество соли, число — в граммах');
-    case 'fat': return t('1 фигурка масла = 2 г насыщенных жиров');
-    case 'kcal': return t('1 уголёк = 200 ккал');
-    case 'carbs': return t('1 фигурка батона = 10 г углеводов');
+    case 'salt': return t('чем больше крупинок, тем больше соли');
+    case 'fat': return t('1 капля = 2 г насыщенных жиров');
+    case 'kcal': return t('1 огонёк = 200 ккал');
+    case 'carbs': return t('1 зёрнышко = 10 г углеводов');
     case 'protein': return t('1 яйцо = 6 г белка');
   }
 }
-export const UNITS_NOTE = 'Только сахар показываем кубиками по 5 г. Для соли — крупинки, для жиров — кусочки масла по 2 г, для калорий — угольки по 200 ккал, для углеводов — батоны по 10 г, для белка — яйца по 6 г.';
+export const UNITS_NOTE = 'Кубик: 5 г сахара. Капля: 2 г насыщенных жиров. Огонёк: 200 ккал. Зёрнышко: 10 г углеводов. Яйцо: 6 г белка. Крупинки показывают, много ли соли, число рядом в граммах.';
 
 /** Количество показателя с единицей: «106 г», «0,5 г», «460 ккал» */
 export const amountTxt = (v: number, m: MetricId): string => `${m === 'kcal' ? Math.round(v) : num1(v)} ${t(METRICS[m].unit)}`;

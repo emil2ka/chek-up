@@ -2,15 +2,14 @@
 // Знакомство при первом запуске: три шага и состав семьи. Можно пропустить.
 import { useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { METRICS, pl, CUBES, SUGAR_CUBES } from '@/lib/engine';
+import { METRIC_IDS, METRICS, pl, SUGAR_CUBES, unitNote } from '@/lib/engine';
 import { t } from '@/lib/i18n';
 import { MAX_ADULTS, MAX_KIDS, familyDailyCubes, profile as profileStore, type Profile } from '@/lib/profile';
-import { IconArrow, IconCube } from '@/components/icons';
+import { IconArrow } from '@/components/icons';
+import { MetricIcon } from '@/components/ui/MetricIcon';
 import { Stepper } from '@/components/ui/Stepper';
 
 const STEPS = 3;
-const NORM = 10;
-const COLA = Math.round(106 / METRICS.sugar.cubeG);
 
 export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): void }) {
   const reduce = useReducedMotion();
@@ -64,35 +63,34 @@ export function Onboarding({ profile, onDone }: { profile: Profile; onDone(): vo
           <motion.div key={step} {...slide} className="flex min-h-0 flex-1 flex-col justify-center">
             {step === 0 && (
               <>
-                <div className="relative mx-auto mb-9 h-44 w-56" aria-hidden="true">
-                  <IconCube className="absolute top-2 left-3 size-36 -rotate-12 text-white drop-shadow-[0_22px_30px_color-mix(in_srgb,var(--ink)_45%,transparent)]" />
-                  <IconCube className="absolute right-0 bottom-0 size-22 rotate-14 text-white drop-shadow-[0_14px_20px_color-mix(in_srgb,var(--ink)_45%,transparent)]" />
-                  <IconCube className="absolute top-0 right-6 size-12 rotate-28 text-white/90 drop-shadow-[0_8px_12px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
+                <div className="mx-auto mb-9 grid w-fit grid-cols-3 gap-x-6 gap-y-4" aria-hidden="true">
+                  {METRIC_IDS.map((m, i) => (
+                    <span key={m} className="rise" style={{ '--d': `${i * 60}ms` } as CSSProperties}><MetricIcon m={m} className={`size-20 drop-shadow-[0_14px_18px_color-mix(in_srgb,var(--ink)_42%,transparent)] ${i % 2 ? 'rotate-8' : '-rotate-8'}`} /></span>
+                  ))}
                 </div>
-                <h1 className="font-display text-[clamp(34px,10.6vw,44px)] leading-[.98] font-black tracking-[-.045em] text-balance">
-                  {t('Чек знает, что ты')} <span className="hl">{t('ешь')}</span>
+                <h1 className="font-display text-[clamp(34px,10.6vw,44px)] leading-[1] font-black tracking-[-.045em]">
+                  {t('Узнай')} <span className="hl">{t('всё,')}</span> {t('что в твоих чеках')}
                 </h1>
-                <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  {t('Сфоткай чек из магазина. Покажем, сколько в нём сахара, соли и жиров, и подскажем, что заменить.')}
+                <p className="mt-4 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90">
+                  {t('Сфоткай чек из магазина: покажем, что внутри покупок, сколько ушло денег и что взять вместо.')}
                 </p>
               </>
             )}
 
             {step === 1 && (
               <>
-                <ul className="mx-auto mb-9 grid w-fit grid-cols-5 gap-2.5" aria-label={`${NORM} ${pl(NORM, CUBES)}`}>
-                  {Array.from({ length: NORM }, (_, i) => (
-                    <li key={i} className="rise" style={{ '--d': `${i * 45}ms` } as CSSProperties}>
-                      <IconCube className={`size-13 text-white drop-shadow-[0_8px_12px_color-mix(in_srgb,var(--ink)_38%,transparent)] ${i % 2 ? 'rotate-6' : '-rotate-6'}`} />
+                <h1 className="font-display text-[clamp(32px,10vw,42px)] leading-[1] font-black tracking-[-.045em] text-balance">
+                  {t('Видно')} <span className="hl">{t('глазами')}</span>
+                </h1>
+                <ul className="mt-6 grid gap-2">
+                  {METRIC_IDS.map((m, i) => (
+                    <li key={m} className="rise flex items-center gap-3 rounded-[18px] bg-white/13 px-3.5 py-2" style={{ '--d': `${i * 50}ms` } as CSSProperties}>
+                      <MetricIcon m={m} className="size-9" />
+                      <b className="w-24 flex-none font-display text-[15px] font-bold">{t(METRICS[m].label)}</b>
+                      <span className="text-[14px] leading-tight font-semibold text-white/88">{unitNote(m)}</span>
                     </li>
                   ))}
                 </ul>
-                <h1 className="font-display text-[clamp(34px,10.6vw,44px)] leading-[.98] font-black tracking-[-.045em] text-balance">
-                  {t('Сахар считаем')} <span className="hl">{t('кубиками')}</span>
-                </h1>
-                <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.42] font-semibold text-white/90">
-                  {t('Один кубик: 5 г сахара. В литре колы около {a} {w}, а взрослому хватит {b} в день.', { a: COLA, w: pl(COLA, CUBES), b: NORM })}
-                </p>
               </>
             )}
 

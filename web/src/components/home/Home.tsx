@@ -6,14 +6,15 @@ import { SugarPile, PALETTES, skinFor } from '@/lib/pile';
 import { t } from '@/lib/i18n';
 import type { JobInfo } from '@/lib/outbox';
 import type { Streak } from '@/lib/streak';
-import type { HistoryEntry, Receipt } from '@/lib/types';
+import type { HistoryEntry, MetricId, Receipt } from '@/lib/types';
 import { IconCamera, IconCube, IconEdit, IconImage, IconReceipt } from '@/components/icons';
 import { StreakPill } from '@/components/streak/Streak';
+import { SixRow } from '@/components/ui/SixMetrics';
 import { DemoSheet } from './DemoSheet';
 import { MyChecks } from './MyChecks';
 import { OutboxCards } from './OutboxCards';
 
-const HOME_CUBES = 9;
+const HOME_CUBES = 11;
 
 type Props = {
   /** гидратация закончилась — можно запускать canvas и показывать историю */
@@ -24,6 +25,8 @@ type Props = {
   jobs: JobInfo[];
   streak: Streak;
   done: { now: number; usual: number };
+  /** сколько чего за эту неделю; null — пока ничего */
+  week: Record<MetricId, number> | null;
   hideMoney: boolean;
   onScan(): void;
   onGallery(): void;
@@ -34,7 +37,7 @@ type Props = {
   onWeek(): void;
 };
 
-export function Home({ ready, entries, real, jobs, streak, done, hideMoney, onScan, onGallery, onManual, onDemo, onOpen, onWeek }: Props) {
+export function Home({ ready, entries, real, jobs, streak, done, week, hideMoney, onScan, onGallery, onManual, onDemo, onOpen, onWeek }: Props) {
   const hasHistory = ready && entries.length > 0;
   const mine = ready && real;
   const heroRef = useRef<HTMLDivElement>(null);
@@ -56,8 +59,8 @@ export function Home({ ready, entries, real, jobs, streak, done, hideMoney, onSc
     try {
       pile = new SugarPile(canvas, {
         floorRadius,
-        // кубики сахара и другие фигурки
-        palette: [skinFor(streak.level), PALETTES.fat, PALETTES.carbs, PALETTES.protein],
+        // все шесть фигурок
+        palette: [skinFor(streak.level), PALETTES.salt, PALETTES.fat, PALETTES.kcal, PALETTES.carbs, PALETTES.protein],
         onCount: n => { if (hintRef.current) hintRef.current.hidden = !(n > 0); },
       });
     } catch (err) {
@@ -111,25 +114,26 @@ export function Home({ ready, entries, real, jobs, streak, done, hideMoney, onSc
           </header>
 
           <div className="mt-5.5 short:mt-2.5">
-            <h1 className={`font-display leading-[.98] font-black tracking-[-.045em] text-balance text-white ${mine ? 'text-[clamp(32px,10vw,44px)]' : 'text-[clamp(32px,10.4vw,46px)]'}`}>
-              <span className="rise block">{t('Что')} <span className="hl">{t('прячется')}</span></span>
-              <span className="rise block" style={{ '--d': '90ms' } as CSSProperties}>{t('в твоём чеке?')}</span>
+            <h1 className={`font-display leading-[1] font-black tracking-[-.045em] text-white ${mine ? 'text-[clamp(26px,8vw,33px)]' : 'text-[clamp(36px,11.4vw,50px)]'}`}>
+              <span className="rise block">{t('Узнай')} <span className="hl">{t('всё,')}</span></span>
+              <span className="rise block" style={{ '--d': '90ms' } as CSSProperties}>{t('что в твоих чеках')}</span>
             </h1>
             {!mine && (
               <>
-                <p className="rise mt-4.5 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
-                  {t('Сфоткай чек из магазина. Покажем состав покупок, сколько они стоили и что можно заменить.')}
+                <p className="rise mt-4 max-w-[32ch] text-[17px] leading-[1.4] font-semibold text-white/92 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
+                  {t('Сфоткай чек: покажем, что внутри покупок, сколько ушло денег и что взять вместо.')}
                 </p>
-                <p
-                  className="rise mt-4 inline-flex items-center gap-2 rounded-full bg-ink/18 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold text-white/92 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)]"
-                  style={{ '--d': '280ms' } as CSSProperties}
-                >
-                  <IconCube className="size-6 flex-none text-white" />
-                  <span>{t('Норма взрослого: 10 кубиков сахара в день')}</span>
-                </p>
+                <div className="rise mt-4 rounded-[22px] bg-ink/18 px-2.5 pt-3 pb-2.5 text-white shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)] short:mt-3" style={{ '--d': '280ms' } as CSSProperties}>
+                  <SixRow label={t('Что покажем')} />
+                </div>
               </>
             )}
             {mine && <StreakPill streak={streak} done={done} onOpen={onWeek} />}
+            {mine && week && (
+              <button type="button" onClick={onWeek} className="pointer-events-auto mt-2.5 w-full rounded-[22px] bg-ink/20 px-2.5 pt-3 pb-2.5 text-white shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_20%,transparent)] backdrop-blur-[6px] [text-shadow:none] active:scale-[.985]">
+                <SixRow label={t('Всё за неделю')} totals={week} />
+              </button>
+            )}
           </div>
 
           {ready && <OutboxCards jobs={jobs} onManual={onManual} />}
@@ -165,7 +169,7 @@ export function Home({ ready, entries, real, jobs, streak, done, hideMoney, onSc
 
           <div ref={stageRef} className="relative h-[calc(var(--cube)*2+46px)] flex-none">
             <p ref={hintRef} hidden className="pt-3 text-center text-[13px] font-semibold text-white/80">
-              {t('Тапни по кубикам или наклони телефон')}
+              {t('Тапни по фигуркам или наклони телефон')}
             </p>
           </div>
         </div>

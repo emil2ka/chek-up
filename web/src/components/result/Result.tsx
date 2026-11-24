@@ -202,7 +202,7 @@ export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score,
           <p className="rs-phrase">{phrase}</p>
           <p className="rs-meta">
             {receipt.store} · {dateRu(receipt.date)}{receipt.masked ? '' : ` · ${money(model.base.total)}`}
-            {author ? ` · ${t('внёс(ла) {n}', { n: author })}` : ''}{demo ? ` · ${t('пример, в учёт не идёт')}` : ''}{other ? ` · ${t('не считаем: {n}', { n: other })}` : ''}
+            {author ? ` · ${t('внесено: {n}', { n: author })}` : ''}{demo ? ` · ${t('пример, в учёт не идёт')}` : ''}{other ? ` · ${t('не считаем: {n}', { n: other })}` : ''}
           </p>
         </section>
 
@@ -279,7 +279,7 @@ export default function Result({ receipt, swaps, off = NO_OFF, tag, priv, score,
                   <h2 id="rs-h-harm" className="rs-h">{mdef.harmful ? t('Цена вреда') : t('Сколько это стоит')}</h2>
                   {harm.total ? (
                     <>
-                      <p className="rs-harm-big"><b>{money(harm.perUnit)}</b> {t('за')} {cubeMetric ? t('кубик сахара') : metric === 'kcal' ? t('100 ккал') : bigCap(1, metric)}</p>
+                      <p className="rs-harm-big"><b>{money(harm.perUnit)}</b> {cubeMetric ? t('за кубик сахара') : metric === 'kcal' ? t('за 100 ккал') : t('за грамм')}</p>
                       <p className="rs-harm-sub">{t('На эти покупки ушло {m}, в них {x}.', { m: money(harm.spend), x: metricTxt(harm.total, metric) })}</p>
                       <ul className="rs-harm-top">
                         {harm.top.map((r, index) => (

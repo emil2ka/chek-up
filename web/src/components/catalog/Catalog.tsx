@@ -31,7 +31,7 @@ export function Catalog() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="px-5 pt-[calc(env(safe-area-inset-top)+14px)] pb-4 text-white">
-        <h1 className="rise font-display text-[28px] leading-none font-black tracking-[-.045em]">{t('Что')} <span className="hl">{t('внутри')}</span></h1>
+        <h1 className="rise font-display text-[28px] leading-none font-black tracking-[-.045em]"><span className="hl">{t('Что внутри')}</span></h1>
 
         <label className="on-light rise mt-3.5 flex h-13 items-center gap-3 rounded-[20px] bg-white pr-1.5 pl-4 text-ink shadow-[0_14px_30px_-12px_color-mix(in_srgb,var(--ink)_55%,transparent)] focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-white" style={{ animationDelay: '120ms' }}>
           <IconSearch className="size-6 flex-none text-blue-1" />
@@ -103,8 +103,8 @@ export function Catalog() {
                     className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-[22px] px-4 py-3 text-left active:scale-[.985]"
                   >
                     <span className="grid min-w-0 gap-0.5">
-                      <span className="font-display text-base leading-tight font-bold tracking-[-.02em]">{it.name}</span>
-                      <span className="text-[13px] font-semibold text-mute">{it.portion}</span>
+                      <span className="font-display text-base leading-tight font-bold tracking-[-.02em]">{t(it.name)}</span>
+                      <span className="text-[13px] font-semibold text-mute">{t(it.portion)}</span>
                     </span>
                     {val > 0 && (!isCubeMetric(metric) || cubes > 0) ? (
                       <span className="grid justify-items-end leading-none">
@@ -136,7 +136,7 @@ export function Catalog() {
                       {it.swap && (
                         <p className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2.5 text-[15px] leading-snug font-bold text-good">
                           <IconArrow className="mt-0.5 size-5 flex-none" />
-                          <span>{t('Лучше взять')}: {it.swap}</span>
+                          <span>{t('Лучше взять')}: {t(it.swap)}</span>
                         </p>
                       )}
                     </div>

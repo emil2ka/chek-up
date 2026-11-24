@@ -16,7 +16,8 @@ function save(): void { try { localStorage.setItem(KEY, JSON.stringify(mem ?? {}
 export const dirty = {
   all: (): Record<string, number> => ({ ...load() }),
   at: (key: string): number | undefined => load()[key],
-  mark(key: string, at: number): void { load()[key] = at; save(); },
+  /** Две правки в одну миллисекунду тоже различаются, иначе ответ на первую снял бы отметку со второй. */
+  mark(key: string, at: number): void { const d = load(); d[key] = Math.max(at, (d[key] ?? 0) + 1); save(); },
   /** Подтверждено сервером: снимаем отметку, только если с тех пор ничего не поменяли. */
   ack(sent: Record<string, number>): void {
     const d = load();

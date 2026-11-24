@@ -53,7 +53,7 @@ export function StreakRow({ streak, tone = 'light' }: { streak: StreakData; tone
   );
 }
 
-export const streakTitle = (s: StreakData): string => (s.current ? `${s.current} ${pl(s.current, WEEKS_F)} ${t('подряд')}` : t('Начни стрик'));
+export const streakTitle = (s: StreakData): string => (s.current ? t('{n} {w} подряд', { n: s.current, w: pl(s.current, WEEKS_F) }) : t('Начни стрик'));
 
 type CloseProps = {
   streak: StreakData;
@@ -114,7 +114,7 @@ export function StreakCard({ streak, week, closedState, done, best, canEdit, onS
             <>
               <p className="mt-1 text-[16px] leading-snug font-extrabold">
                 {done.now
-                  ? <>{t('Внесено')} {done.now} {pl(done.now, RECEIPTS_F)}{done.usual ? ` ${t('из обычных')} ${done.usual}` : ''}</>
+                  ? <>{done.usual ? t('Внесено {n} {w} из обычных {u}', { n: done.now, w: pl(done.now, RECEIPTS_F), u: done.usual }) : t('Внесено {n} {w}', { n: done.now, w: pl(done.now, RECEIPTS_F) })}</>
                   : t('На этой неделе чеков пока нет')}
               </p>
               {isPrev && <p className="mt-1 text-[13px] font-bold text-[#B26A00]">{t('Можно дозаписать до вечера понедельника')} · {t('осталось {n} ч', { n: hoursLeft })}</p>}
@@ -140,7 +140,7 @@ export function StreakCard({ streak, week, closedState, done, best, canEdit, onS
           )}
         </div>
         <p className="mt-3 text-[13px] leading-snug font-semibold text-white/88">
-          {t('Белый кубик — сахар в норме, контурный — больше нормы. Стрик горит только от пропуска, а не от сахара.')}
+          {t('Белый кубик: сахар в норме, контурный: больше нормы. Стрик горит только от пропуска, а не от сахара.')}
         </p>
       </div>
     </section>

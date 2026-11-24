@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import '@fontsource-variable/unbounded';
 import '@fontsource-variable/manrope';
+import '@fontsource-variable/golos-text';
+import '@fontsource-variable/montserrat';
 import './globals.css';
 
 export const metadata: Metadata = {

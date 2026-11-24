@@ -2,6 +2,7 @@
 // g — добавленный (свободный) сахар в порции, г; t — соль, г; f — насыщенные жиры, г; k — калории, ккал; c — углеводы, г; b — белки, г.
 // Значения усреднённые, по типичным товарам; согласованы с опорным справочником распознавания (src/lib/scan/reference.ts).
 import { METRICS } from './engine';
+import { t } from './i18n';
 import type { MetricId } from './types';
 
 export type Cat = 'drinks' | 'dairy' | 'sweets' | 'bakery' | 'salty' | 'other';
@@ -126,6 +127,6 @@ export const catalogValue = (it: CatalogItem, m: MetricId): number => ({ sugar: 
 export function searchCatalog(query: string, cat: Cat | 'all', metric: MetricId = 'sugar'): CatalogItem[] {
   const q = norm(query);
   return CATALOG
-    .filter(it => (cat === 'all' || it.cat === cat) && (!q || norm(it.name).includes(q) || norm(it.portion).includes(q)))
+    .filter(it => (cat === 'all' || it.cat === cat) && (!q || norm(it.name).includes(q) || norm(t(it.name)).includes(q) || norm(it.portion).includes(q)))
     .sort((a, b) => catalogValue(b, metric) / METRICS[metric].cubeG - catalogValue(a, metric) / METRICS[metric].cubeG);
 }

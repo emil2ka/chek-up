@@ -22,7 +22,7 @@
   --r-btn: 18px;
   --shadow-sheet: 0 -14px 40px rgba(8, 20, 90, .35);
   --font-d: 'Unbounded Variable', 'Unbounded', system-ui, sans-serif; /* цифры и заголовки */
-  --font-t: 'Manrope Variable', 'Manrope', system-ui, sans-serif;     /* текст и подписи */
+  --font-t: 'Manrope Variable', 'Golos Text Variable', system-ui, sans-serif;     /* текст и подписи */
   --tabbar: calc(88px + env(safe-area-inset-bottom));                  /* место под нижнюю навигацию */
 }
 
@@ -33,6 +33,12 @@
 /* ── Тема Tailwind поверх тех же переменных ──
    bg-blue-1, text-ink, text-mute, bg-tint, border-line, bg-good/mid/bad,
    font-display (Unbounded), font-sans (Manrope), rounded-sheet, rounded-btn, shadow-panel, bg-sky */
+/* в Unbounded и Manrope нет казахских букв (ә ғ қ ң ө ұ ү һ) */
+html[lang='kk'] {
+  --font-d: 'Montserrat Variable', system-ui, sans-serif;
+  --font-t: 'Golos Text Variable', system-ui, sans-serif;
+}
+
 @theme inline {
   --color-blue-1: var(--blue-1);
   --color-blue-2: var(--blue-2);

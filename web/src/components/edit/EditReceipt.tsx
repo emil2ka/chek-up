@@ -135,7 +135,7 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
         <div className="self-end"><Switch label={t('Возврат')} checked={refund} onChange={setRefund} /></div>
       </div>
       {badDate && <p className="mt-1 px-1 text-[13px] font-bold text-bad">{t('Дата не может быть в будущем')}</p>}
-      {unsure > 0 && <p className="mt-3 rounded-2xl bg-[color-mix(in_srgb,var(--mid)_16%,var(--white))] px-3.5 py-3 text-[14px] leading-snug font-bold">{t('Уточни')} {unsure} {pl(unsure, CHECK_F)}: {t('прочитались плохо')}</p>}
+      {unsure > 0 && <p className="mt-3 rounded-2xl bg-[color-mix(in_srgb,var(--mid)_16%,var(--white))] px-3.5 py-3 text-[14px] leading-snug font-bold">{t('Проверь {n} {w}: прочитались плохо.', { n: unsure, w: pl(unsure, CHECK_F) })}</p>}
       {!!gap && <p className="mt-2 rounded-2xl bg-[color-mix(in_srgb,var(--mid)_16%,var(--white))] px-3.5 py-3 text-[14px] leading-snug font-bold">{gap < 0 ? t('Не хватает {n} до суммы на чеке: возможно, пропущена строка.', { n: money(-gap) }) : t('На {n} больше суммы на чеке: возможно, есть лишняя строка или скидка.', { n: money(gap) })}</p>}
 
       <ul className="mt-3 grid gap-2">
@@ -161,7 +161,7 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
                   </label>
                   {r.it.raw && r.it.raw !== r.it.n && <p className="px-1 text-[13px] font-semibold text-mute">{t('На чеке')}: {r.it.raw}</p>}
                   <NumField label={t('Цена')} unit="₸" value={r.it.p} onChange={v => set(r.key, x => ({ ...x, it: { ...x.it, p: Math.round(v), q: undefined } }))} />
-                  <Switch label={t('Не для нас')} hint={t('подарок, для соседей — не считать')} checked={r.off} onChange={v => set(r.key, x => ({ ...x, off: v }))} />
+                  <Switch label={t('Не для нас')} hint={t('подарок, для соседей: не считать')} checked={r.off} onChange={v => set(r.key, x => ({ ...x, off: v }))} />
                   <Switch label={t('Не еда')} checked={!!r.it.nf} onChange={v => patch(r.key, v ? { nf: 1 } : { nf: undefined })} />
                   {!r.it.nf && (
                     <>

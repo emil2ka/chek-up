@@ -187,7 +187,7 @@ function MemberSheet({ member, owner, onClose }: { member: FamilyState['members'
             <Segmented label={t('Роль')} value={member.role === 'owner' ? 'adult' : member.role} onChange={v => void run(async () => { await setMemberRole(member.id, v); onClose(); })} options={[['adult', t('Взрослый')], ['child', t('Ребёнок')]] as const} />
             {confirm ? (
               <div className="rounded-[20px] bg-tint p-3.5">
-                <p className="text-[15px] leading-snug font-bold">{confirm === 'owner' ? t('Передать владение? Ты станешь взрослым участником.') : t('Убрать из семьи? Его чеки останутся у него, общие копии — у вас.')}</p>
+                <p className="text-[15px] leading-snug font-bold">{confirm === 'owner' ? t('Передать владение? Ты станешь взрослым участником.') : t('Убрать из семьи? Личные чеки уйдут вместе с участником, общие копии останутся у вас.')}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 [&>:first-child]:bg-white">
                   <button type="button" className={quietCls} onClick={() => setConfirm(null)}>{t('Отмена')}</button>
                   <button type="button" disabled={busy} className={dangerCls} onClick={() => void run(async () => { if (confirm === 'owner') await setMemberRole(member.id, 'owner'); else await removeMember(member.id); onClose(); })}>{t('Да')}</button>
@@ -255,7 +255,7 @@ export function Account({ family, onToast }: { family: FamilyState; onToast(text
           <button type="button" className={rowCls} onClick={() => setSheet('join')}><span className="flex-1">{t('У меня есть приглашение')}</span><IconChevron className="size-5 text-mute" /></button>
           {!alone && (leave
             ? <div className="rounded-[20px] bg-tint p-3.5">
-                <p className="text-[15px] leading-snug font-bold">{t('Выйти из семьи? Твои чеки останутся с тобой, общие копии — у семьи.')}</p>
+                <p className="text-[15px] leading-snug font-bold">{t('Выйти из семьи? Твои чеки останутся с тобой, общие копии останутся у семьи.')}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 [&>:first-child]:bg-white">
                   <button type="button" className={quietCls} onClick={() => setLeave(false)}>{t('Остаться')}</button>
                   <button type="button" disabled={busy} className={dangerCls} onClick={() => void run(async () => { await leaveFamily(); setLeave(false); onToast(t('Теперь у тебя своя семья')); })}>{t('Выйти')}</button>
@@ -338,10 +338,10 @@ function DevicesSheet({ signedIn, onClose, onToast }: { signedIn: boolean; onClo
         {info && info.devices.length > 1 && <button type="button" disabled={busy} className={quietCls} onClick={() => void run(async () => { await signOut('others'); setInfo(await accountInfo()); })}>{t('Отключить все остальные')}</button>}
         {info && (confirm
           ? <div className="rounded-[20px] bg-tint p-3.5">
-              <p className="text-[15px] leading-snug font-bold">{signedIn ? t('Чеки останутся в аккаунте, с этого устройства они исчезнут.') : t('Ты не вошёл в аккаунт: после выхода открыть эти чеки будет нельзя. Сначала войди.')}</p>
+              <p className="text-[15px] leading-snug font-bold">{signedIn ? t('Чеки останутся в аккаунте, с этого устройства они исчезнут.') : t('Вход не подключён: после выхода открыть эти чеки будет нельзя. Сначала войди.')}</p>
               <div className="mt-3 grid grid-cols-2 gap-2 [&>:first-child]:bg-white">
                 <button type="button" className={quietCls} onClick={() => setConfirm(null)}>{t('Отмена')}</button>
-                <button type="button" disabled={busy} className={dangerCls} onClick={() => void run(async () => { await signOut(confirm); onClose(); onToast(t('Ты вышел из аккаунта')); })}>{t('Выйти')}</button>
+                <button type="button" disabled={busy} className={dangerCls} onClick={() => void run(async () => { await signOut(confirm); onClose(); onToast(t('Выход выполнен')); })}>{t('Выйти')}</button>
               </div>
             </div>
           : <div className="grid grid-cols-2 gap-2">
@@ -369,6 +369,7 @@ function DataSheet({ onClose, onToast }: { onClose(): void; onToast(s: string): 
     <Sheet title={t('Мои данные')} onClose={onClose}>
       <div className="grid gap-3">
         <p className="px-1 text-[14px] leading-snug font-semibold text-mute">{t('Храним позиции чеков, цены, состав семьи и отметки недель. Фото чеков не храним.')}</p>
+        <a href="/privacy" target="_blank" className="px-1 text-[14px] font-bold text-blue-1 underline underline-offset-4">{t('Подробно: какие данные храним')}</a>
         <button type="button" className={quietCls} disabled={busy} onClick={() => void save()}>{t('Скачать всё одним файлом')}</button>
         <div className="rounded-[20px] bg-[color-mix(in_srgb,var(--bad)_9%,var(--white))] p-3.5">
           <p className="text-[15px] leading-snug font-bold">{t('Удалить аккаунт навсегда')}</p>

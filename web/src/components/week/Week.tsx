@@ -102,7 +102,7 @@ export function Week({ ready, entries, profile, family, marks, streak, onOpen, o
   const normLine = incomplete
     ? t('Сумма по доступным данным: в части чеков этого показателя нет.')
     : empty
-      ? t('Внеси чек — и здесь появятся данные за неделю.')
+      ? t('Внеси чек, и здесь появятся данные за неделю.')
       : !mdef.harmful
         ? t('По чекам: {n}% недельного ориентира семьи.', { n: pct })
         : over > 0.05
@@ -162,7 +162,7 @@ export function Week({ ready, entries, profile, family, marks, streak, onOpen, o
                   <i className={`block h-full rounded-full transition-[width] duration-700 ease-out ${tone === 'good' ? 'bg-good' : tone === 'mid' ? 'bg-mid' : 'bg-bad'}`} style={{ width: `${Math.max(total ? 4 : 0, Math.min(100, pct))}%` }} />
                 </div>
                 <p className="mt-3 text-[15px] leading-snug font-semibold">{normLine}</p>
-                {mw.fromStock > 0.05 && <p className="mt-1.5 text-[13px] leading-snug font-semibold text-mute">{t('Из них {x} — из запасов, купленных раньше.', { x: metricTxt(mw.fromStock, metric) })}</p>}
+                {mw.fromStock > 0.05 && <p className="mt-1.5 text-[13px] leading-snug font-semibold text-mute">{t('Из них {x} из запасов, купленных раньше.', { x: metricTxt(mw.fromStock, metric) })}</p>}
                 {stats.guests > 0 && <p className="mt-1.5 text-[13px] leading-snug font-semibold text-mute">{t('Чеки с пометкой «гости» в норму не входят.')}</p>}
                 <button type="button" onClick={onProfile} className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-xl text-[14px] font-bold text-blue-1 active:opacity-70">
                   <span>{t('Семья')}: {familyTxt}</span><IconChevron className="size-4" />
@@ -176,7 +176,7 @@ export function Week({ ready, entries, profile, family, marks, streak, onOpen, o
                 <h2 id="wk-h-goal" className="rs-h">{t('Цель')}</h2>
                 <div className="rounded-3xl bg-tint p-4">
                   {goal.base < 2
-                    ? <p className="text-[15px] leading-snug font-semibold">{t('Закрой две недели — посчитаем твоё обычное количество сахара и предложим цель.')}</p>
+                    ? <p className="text-[15px] leading-snug font-semibold">{t('Закрой две недели: посчитаем обычное количество сахара и предложим цель.')}</p>
                     : profile.goal
                       ? <>
                           <p className="text-[15px] leading-snug font-semibold">{t('Обычно {a}, цель −{p}%: до {g} {w}.', { a: goal.average, p: profile.goal, g: goal.target, w: pl(goal.target, CUBES) })}</p>
@@ -279,7 +279,7 @@ export function Week({ ready, entries, profile, family, marks, streak, onOpen, o
               </>
             )}
 
-            <p className="rs-note">{t('Неделя — с понедельника по воскресенье. Это купленное, а не съеденное.')} {unitNote(metric)}. {t('Норма')}: {t(mdef.norm)}.</p>
+            <p className="rs-note">{t('Неделя идёт с понедельника по воскресенье. Это купленное, а не съеденное.')} {unitNote(metric)}. {t('Норма')}: {t(mdef.norm)}.</p>
           </div>
         )}
       </div>

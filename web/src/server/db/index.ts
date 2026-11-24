@@ -54,6 +54,8 @@ async function open(): Promise<Db> {
     // prepare: false — чтобы работать через пулер Supabase в режиме transaction
     return drizzle(postgres(url, { max: 5, prepare: false }), { schema }) as unknown as Db;
   }
+  // у облачного хостинга диск временный: без настоящей базы чеки людей пропали бы при первом же перезапуске
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) throw new Error('DATABASE_URL не задан: на хостинге нужна настоящая Postgres');
   // только для разработки: путь динамический, в серверный бандл тащить проект не нужно
   const dir = path.resolve(/*turbopackIgnore: true*/ process.env.PGLITE_DIR || '.data/pglite');
   mkdirSync(dir, { recursive: true });

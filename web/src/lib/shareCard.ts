@@ -27,8 +27,6 @@ export type ShareCardData = {
 };
 
 const W = 1080, H = 1920;
-const FONT_D = "'Unbounded Variable', 'Unbounded', system-ui, sans-serif";
-const FONT_T = "'Manrope Variable', 'Manrope', system-ui, sans-serif";
 const TONE: Record<Tone, string> = { good: '#19B36B', mid: '#F2A20C', bad: '#F0433A' };
 /** больше кубиков на картинке не рисуем */
 const MAX_DRAWN = 150;
@@ -111,11 +109,13 @@ function pile(c: CanvasRenderingContext2D, count: number, floorY: number, top: n
 }
 
 export async function renderShareCard(d: ShareCardData): Promise<Blob> {
+  const css = getComputedStyle(document.documentElement);
+  const FONT_D = css.getPropertyValue('--font-d').trim() || 'sans-serif', FONT_T = css.getPropertyValue('--font-t').trim() || 'sans-serif';
   // шрифты уже подключены в приложении — дожидаемся нужных начертаний
   await Promise.all([
-    document.fonts.load(`900 400px ${FONT_D}`),
-    document.fonts.load(`500 60px ${FONT_D}`),
-    document.fonts.load(`700 44px ${FONT_T}`),
+    document.fonts.load(`900 400px ${FONT_D}`, '0чқ'),
+    document.fonts.load(`500 60px ${FONT_D}`, 'чқ'),
+    document.fonts.load(`700 44px ${FONT_T}`, 'чқ₸'),
   ]).catch(() => null);
 
   const cv = document.createElement('canvas');

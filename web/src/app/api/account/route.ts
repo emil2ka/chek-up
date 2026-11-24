@@ -1,4 +1,5 @@
 // /api/account — GET: кто я, способы входа и устройства; PATCH: имя; DELETE: удалить аккаунт и данные.
+import { connection } from 'next/server';
 import { z } from 'zod';
 import { accountInfo, deleteAccount, rename } from '@/server/auth';
 import { fail, ok, readJson, withAuth } from '@/server/http';
@@ -6,7 +7,10 @@ import { fail, ok, readJson, withAuth } from '@/server/http';
 const Patch = z.object({ name: z.string().max(40) });
 const Delete = z.object({ confirm: z.literal('delete') });
 
-export const GET = (request: Request) => withAuth(request, 'account', async ({ db, me }) => ok(await accountInfo(db, me)));
+export async function GET(request: Request) {
+  await connection(); // не выполнять при сборке
+  return withAuth(request, 'account', async ({ db, me }) => ok(await accountInfo(db, me)));
+}
 
 export const PATCH = (request: Request) => withAuth(request, 'account', async ({ db, me }) => {
   const body = await readJson(request, Patch, 2_000);

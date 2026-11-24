@@ -12,14 +12,11 @@
   -webkit-font-smoothing: antialiased;
 }
 .rs *, .rs *::before, .rs *::after { box-sizing: border-box; }
-:where(.rs) :where(p, h2, ul) { margin: 0; padding: 0; }
-:where(.rs) ul { list-style: none; }
-/* вкладки показателей (role=tab) стилизуются утилитами Tailwind, а они лежат в @layer и проиграли бы этому сбросу */
-:where(.rs) button:where(:not([role='tab'])) {
-  font: inherit; color: inherit; margin: 0; border: 0; background: none; padding: 0;
-  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+/* сбросы браузерных стилей делает Tailwind; здесь только то, чего там нет — в слое base, чтобы утилиты могли переопределить */
+@layer base {
+  .rs button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .rs svg { width: 22px; height: 22px; flex: none; display: block; }
 }
-:where(.rs) svg { width: 22px; height: 22px; flex: none; display: block; }
 .rs-sr {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
@@ -123,6 +120,23 @@
 }
 .rs-empty { font-size: 15px; color: var(--mute); padding: 0 4px; }
 
+/* главная мысль о чеке */
+.rs-phrase { padding: 0 4px; font: 800 clamp(20px, 5.8vw, 24px)/1.18 var(--font-d); letter-spacing: -.03em; text-wrap: balance; }
+.rs-meta { margin-top: 10px; padding: 0 4px; font: 600 13px/1.4 var(--font-t); color: var(--mute); }
+.rs-check {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 56px; margin-bottom: 18px; padding: 10px 14px; border-radius: 18px; text-align: left;
+  background: color-mix(in srgb, var(--mid) 16%, var(--white));
+  font: 700 14px/1.35 var(--font-t);
+}
+.rs-check b { flex: none; font: 800 14px/1 var(--font-t); color: var(--blue-1); }
+.rs-sec + .rs-sec:has(> .rs-disclose) { margin-top: 18px; }
+.rs-disclose, .rs-more {
+  width: 100%; min-height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  font: 800 15px/1 var(--font-t); color: var(--blue-1);
+}
+.rs-disclose { background: var(--tint); }
+
 /* замены */
 .rs-sw-list { display: grid; gap: 8px; }
 .rs-sw {
@@ -216,7 +230,6 @@
 .rs-harm-n { min-width: 0; font: 600 14px/1.3 var(--font-t); }
 .rs-harm-v { display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap; font: 700 13px/1 var(--font-t); color: var(--mute); }
 .rs-harm-v b { font: 800 14px/1 var(--font-d); color: var(--ink); letter-spacing: -.02em; }
-.rs-harm-v::after { content: 'куб.'; }
 .rs-offer { align-items: center !important; }
 .rs-offer .rs-harm-n small { display: block; margin-top: 3px; font: 600 12px/1.35 var(--font-t); color: var(--mute); }
 .rs-offer-s { white-space: nowrap; font: 800 15px/1 var(--font-d); color: #0E8A51; letter-spacing: -.02em; }

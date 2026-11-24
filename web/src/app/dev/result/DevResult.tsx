@@ -1,9 +1,10 @@
 'use client';
 // Экран результата в таком же прокручиваемом контейнере, как в оболочке (ChekupApp): чек — из ?r=.
+import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RECEIPTS } from '@/lib/data';
 import Result from '@/components/result/Result';
-import type { Analysis, Receipt } from '@/lib/types';
+import type { Receipt } from '@/lib/types';
 
 const baseReceipt = RECEIPTS[0];
 const saltSamples: Receipt[] = [
@@ -11,12 +12,9 @@ const saltSamples: Receipt[] = [
   { ...baseReceipt, id: 'salt-medium', title: 'Покупки на день', items: [0, 5, 6, 12].map(index => baseReceipt.items[index]) },
 ];
 
-declare global {
-  interface Window { __result?: { swaps: number[]; analysis: Analysis; calls: number } }
-}
-
 export default function DevResult() {
   const id = useSearchParams().get('r') ?? 'week';
+  const [swaps, setSwaps] = useState<number[]>([]);
   const receipt = [...RECEIPTS, ...saltSamples].find(r => r.id === id) ?? baseReceipt;
 
   return (
@@ -25,12 +23,10 @@ export default function DevResult() {
         <Result
           key={receipt.id}
           receipt={receipt}
-          swaps={[]}
+          swaps={swaps}
           onBack={() => console.info('[dev] назад')}
           onScan={() => console.info('[dev] сканировать новый чек')}
-          onChange={({ swaps, analysis }) => {
-            window.__result = { swaps, analysis, calls: (window.__result?.calls ?? 0) + 1 };
-          }}
+          onSwaps={setSwaps}
         />
       </section>
     </main>

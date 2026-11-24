@@ -1,5 +1,6 @@
 // Общий расчёт для всех экранов. Этот файл — контракт между частями приложения.
 // Зеркало на Dart — mobile/lib/core/engine.dart: формулы и числа должны совпадать (это проверяют тесты).
+import { t } from './i18n';
 import type { Analysis, AnalyzedItem, MetricId, Receipt, ReceiptItem, SwapItem, Verdict, Why } from './types';
 
 export const METRIC_IDS: readonly MetricId[] = ['sugar', 'salt', 'fat', 'kcal', 'carbs', 'protein'];
@@ -136,10 +137,10 @@ export function analyze(receipt: Receipt, swaps: Iterable<number> = [], off: Ite
 
 /** Словесная оценка: tone — 'good' | 'mid' | 'bad' (цвета --good / --mid / --bad) */
 export function verdict(score: number): Verdict {
-  if (score >= 80) return { label: 'Отлично', tone: 'good' };
-  if (score >= 60) return { label: 'Неплохо', tone: 'good' };
-  if (score >= 40) return { label: 'Так себе', tone: 'mid' };
-  return { label: 'Корзина-бомба', tone: 'bad' };
+  if (score >= 80) return { label: t('Отлично'), tone: 'good' };
+  if (score >= 60) return { label: t('Неплохо'), tone: 'good' };
+  if (score >= 40) return { label: t('Так себе'), tone: 'mid' };
+  return { label: t('Корзина-бомба'), tone: 'bad' };
 }
 
 export type Forms = readonly [string, string, string];
@@ -147,18 +148,19 @@ export type Forms = readonly [string, string, string];
 /** pl(21, ['кубик','кубика','кубиков']) → 'кубик' */
 export function pl(n: number, forms: Forms): string {
   const a = Math.abs(n) % 100, b = a % 10;
-  if (a > 10 && a < 20) return forms[2];
-  if (b === 1) return forms[0];
-  if (b >= 2 && b <= 4) return forms[1];
-  return forms[2];
+  if (a > 10 && a < 20) return t(forms[2]);
+  if (b === 1) return t(forms[0]);
+  if (b >= 2 && b <= 4) return t(forms[1]);
+  return t(forms[2]);
 }
 export const CUBES: Forms = ['кубик', 'кубика', 'кубиков'];
+export const SUGAR_CUBES: Forms = ['кубик сахара', 'кубика сахара', 'кубиков сахара'];
 export const DAYS: Forms = ['день', 'дня', 'дней'];
 
 /** Подпись под большой цифрой, когда число — штучки в куче («кубика сахара», «зёрен углеводов»). */
 export const capOf = (n: number, m: MetricId): string => {
-  if (isCubeMetric(m)) return `${pl(n, CUBES)} ${METRICS[m].of}`;
-  return GRAM_CAP[m] ?? METRICS[m].unit;
+  if (isCubeMetric(m)) return pl(n, SUGAR_CUBES);
+  return t(GRAM_CAP[m] ?? METRICS[m].unit);
 };
 /** Подпись под числом в граммах или ккал: «г соли», «ккал», «г углеводов», «г белка». */
 const GRAM_CAP: Partial<Record<MetricId, string>> = { salt: 'г соли', fat: 'г насыщенных жиров', kcal: 'ккал', carbs: 'г углеводов', protein: 'г белка' };
@@ -179,18 +181,18 @@ export const num1 = (n: number): string => (Math.round(n * 10) / 10).toString().
 /** Как мы показываем показатель и что значит одна штучка. */
 export function unitNote(m: MetricId): string {
   switch (m) {
-    case 'sugar': return '1 кубик = 5 г добавленного сахара';
-    case 'salt': return 'крупинки показывают количество соли, число — в граммах';
-    case 'fat': return '1 фигурка масла = 2 г насыщенных жиров';
-    case 'kcal': return '1 уголёк = 200 ккал';
-    case 'carbs': return '1 фигурка батона = 10 г углеводов';
-    case 'protein': return '1 яйцо = 6 г белка';
+    case 'sugar': return t('1 кубик = 5 г добавленного сахара');
+    case 'salt': return t('крупинки показывают количество соли, число — в граммах');
+    case 'fat': return t('1 фигурка масла = 2 г насыщенных жиров');
+    case 'kcal': return t('1 уголёк = 200 ккал');
+    case 'carbs': return t('1 фигурка батона = 10 г углеводов');
+    case 'protein': return t('1 яйцо = 6 г белка');
   }
 }
 export const UNITS_NOTE = 'Только сахар показываем кубиками по 5 г. Для соли — крупинки, для жиров — кусочки масла по 2 г, для калорий — угольки по 200 ккал, для углеводов — батоны по 10 г, для белка — яйца по 6 г.';
 
 /** Количество показателя с единицей: «106 г», «0,5 г», «460 ккал» */
-export const amountTxt = (v: number, m: MetricId): string => `${m === 'kcal' ? Math.round(v) : num1(v)} ${METRICS[m].unit}`;
+export const amountTxt = (v: number, m: MetricId): string => `${m === 'kcal' ? Math.round(v) : num1(v)} ${t(METRICS[m].unit)}`;
 
 export const metricTxt = (v: number, m: MetricId): string => `${bigNum(v, m)} ${bigCap(v, m)}`;
 
@@ -198,4 +200,4 @@ export const metricTxt = (v: number, m: MetricId): string => `${bigNum(v, m)} ${
 export const money = (n: number): string => Math.round(n).toLocaleString('ru-RU').replace(/[\u00A0\u202F,]/g, '\u00A0') + '\u00A0₸';
 
 /** dateRu('2026-11-16') → '16 ноября' */
-export const dateRu = (iso: string): string => new Date(iso + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+export { dayTxt as dateRu } from './calendar';

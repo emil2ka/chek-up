@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOG, searchCatalog } from './catalog';
 import { addDays } from './calendar';
-import { analyze } from './engine';
 import { RECEIPTS } from './data';
 import { badges, completeness, goalState, monthStats, weekFacts, weekStats } from './insights';
 import { familyDailyCubes, familyDailyG } from './profile';

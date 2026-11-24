@@ -2,6 +2,8 @@
 // чтобы у всех участников семьи и на сервере границы недели совпадали.
 // Зеркало на Dart — mobile/lib/core/calendar.dart.
 
+import { currentLang, t } from './i18n';
+
 export const TZ_OFFSET_MIN = 300;
 const DAY = 86_400_000;
 
@@ -31,7 +33,7 @@ const MONTHS_GEN = ['января', 'февраля', 'марта', 'апрел�
 export const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 
 /** «16 ноября» */
-export const dayTxt = (iso: string): string => `${+iso.slice(8, 10)} ${MONTHS_GEN[+iso.slice(5, 7) - 1]}`;
+export const dayTxt = (iso: string): string => `${+iso.slice(8, 10)} ${t(MONTHS_GEN[+iso.slice(5, 7) - 1])}`;
 /** «16–22 ноября», «30 ноября – 6 декабря» */
 export function weekTxt(week: string): string {
   const end = addDays(week, 6);
@@ -40,7 +42,10 @@ export function weekTxt(week: string): string {
     : `${dayTxt(week)} – ${dayTxt(end)}`;
 }
 /** «Ноябрь 2026» из YYYY-MM */
-export const monthTxt = (ym: string): string => `${MONTHS[+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}`;
+export const monthTxt = (ym: string): string => {
+  const m = t(MONTHS[+ym.slice(5, 7) - 1]);
+  return currentLang() === 'kk' ? `${ym.slice(0, 4)} ж. ${m.toLowerCase()}` : `${m} ${ym.slice(0, 4)}`;
+};
 export const monthOf = (iso: string): string => iso.slice(0, 7);
 export const addMonths = (ym: string, n: number): string => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1)).toISOString().slice(0, 7);
 export const daysInMonth = (ym: string): number => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();

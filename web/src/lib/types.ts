@@ -120,19 +120,29 @@ export type Verdict = { label: string; tone: Tone };
 /** Пропсы экрана результата (src/components/result/Result.tsx). */
 export type ResultProps = {
   receipt: Receipt;
-  /** индексы замен из плана */
+  /** план: какие замены взять в следующий раз */
   swaps: number[];
   /** позиции «не для нас» */
   off?: number[];
   tag?: 'guests';
   priv?: boolean;
+  /** готовая оценка — для чеков, где цены скрыты и посчитать её здесь нельзя */
+  score?: number;
+  /** вид кубика сахара по стрику: 0, 4, 12, 26, 52 */
+  level?: number;
+  /** кто внёс, если не я */
+  author?: string;
+  /** демо-чек: в учёт не идёт */
+  demo?: boolean;
   /** нажата «назад» */
   onBack(): void;
-  /** нажата «Сканировать новый чек» */
+  /** нажата «Внести ещё чек» */
   onScan(): void;
-  /** сразу после монтирования и после каждого переключения замены */
-  onChange(e: { swaps: number[]; analysis: Analysis }): void;
-  /** нажата «Изменить чек» */
+  /** переключили замену в плане */
+  onSwaps(swaps: number[]): void;
+  /** как учитывать чек; нет — менять нельзя */
+  onFlags?(f: { tag?: 'guests' | null; priv?: boolean }): void;
+  /** нажата «Изменить чек»; нет — менять нельзя */
   onEdit?(): void;
 };
 

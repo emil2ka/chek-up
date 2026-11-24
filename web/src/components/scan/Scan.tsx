@@ -1,17 +1,16 @@
 'use client';
 // Экран сканирования (~2,6 с): «бумажный» чек или фото, бегущая линия сканера,
 // быстро сменяющиеся позиции с сахаром и растущий счётчик кубиков.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { amountTxt, analyze, CUBES, cubesOfValue, dateRu, METRICS, pl, valueOf } from '@/lib/engine';
-import type { MetricId } from '@/lib/types';
-import { recognize } from '@/lib/recognize';
-import type { ScanResponse } from '@/lib/schema';
-import type { Receipt } from '@/lib/types';
+import { amountTxt, analyze, cubesOfValue, dateRu, METRICS, pl, SUGAR_CUBES, valueOf } from '@/lib/engine';
+import { t } from '@/lib/i18n';
+import { outboxServerSnapshot, outboxSnapshot, subscribeOutbox, waitFor, type Outcome } from '@/lib/outbox';
+import type { MetricId, Receipt } from '@/lib/types';
 import { IconClose } from '@/components/icons';
 
 const DURATION = 2600; // мс — минимум; настоящее распознавание может идти дольше
-const WAIT = ['Ищу сладкое, солёное и жирное', 'Разбираю сокращения кассы', 'Сверяю со справочником', 'Считаю сахар, соль и жиры'];
+const WAIT = ['Ищу сладкое, солёное и жирное', 'Разбираю сокращения кассы', 'Сверяю со справочником', 'Считаю сахар, соль и жиры', 'Ещё немного'];
 /** по этим показателям ищем «вредное» в ленте сканера (калории — не вред сами по себе) */
 const SCANNED: MetricId[] = ['sugar', 'salt', 'fat'];
 const LINES = [92, 64, 80, 48, 86, 70, 58, 90, 44, 76, 66, 84, 52, 72];
@@ -19,27 +18,35 @@ const nb = (s: string) => s.replace(/(\d) (?=\S)/g, '$1 '); // «270 г» не 
 
 type Props = {
   /** фото с камеры (или null для демо-чека) */
-  file: File | null;
+  files: File[];
+  /** чек в очереди, которого ждём */
+  jobId: string | null;
   /** выбранный демо-чек (если нет фото) */
   receipt: Receipt | null;
-  onDone(res: ScanResponse): void;
+  /** чек прочитан (демо — сразу) */
+  onDone(o: Outcome): void;
   onCancel(): void;
-  onError(err: unknown): void;
+  /** не ждать: чек дочитается в фоне */
+  onBackground(): void;
+  /** длинный чек: доснять ещё кадр */
+  onMore(): void;
 };
 
 type Tick = { k: number; name: string; grams: string } | null;
 
-export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
+export function Scan({ files, jobId, receipt, onDone, onCancel, onBackground, onMore }: Props) {
   const reduce = useReducedMotion();
-  const photo = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  const first = files[0] ?? null;
+  const photo = useMemo(() => (first ? URL.createObjectURL(first) : null), [first]);
+  const queued = useSyncExternalStore(subscribeOutbox, outboxSnapshot, outboxServerSnapshot).filter(j => j.status !== 'error').length;
   const [found, setFound] = useState<Receipt | null>(receipt);
   const [tick, setTick] = useState<Tick>(null);
   const [count, setCount] = useState(0);
   const [wait, setWait] = useState(0);
 
   // последние обработчики без перезапуска эффекта
-  const cb = useRef({ onDone, onError });
-  useEffect(() => { cb.current = { onDone, onError }; });
+  const cb = useRef({ onDone });
+  useEffect(() => { cb.current = { onDone }; });
 
   // превью фото: освободить blob-URL, когда экран уйдёт (с запасом на анимацию ухода)
   useEffect(() => {
@@ -55,43 +62,40 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
     const t0 = performance.now();
     const waiter = window.setInterval(() => setWait(w => (w + 1) % WAIT.length), 1700);
 
-    const job: Promise<ScanResponse> = receipt
-      ? Promise.resolve({ receipt, notice: null })
-      : file
-        ? recognize(file)
-        : Promise.reject(new Error('Нет ни фото, ни чека'));
-
-    job.then(res => {
+    const show = (r: Receipt, o: Outcome) => {
       window.clearInterval(waiter);
       if (dead) return;
-      const r = res.receipt;
       setFound(r);
       const a = analyze(r);
       // позиции, где чего-то хотя бы кубик; для каждой показываем самый выраженный показатель
       const worst = (it: (typeof a.items)[number]) => SCANNED.map(m => ({ m, v: valueOf(it.active, m), c: cubesOfValue(valueOf(it.active, m), m) })).sort((x, y) => y.c - x.c)[0];
-      const sweet = a.items.filter(it => worst(it).c >= 1);
-      const all = SCANNED.reduce((s, m) => s + a.cubesBy[m], 0);
+      const sweet = a.items.filter(it => !it.nf && worst(it).c >= 1).slice(0, 8);
       const startAt = Math.max(150, performance.now() - t0);
-      // если ответ пришёл поздно, всё равно даём позициям ~1,6 с, чтобы их успели прочитать
-      const span = Math.max(Math.min(1600, sweet.length * 320), DURATION - startAt - 450);
+      // позиции успевают прочитать, но готовый чек зря не держим
+      const span = Math.max(Math.min(1400, sweet.length * 280), DURATION - startAt - 450);
       const step = sweet.length ? span / sweet.length : span;
       sweet.forEach((it, k) => later(() => {
         const w = worst(it);
-        setTick({ k, name: nb(it.active.n), grams: `${amountTxt(w.v, w.m).replace(' ', '\u00A0')} ${METRICS[w.m].of}` });
-        setCount(Math.round(all * (k + 1) / sweet.length));
-      }, startAt + k * step));
-      later(() => cb.current.onDone(res), Math.max(DURATION, performance.now() - t0 + 300));
-    }).catch(err => {
-      window.clearInterval(waiter);
-      if (!dead) cb.current.onError(err);
+        setTick({ k, name: nb(it.active.n), grams: `${amountTxt(w.v, w.m).replace(' ', '\u00A0')} ${t(METRICS[w.m].of)}` });
+        setCount(Math.round(a.cubes * (k + 1) / sweet.length));
+      }, k * step));
+      later(() => cb.current.onDone(o), Math.max(DURATION - startAt, span + 250));
+    };
+
+    let off = () => {};
+    if (receipt) show(receipt, { kind: 'demo', receipt, notice: '' });
+    else if (jobId) off = waitFor(jobId, o => {
+      if (o.kind === 'error') { window.clearInterval(waiter); if (!dead) cb.current.onDone(o); }
+      else show(o.receipt, o);
     });
 
     return () => {
       dead = true;
+      off();
       window.clearInterval(waiter);
       timers.forEach(clearTimeout);
     };
-  }, [file, receipt]);
+  }, [jobId, receipt]);
 
   return (
     <div className="flex min-h-full flex-col px-5 pt-[calc(env(safe-area-inset-top)+10px)] pb-[calc(env(safe-area-inset-bottom)+28px)] text-white">
@@ -99,12 +103,12 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
         <button
           type="button"
           onClick={onCancel}
-          aria-label="Отменить сканирование"
+          aria-label={t('Отменить')}
           className="grid size-11 place-items-center rounded-[14px] bg-white/16 transition-transform active:scale-[.92]"
         >
           <IconClose className="size-5.5" />
         </button>
-        <p className="text-center text-xs font-extrabold tracking-[.08em] text-white/82 uppercase">Сканирую</p>
+        <p className="text-center text-xs font-extrabold tracking-[.08em] text-white/82 uppercase">{t('Сканирую')}{files.length > 1 ? ` · ${t('кадров: {n}', { n: files.length })}` : ''}</p>
       </header>
 
       {/* чек под сканером */}
@@ -154,17 +158,17 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
       {/* подписи */}
       <div className="text-center" aria-live="polite">
         <h1 className="font-display text-[30px] leading-[.95] font-black tracking-[-.045em]">
-          Читаю чек<span className="dots"><i>.</i><i>.</i><i>.</i></span>
+          {t('Читаю чек')}<span className="dots"><i>.</i><i>.</i><i>.</i></span>
         </h1>
 
         <div className="relative mt-3.5 h-16.5 overflow-hidden short:mt-2.5">
-          <AnimatePresence initial={false}>
+          <AnimatePresence initial={false} mode="wait">
             {tick ? (
               <motion.p
                 key={tick.k}
                 initial={reduce ? { opacity: 0 } : { opacity: 0, y: 26 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -26 }}
+                exit={{ opacity: 0, transition: { duration: 0.08 } }}
                 transition={{ type: 'spring', stiffness: 520, damping: 30 }}
                 className="absolute inset-0 m-auto flex h-fit min-h-11.5 w-fit max-w-full items-center gap-2.25 rounded-[23px] bg-white/18 px-4.5 py-2.5 text-left text-[15px] leading-[1.3] font-bold text-balance shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_25%,transparent)]"
               >
@@ -176,10 +180,10 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
                 key={`wait-${wait}`}
                 initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.08 } }}
                 className="absolute inset-0 m-auto flex h-fit w-fit items-center text-[15px] font-bold text-white/80"
               >
-                {WAIT[wait]}
+                {t(WAIT[wait])}
               </motion.p>
             )}
           </AnimatePresence>
@@ -195,9 +199,17 @@ export function Scan({ file, receipt, onDone, onCancel, onError }: Props) {
           >
             {count}
           </motion.b>
-          <span className="mt-1.5 text-sm font-bold text-white/86">{pl(count, CUBES)} сахара, соли и жиров найдено</span>
+          <span className="mt-1.5 text-sm font-bold text-white/86">{pl(count, SUGAR_CUBES)}</span>
         </p>
       </div>
+
+      {jobId && !found && (
+        <div className="rise mt-5 grid gap-2.5" style={{ '--d': '900ms' } as CSSProperties}>
+          <button type="button" onClick={onBackground} className="btn-glass inline-flex min-h-13 items-center justify-center rounded-btn px-4 text-[15px] font-bold active:scale-[.97]">{t('Продолжить в фоне')}</button>
+          {files.length < 3 && <button type="button" onClick={onMore} className="min-h-11 text-[14px] font-bold text-white/90 underline decoration-white/40 underline-offset-4">{t('Чек длинный? Добавь ещё кадр')}</button>}
+          {queued > 1 && <p className="text-center text-[13px] font-semibold text-white/85">{t('В очереди чеков: {n}', { n: queued })}</p>}
+        </div>
+      )}
     </div>
   );
 }

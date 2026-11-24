@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { RECEIPTS } from '@/lib/data';
-import { analyze, CUBES, dateRu, pl, verdict } from '@/lib/engine';
+import { analyze, dateRu, pl, SUGAR_CUBES, verdict } from '@/lib/engine';
+import { t } from '@/lib/i18n';
 import type { Receipt } from '@/lib/types';
 import { IconChevron, IconClose } from '@/components/icons';
 
@@ -56,13 +57,13 @@ export function DemoSheet({ onClose, onPick }: Props) {
           <div aria-hidden className="mx-auto mb-3 h-1.25 w-11 rounded-full bg-line" />
           <div className="flex items-start justify-between gap-3 px-1 pt-1 pb-4">
             <div>
-              <p className="text-xs font-extrabold tracking-[.08em] text-blue-1 uppercase">Демо-чеки</p>
-              <h2 id="sheet-title" className="mt-1.5 font-display text-[27px] leading-[.95] font-black tracking-[-.045em]">Выбери пример</h2>
+              <p className="text-xs font-extrabold tracking-[.08em] text-blue-1 uppercase">{t('Демо-чеки')}</p>
+              <h2 id="sheet-title" className="mt-1.5 font-display text-[27px] leading-[.95] font-black tracking-[-.045em]">{t('Выбери пример')}</h2>
             </div>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Закрыть"
+              aria-label={t('Закрыть')}
               className="grid size-11 flex-none place-items-center rounded-[14px] bg-tint text-ink transition-transform active:scale-[.92]"
             >
               <IconClose className="size-5.5" />
@@ -87,7 +88,7 @@ export function DemoSheet({ onClose, onPick }: Props) {
                   >
                     <span className="grid h-21.5 place-content-center justify-items-center rounded-[18px] bg-sky text-white shadow-[inset_0_-4px_0_color-mix(in_srgb,var(--ink)_18%,transparent)]">
                       <b className="font-display text-[30px] leading-none font-black tracking-[-.05em]">{a.cubes}</b>
-                      <small className="mt-1 text-xs font-bold text-white/88">{pl(a.cubes, CUBES)} сахара</small>
+                      <small className="mt-1 text-xs font-bold text-white/88">{pl(a.cubes, SUGAR_CUBES)}</small>
                     </span>
                     <span className="grid min-w-0 gap-0.5">
                       <span className="font-display text-base leading-[1.2] font-bold tracking-[-.02em]">{r.title}</span>

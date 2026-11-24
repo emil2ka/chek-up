@@ -1,15 +1,18 @@
 'use client';
-// «Профиль»: состав семьи и норма, достижения, установка на телефон, справка и очистка истории.
+// «Профиль»: состав семьи и нормы, достижения, аккаунт и семья, язык, установка, справка.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { amountTxt, bigNum, CUBES, isCubeMetric, METRIC_IDS, METRICS, pl, UNITS_NOTE, type Forms } from '@/lib/engine';
-import { badges } from '@/lib/insights';
+import { bigNum, CUBES, isCubeMetric, METRIC_IDS, METRICS, pl, UNITS_NOTE } from '@/lib/engine';
+import type { FamilyState } from '@/lib/family';
+import { t } from '@/lib/i18n';
+import { badges, isDemo } from '@/lib/insights';
 import { MAX_ADULTS, MAX_KIDS, familyDaily, familyDailyCubesOf, profile as profileStore, type Profile as ProfileData } from '@/lib/profile';
+import type { WeekMark } from '@/lib/streak';
 import type { HistoryEntry } from '@/lib/types';
+import { Account } from '@/components/account/Account';
 import { IconBadge, IconChevron, IconCube, IconDownload, IconInfo, IconTrash } from '@/components/icons';
+import { RECEIPTS_F } from '@/components/streak/Streak';
+import { dangerCls, H2, iconCls, quietCls, rowCls, Segmented } from '@/components/ui/kit';
 import { Stepper } from '@/components/ui/Stepper';
-import { LinkAccount } from './LinkAccount';
-
-const RECEIPTS_F: Forms = ['чек', 'чека', 'чеков'];
 
 type InstallEvent = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
 
@@ -17,17 +20,24 @@ type Props = {
   ready: boolean;
   entries: HistoryEntry[];
   profile: ProfileData;
+  family: FamilyState;
+  marks: WeekMark[];
+  best: number;
+  /** стереть свои чеки */
   onClear(): void;
   onReplayIntro(): void;
+  onToast(text: string): void;
 };
 
-export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Props) {
-  const list = useMemo(() => badges(ready ? entries : [], profile), [ready, entries, profile]);
+export function Profile({ ready, entries, profile, family, marks, best, onClear, onReplayIntro, onToast }: Props) {
+  const list = useMemo(() => badges(ready ? entries : [], profile, marks, best), [ready, entries, profile, marks, best]);
   const done = list.filter(b => b.done).length;
   const [picked, setPicked] = useState<string | null>(null);
   const [openRow, setOpenRow] = useState<'install' | 'how' | null>(null);
   const [confirm, setConfirm] = useState(false);
   const pickedBadge = list.find(b => b.id === picked) ?? null;
+  const own = entries.filter(e => !e.by || e.by === family.me.id || isDemo(e)).length;
+  const child = family.me.role === 'child';
 
   // ── установка на телефон: в Chrome на Android браузер сам отдаёт событие ──
   const installEvent = useRef<InstallEvent | null>(null);
@@ -50,62 +60,45 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
     setCanInstall(false);
   };
 
-  const row = 'flex min-h-15 w-full items-center gap-3 rounded-[20px] bg-tint px-3.5 text-left text-[16px] font-bold active:scale-[.985]';
-  const rowIcon = 'grid size-9 flex-none place-items-center rounded-xl bg-white text-blue-1';
-
   return (
     <div className="flex min-h-full flex-col">
-      <header className="relative overflow-clip px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-7 text-white">
+      <header className="relative overflow-clip px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-6 text-white">
         <div aria-hidden className="pointer-events-none absolute -top-24 -right-28 size-80 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--blue-3)_55%,transparent),transparent)]" />
-        <h1 className="rise relative font-display text-[22px] font-extrabold tracking-[-.04em]">Профиль</h1>
-        <div className="rise relative mt-5 flex items-end justify-between gap-4" style={{ animationDelay: '60ms' }}>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold text-white/85">Дневные ориентиры для семьи</p>
-            <ul className="mt-3 grid grid-cols-3 gap-2">
-              {METRIC_IDS.map(m => (
-                <li key={m} className="grid min-w-0 justify-items-start gap-0.5 rounded-2xl bg-white/12 p-2.5">
-                  <i aria-hidden className="size-2.5 rounded-full" style={{ background: METRICS[m].color, boxShadow: '0 0 0 1.5px rgba(255,255,255,.85)' }} />
-                  <b className="font-display text-[21px] leading-none font-black tracking-[-.05em] tabular-nums">{bigNum(familyDaily(profile, m), m)}</b>
-                  <span className="text-[13px] font-bold text-white/88">{METRICS[m].short} · {isCubeMetric(m) ? 'куб.' : METRICS[m].unit}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <IconCube className="mb-2 hidden size-16 flex-none sm:block rotate-12 text-white drop-shadow-[0_14px_24px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
-        </div>
+        <h1 className="rise relative font-display text-[26px] font-black tracking-[-.04em]">{family.me.name || t('Профиль')}</h1>
+        <p className="rise relative mt-3 text-[14px] font-semibold text-white/88" style={{ animationDelay: '60ms' }}>{t('Ориентиры на день для семьи')}</p>
+        <ul className="rise relative mt-2 grid grid-cols-3 gap-2" style={{ animationDelay: '60ms' }}>
+          {METRIC_IDS.map(m => (
+            <li key={m} className="grid min-w-0 justify-items-start gap-0.5 rounded-2xl bg-white/12 p-2.5">
+              <b className="font-display text-[20px] leading-none font-black tracking-[-.05em] tabular-nums">{bigNum(familyDaily(profile, m), m)}</b>
+              <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-bold text-white/88"><i aria-hidden className="size-2 flex-none rounded-full" style={{ background: METRICS[m].color, boxShadow: '0 0 0 1.5px rgba(255,255,255,.85)' }} /><span className="truncate">{m === 'kcal' ? t('Ккал') : `${t(METRICS[m].short)}, ${isCubeMetric(m) ? t('куб.') : t(METRICS[m].unit)}`}</span></span>
+            </li>
+          ))}
+        </ul>
       </header>
 
       <div className="on-light relative flex-1 rounded-t-sheet bg-white px-3.5 pt-6 pb-6 text-ink shadow-panel">
-        {/* ── семья ── */}
         <section aria-labelledby="pf-h-family">
-          <h2 id="pf-h-family" className="px-1 pb-3 font-display text-[19px] leading-tight font-extrabold tracking-[-.02em]">Кто ест из корзины</h2>
-          <div className="grid gap-2">
-            <Stepper label="Взрослые" hint={`до ${METRICS.sugar.adult} г сахара, ${METRICS.salt.adult} г соли, ${METRICS.fat.adult} г жиров в день`} value={profile.adults} min={1} max={MAX_ADULTS} onChange={v => profileStore.update({ adults: v })} />
-            <Stepper label="Дети" hint={`до ${METRICS.sugar.kid} г сахара, ${METRICS.salt.kid} г соли, ${METRICS.fat.kid} г жиров в день`} value={profile.kids} min={0} max={MAX_KIDS} onChange={v => profileStore.update({ kids: v })} />
-          </div>
+          <H2 id="pf-h-family">{t('Кто ест из корзины')}</H2>
+          <fieldset disabled={child} className="grid gap-2">
+            <Stepper label={t('Взрослые')} hint={t('до {a} г сахара и {b} г соли в день', { a: METRICS.sugar.adult, b: METRICS.salt.adult })} value={profile.adults} min={1} max={MAX_ADULTS} onChange={v => profileStore.updateFamily({ adults: v })} />
+            <Stepper label={t('Дети')} hint={t('до {a} г сахара и {b} г соли в день', { a: METRICS.sugar.kid, b: METRICS.salt.kid })} value={profile.kids} min={0} max={MAX_KIDS} onChange={v => profileStore.updateFamily({ kids: v })} />
+          </fieldset>
           <p className="mt-3 px-1 text-[14px] leading-snug font-semibold text-mute">
-            На всю семью в день выходит до <b className="text-ink">{amountTxt(familyDaily(profile, 'sugar'), 'sugar')}</b> сахара, <b className="text-ink">{amountTxt(familyDaily(profile, 'salt'), 'salt')}</b> соли, <b className="text-ink">{amountTxt(familyDaily(profile, 'fat'), 'fat')}</b> насыщенных жиров и ориентировочно {familyDaily(profile, 'kcal')} ккал, {familyDaily(profile, 'carbs')} г углеводов и {familyDaily(profile, 'protein')} г белка.
-            Это {familyDailyCubesOf(profile, 'sugar') * 7} {pl(familyDailyCubesOf(profile, 'sugar') * 7, CUBES)} сахара в неделю; с нормами сравнивается раздел «Неделя».
+            {child ? t('Состав семьи меняет взрослый.') : t('На неделю это до {n} {w} сахара.', { n: familyDailyCubesOf(profile, 'sugar') * 7, w: pl(familyDailyCubesOf(profile, 'sugar') * 7, CUBES) })}
           </p>
         </section>
 
-        {/* ── достижения ── */}
         <section aria-labelledby="pf-h-badges" className="mt-8">
-          <div className="flex items-center justify-between px-1 pb-3">
-            <h2 id="pf-h-badges" className="font-display text-[19px] leading-tight font-extrabold tracking-[-.02em]">Достижения</h2>
-            <span className="inline-flex h-8 items-center rounded-full bg-tint px-3 font-display text-sm font-extrabold text-blue-1">{done} из {list.length}</span>
-          </div>
+          <H2 id="pf-h-badges" right={<span className="inline-flex h-8 items-center rounded-full bg-tint px-3 font-display text-sm font-extrabold text-blue-1">{done} {t('из')} {list.length}</span>}>{t('Достижения')}</H2>
           <ul className="grid grid-cols-3 gap-2">
             {list.map(b => (
               <li key={b.id}>
                 <button
                   type="button"
                   aria-pressed={picked === b.id}
-                  aria-label={`${b.title}: ${b.done ? 'получено' : 'ещё нет'}. ${b.desc}`}
+                  aria-label={`${t(b.title)}: ${b.done ? t('получено') : t('ещё нет')}. ${t(b.desc)}`}
                   onClick={() => setPicked(picked === b.id ? null : b.id)}
-                  className={`grid w-full justify-items-center gap-2 rounded-3xl px-1.5 pt-3.5 pb-3 transition active:scale-[.95] ${
-                    picked === b.id ? 'bg-[color-mix(in_srgb,var(--blue-3)_26%,var(--tint))]' : 'bg-tint'
-                  }`}
+                  className={`grid w-full justify-items-center gap-2 rounded-3xl px-1.5 pt-3.5 pb-3 transition active:scale-[.95] ${picked === b.id ? 'bg-[color-mix(in_srgb,var(--blue-3)_26%,var(--tint))]' : 'bg-tint'}`}
                 >
                   <span className={`grid size-14 place-items-center rounded-[18px] ${
                     b.done
@@ -114,7 +107,7 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
                   }`}>
                     <IconBadge name={b.icon} className="size-7" />
                   </span>
-                  <span className={`min-h-8 text-center text-xs leading-[1.25] font-extrabold ${b.done ? 'text-ink' : 'text-mute'}`}>{b.title}</span>
+                  <span className={`min-h-8 text-center text-xs leading-[1.25] font-extrabold ${b.done ? 'text-ink' : 'text-mute'}`}>{t(b.title)}</span>
                   {b.progress && !b.done && (
                     <span className="h-1.5 w-12 overflow-hidden rounded-full bg-white" aria-hidden="true">
                       <i className="block h-full rounded-full bg-blue-2" style={{ width: `${b.progress[0] / b.progress[1] * 100}%` }} />
@@ -126,25 +119,21 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
           </ul>
           <p className="mt-3 min-h-11 rounded-2xl bg-tint px-3.5 py-3 text-[14px] leading-snug font-semibold" aria-live="polite">
             {pickedBadge
-              ? <><b>{pickedBadge.title}.</b> {pickedBadge.desc}{pickedBadge.progress && !pickedBadge.done ? ` — ${pickedBadge.progress[0]} из ${pickedBadge.progress[1]}` : ''}{pickedBadge.done ? ' — получено.' : '.'}</>
-              : <span className="text-mute">Нажми на значок, чтобы узнать, как его получить.</span>}
+              ? <><b>{t(pickedBadge.title)}.</b> {t(pickedBadge.desc)}. {pickedBadge.done ? t('Получено.') : pickedBadge.progress ? t('Сейчас {a} из {b}.', { a: pickedBadge.progress[0], b: pickedBadge.progress[1] }) : ''}</>
+              : <span className="text-mute">{t('Нажми на значок, чтобы узнать, как его получить.')}</span>}
           </p>
         </section>
 
-        {/* ── один аккаунт: общий сервер и БД с мобильным приложением ── */}
-        <section aria-labelledby="pf-h-account" className="mt-8">
-          <h2 id="pf-h-account" className="px-1 pb-3 font-display text-[19px] leading-tight font-extrabold tracking-[-.02em]">Один аккаунт</h2>
-          <LinkAccount />
-        </section>
+        <Account family={family} onToast={onToast} />
 
-        {/* ── приложение ── */}
         <section aria-labelledby="pf-h-app" className="mt-8">
-          <h2 id="pf-h-app" className="px-1 pb-3 font-display text-[19px] leading-tight font-extrabold tracking-[-.02em]">Приложение</h2>
+          <H2 id="pf-h-app">{t('Приложение')}</H2>
           <div className="grid gap-2">
+            <Segmented label={t('Язык')} value={profile.lang} onChange={v => profileStore.update({ lang: v })} options={[['ru', 'Русский'], ['kk', 'Қазақша']] as const} />
             <div>
-              <button type="button" aria-expanded={openRow === 'install'} onClick={() => setOpenRow(openRow === 'install' ? null : 'install')} className={row}>
-                <span className={rowIcon}><IconDownload className="size-5" /></span>
-                <span className="flex-1">Установить на телефон</span>
+              <button type="button" aria-expanded={openRow === 'install'} onClick={() => setOpenRow(openRow === 'install' ? null : 'install')} className={rowCls}>
+                <span className={iconCls}><IconDownload className="size-5" /></span>
+                <span className="flex-1">{t('Установить на телефон')}</span>
                 <IconChevron className={`size-5 text-mute transition-transform ${openRow === 'install' ? 'rotate-90' : ''}`} />
               </button>
               {openRow === 'install' && (
@@ -152,58 +141,57 @@ export function Profile({ ready, entries, profile, onClear, onReplayIntro }: Pro
                   {canInstall && (
                     <button type="button" onClick={install} className="mb-3 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-btn bg-blue-1 px-5 font-display text-base font-bold text-white active:scale-[.97]">
                       <IconDownload className="size-5.5" />
-                      <span>Установить</span>
+                      <span>{t('Установить')}</span>
                     </button>
                   )}
-                  <p><b>iPhone:</b> в Safari нажми «Поделиться», затем «На экран „Домой“».</p>
-                  <p className="mt-1.5"><b>Android:</b> в Chrome открой меню с тремя точками и выбери «Установить приложение».</p>
-                  <p className="mt-1.5 text-mute">После этого «Чек-ап» открывается с рабочего стола на весь экран.</p>
+                  <p><b>iPhone:</b> {t('в Safari нажми «Поделиться», затем «На экран „Домой“».')}</p>
+                  <p className="mt-1.5"><b>Android:</b> {t('в Chrome открой меню с тремя точками и выбери «Установить приложение». Тогда фото чека можно отправить сюда кнопкой «Поделиться» из галереи.')}</p>
                 </div>
               )}
             </div>
 
             <div>
-              <button type="button" aria-expanded={openRow === 'how'} onClick={() => setOpenRow(openRow === 'how' ? null : 'how')} className={row}>
-                <span className={rowIcon}><IconInfo className="size-5.5" /></span>
-                <span className="flex-1">Как считается оценка</span>
+              <button type="button" aria-expanded={openRow === 'how'} onClick={() => setOpenRow(openRow === 'how' ? null : 'how')} className={rowCls}>
+                <span className={iconCls}><IconInfo className="size-5.5" /></span>
+                <span className="flex-1">{t('Как считаем')}</span>
                 <IconChevron className={`size-5 text-mute transition-transform ${openRow === 'how' ? 'rotate-90' : ''}`} />
               </button>
               {openRow === 'how' && (
-                <div className="rise px-3.5 pt-3 pb-1 text-[15px] leading-snug font-semibold" style={{ animationDuration: '320ms' }}>
-                  <p>Оценка корзины — от 0 до 100. Её снижают доля вредных товаров в сумме чека, количество добавленного сахара, соли и насыщенных жиров, а ещё траты на алкоголь и энергетики. Калории в оценку не входят: еда должна быть калорийной, важно, откуда они.</p>
-                  <p className="mt-1.5">{UNITS_NOTE} Сахар — только добавленный и другие свободные сахара; сахар в цельных фруктах не считается.</p>
-                  <p className="mt-1.5 text-mute">Цифры примерные: это ориентир для покупок, а не медицинская рекомендация.</p>
+                <div className="rise grid gap-2 px-3.5 pt-3 pb-1 text-[15px] leading-snug font-semibold" style={{ animationDuration: '320ms' }}>
+                  <p>{t('Оценка от 0 до 100 не зависит от размера корзины: сахар, соль и жиры сравниваем с калориями, вредное и алкоголь с суммой на еду. Запасы вроде сахара и масла делим на недели.')}</p>
+                  <p>{t('Замены в чеке это план. В экономию и минус кубиков они попадут, когда следующий чек подтвердит, что ты правда купил другое.')}</p>
+                  <p>{t('Стрик: неделя засчитана, если ты отметил, что внёс все чеки или что покупок не было. Прошлую неделю можно закрыть до вечера понедельника. За четыре недели даётся заморозка на пропуск, запас до двух.')}</p>
+                  <p>{t(UNITS_NOTE)} {t('Сахар только добавленный, из цельных фруктов не считаем.')}</p>
+                  <p className="text-mute">{t('Цифры примерные: это ориентир для покупок, а не медицинская рекомендация.')}</p>
                 </div>
               )}
             </div>
 
-            <button type="button" onClick={onReplayIntro} className={row}>
-              <span className={rowIcon}><IconCube className="size-5.5" /></span>
-              <span className="flex-1">Показать знакомство заново</span>
+            <button type="button" onClick={onReplayIntro} className={rowCls}>
+              <span className={iconCls}><IconCube className="size-5.5" /></span>
+              <span className="flex-1">{t('Показать знакомство заново')}</span>
               <IconChevron className="size-5 text-mute" />
             </button>
 
             {confirm ? (
               <div className="rounded-[20px] bg-[color-mix(in_srgb,var(--bad)_10%,var(--white))] p-3.5">
-                <p className="text-[15px] leading-snug font-bold">
-                  Удалить {entries.length} {pl(entries.length, RECEIPTS_F)} из истории? Вернуть их не получится.
-                </p>
+                <p className="text-[15px] leading-snug font-bold">{t('Удалить {n} {w}? Вернуть их не получится.', { n: own, w: pl(own, RECEIPTS_F) })}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setConfirm(false)} className="min-h-12 rounded-2xl bg-white font-bold shadow-[inset_0_0_0_1.5px_var(--line)] active:scale-[.97]">Оставить</button>
-                  <button type="button" onClick={() => { setConfirm(false); onClear(); }} className="min-h-12 rounded-2xl bg-bad font-bold text-white active:scale-[.97]">Удалить</button>
+                  <button type="button" onClick={() => setConfirm(false)} className={quietCls}>{t('Оставить')}</button>
+                  <button type="button" onClick={() => { setConfirm(false); onClear(); }} className={dangerCls}>{t('Удалить')}</button>
                 </div>
               </div>
             ) : (
-              <button type="button" disabled={!ready || entries.length === 0} onClick={() => setConfirm(true)} className={`${row} disabled:opacity-45 disabled:active:scale-100`}>
-                <span className={`${rowIcon} text-bad`}><IconTrash className="size-5" /></span>
-                <span className="flex-1">Очистить историю чеков</span>
+              <button type="button" disabled={!ready || own === 0} onClick={() => setConfirm(true)} className={rowCls}>
+                <span className={`${iconCls} text-bad!`}><IconTrash className="size-5" /></span>
+                <span className="flex-1">{t('Удалить все мои чеки')}</span>
               </button>
             )}
           </div>
         </section>
 
         <p className="mt-7 px-1 text-xs leading-relaxed font-semibold text-mute">
-          Чек-ап, версия 0.1. Чеки и профиль хранятся на этом устройстве и в твоём аккаунте на сервере (без фото чеков). Оценки примерные и не заменяют консультацию врача.
+          {t('Чек-ап, версия {v}. Чеки и профиль хранятся на этом устройстве и в твоём аккаунте на сервере. Фото чеков не храним. Оценки примерные и не заменяют консультацию врача.', { v: '0.2' })}
         </p>
       </div>
     </div>

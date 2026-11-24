@@ -1,6 +1,7 @@
 'use client';
 // Нижняя навигация: плавающая белая панель поверх экранов-разделов.
 import { motion, useReducedMotion } from 'motion/react';
+import { t } from '@/lib/i18n';
 import { IconBars, IconCamera, IconSearch, IconUser } from '@/components/icons';
 
 export type Tab = 'home' | 'week' | 'catalog' | 'profile';
@@ -16,7 +17,7 @@ export function TabBar({ tab, onTab }: { tab: Tab; onTab(t: Tab): void }) {
   const reduce = useReducedMotion();
   return (
     <motion.nav
-      aria-label="Разделы"
+      aria-label={t('Разделы')}
       initial={reduce ? { opacity: 0 } : { y: 90, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={reduce ? { opacity: 0 } : { y: 90, opacity: 0 }}
@@ -46,7 +47,7 @@ export function TabBar({ tab, onTab }: { tab: Tab; onTab(t: Tab): void }) {
                   />
                 )}
                 <Icon className="relative size-6" />
-                <span className="relative">{label}</span>
+                <span className="relative">{t(label)}</span>
               </button>
             </li>
           );

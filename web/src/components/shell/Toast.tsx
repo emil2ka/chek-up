@@ -1,8 +1,9 @@
 'use client';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { t } from '@/lib/i18n';
 import { IconClose, IconInfo } from '@/components/icons';
 
-export type ToastMsg = { id: number; text: string } | null;
+export type ToastMsg = { id: number; text: string; action?: { label: string; run(): void } } | null;
 
 export function Toast({ msg, onClose }: { msg: ToastMsg; onClose(): void }) {
   const reduce = useReducedMotion();
@@ -21,11 +22,14 @@ export function Toast({ msg, onClose }: { msg: ToastMsg; onClose(): void }) {
             <span className="grid size-7 flex-none place-items-center rounded-[9px] bg-mid text-ink">
               <IconInfo className="size-4.5" />
             </span>
-            <span className="flex-1 pt-1">{msg.text}</span>
+            <span className="flex-1 pt-1">
+              {msg.text}
+              {msg.action && <button type="button" onClick={() => { msg.action?.run(); onClose(); }} className="-mb-2 block min-h-11 text-left font-extrabold text-blue-3">{msg.action.label}</button>}
+            </span>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Закрыть уведомление"
+              aria-label={t('Закрыть уведомление')}
               className="-my-2.5 -mr-3 grid size-11 flex-none place-items-center rounded-xl text-white/70"
             >
               <IconClose className="size-4.5" />

@@ -113,7 +113,7 @@ const BADGE_PATHS = {
   stack: <><rect x="4" y="13.500" width="7" height="7" rx="1.800" /><rect x="13" y="13.500" width="7" height="7" rx="1.800" /><rect x="8.500" y="4.500" width="7" height="7" rx="1.800" /></>,
   swap: <><path d="M4 8.500h13M13.500 5l3.500 3.500-3.500 3.500" /><path d="M20 15.500H7M10.500 12L7 15.500l3.500 3.500" /></>,
   leaf: <><path d="M5 19c0-8 5-13 14-14 0 9-4.500 14-12 14" /><path d="M5 19c2.500-4.500 5.500-7.500 9-9.500" /></>,
-  bomb: <><circle cx="10.500" cy="14" r="6" /><path d="M14.500 9.500l2.500-2.500M17 7c.5-2 2-2.500 3.500-2" /></>,
+  flame: <><path d="M12 3c.5 3.500 5.500 5.500 5.500 10.500a5.500 5.500 0 0 1-11 0c0-2.200 1-3.600 2.200-4.700.2 1.700.9 2.500 1.700 2.900C10 9 10 6 12 3z" /></>,
   coin: <><circle cx="12" cy="12" r="8" /><path d="M8.500 8.500h7M12 8.500V16" /></>,
   minus: <><rect x="4" y="4" width="16" height="16" rx="4" /><path d="M8.500 12h7" /></>,
   shield: <><path d="M12 3.500l7 2.500v5.500c0 4.500-3 7.500-7 9-4-1.500-7-4.500-7-9V6z" /><path d="M9 12l2.200 2.200L15 10" /></>,
@@ -125,5 +125,41 @@ export type BadgeIconName = keyof typeof BADGE_PATHS;
 export const IconBadge = ({ name, ...p }: P & { name: BadgeIconName }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.1} {...p}>
     {BADGE_PATHS[name]}
+  </svg>
+);
+
+export const IconEdit = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <path d="M4.5 19.5l.8-4L16 4.8a1.8 1.8 0 0 1 2.600 0l.6.6a1.8 1.8 0 0 1 0 2.600L8.500 18.700z" /><path d="M14 7l3 3" />
+  </svg>
+);
+export const IconImage = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <rect x="3.5" y="4.500" width="17" height="15" rx="3.500" /><circle cx="9" cy="10" r="1.800" /><path d="M4 17l5-4.500 3.500 3 3-2.500 5 4.500" />
+  </svg>
+);
+export const IconCalendar = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <rect x="4" y="5.500" width="16" height="14.500" rx="3" /><path d="M4 10.500h16M9 3.500v4M15 3.500v4" />
+  </svg>
+);
+export const IconLock = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <rect x="5" y="10.500" width="14" height="9.500" rx="3" /><path d="M8 10.500V8a4 4 0 0 1 8 0v2.500" />
+  </svg>
+);
+export const IconUsers = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <circle cx="9" cy="8.500" r="3.300" /><path d="M2.800 19.500c.8-3.200 3.300-4.800 6.200-4.800s5.400 1.600 6.200 4.800" /><path d="M15.500 5.500a3.200 3.200 0 0 1 0 6.200M17.500 15c1.900.6 3.200 2.100 3.700 4.500" />
+  </svg>
+);
+export const IconSnow = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <path d="M12 3v18M4.200 7.500l15.600 9M19.800 7.500l-15.600 9M9.500 4.500L12 7l2.500-2.500M9.500 19.500L12 17l2.500 2.500" />
+  </svg>
+);
+export const IconClock = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={2.2} {...p}>
+    <circle cx="12" cy="12" r="8.200" /><path d="M12 7.500V12l3 2" />
   </svg>
 );

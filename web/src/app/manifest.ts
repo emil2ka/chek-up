@@ -14,6 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#1238F5',
     theme_color: '#1238F5',
     categories: ['health', 'food', 'lifestyle'],
+    share_target: {
+      action: '/share',
+      method: 'post',
+      enctype: 'multipart/form-data',
+      params: { files: [{ name: 'photo', accept: ['image/*'] }] },
+    },
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

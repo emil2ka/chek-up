@@ -43,6 +43,16 @@ export const PALETTES: Record<'sugar' | 'salt' | 'fat' | 'kcal' | 'carbs' | 'pro
   kcal: { shape: 'ember', body: ['#FFFAF2', '#FFD7AA', '#F28A3E'], base: '#FFC795', shade: '210, 100, 20', grainA: '220, 120, 40', grainC: '240, 150, 70', edge: '215, 105, 25', outline: '180, 80, 0' },
 };
 
+/** Вид кубиков за стрик: рафинад → тростниковый → нават → кристалл. */
+export const CUBE_SKINS: Record<number, PilePalette> = {
+  0: PALETTES.sugar,
+  4: { body: ['#FBE7C6', '#E7B873', '#B9803A'], base: '#DDAE6B', shade: '120, 72, 20', grainA: '150, 96, 36', grainC: '250, 226, 180', edge: '140, 88, 30', outline: '110, 66, 18' },
+  12: { body: ['#FFF3C9', '#FFCF5C', '#E79A12'], base: '#FFD777', shade: '190, 110, 0', grainA: '255, 246, 205', grainC: '225, 150, 20', edge: '205, 130, 10', outline: '160, 96, 0' },
+  26: { body: ['#FFFFFF', '#CFF4FF', '#79CBEF'], base: '#BFE9FA', shade: '30, 130, 190', grainA: '255, 255, 255', grainC: '120, 200, 240', edge: '60, 160, 215', outline: '20, 110, 170' },
+  52: { body: ['#FFFFFF', '#F3DBFF', '#BE86EE'], base: '#E2C4F8', shade: '120, 50, 180', grainA: '255, 255, 255', grainC: '190, 130, 240', edge: '150, 80, 210', outline: '110, 40, 170' },
+};
+export const skinFor = (level: number): PilePalette => CUBE_SKINS[level] ?? PALETTES.sugar;
+
 export type SugarPileOptions = {
   onCount?: (n: number) => void;
   floorRadius?: number;

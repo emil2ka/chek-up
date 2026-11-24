@@ -1,6 +1,7 @@
 // Карточка для «Поделиться»: картинка 1080×1920 в стиле «Гора сахара». Только для клиента.
 import { bigCap, bigNum, isCubeMetric, METRIC_IDS, METRICS } from './engine';
-import { PALETTES, type PilePalette } from './pile';
+import { t } from './i18n';
+import { PALETTES, skinFor, type PilePalette } from './pile';
 import { drawFoodPiece } from './foodPiece';
 import { drawSaltCrystal, saltGrainCount } from './saltCrystal';
 import type { MetricId, Tone } from './types';
@@ -12,10 +13,15 @@ export type ShareCardData = {
   cubesBy: Record<MetricId, number>;
   totals: Record<MetricId, number>;
   available: readonly MetricId[];
-  score: number;
-  /** «так себе» */
-  verdict: string;
+  /** «62 из 100 · неплохо», «5 недель подряд» */
+  pill: string;
   tone: Tone;
+  /** строка над цифрой */
+  kick?: string;
+  /** строка на белой карточке */
+  question?: string;
+  /** вид кубика по стрику */
+  level?: number;
   /** «Magnum · 16 ноября» */
   where: string;
 };
@@ -136,7 +142,7 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillText('чек-ап', 182, 153);
 
   // плашка с оценкой
-  const pill = `${d.score} из 100 · ${d.verdict}`;
+  const { pill } = d;
   c.font = `700 42px ${FONT_T}`;
   const pw = c.measureText(pill).width + 118;
   const px = (W - pw) / 2, py = 286;
@@ -153,7 +159,7 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.textAlign = 'center';
   c.fillStyle = '#fff';
   c.font = `500 56px ${FONT_D}`;
-  c.fillText('В моём чеке', W / 2, 510);
+  c.fillText(d.kick ?? t('В моём чеке'), W / 2, 510);
   const cubes = d.metric === 'salt' ? saltGrainCount(d.totals.salt) : d.cubesBy[d.metric];
   const available = d.available.includes(d.metric);
   const num = available ? bigNum(d.totals[d.metric], d.metric) : '—';
@@ -164,18 +170,18 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
   c.fillText(num, W / 2, 530 + size * 0.78);
   c.shadowColor = 'transparent';
   c.font = `500 56px ${FONT_D}`;
-  c.fillText(available ? bigCap(d.totals[d.metric], d.metric) : 'нет данных', W / 2, 530 + size * 0.78 + 96);
+  c.fillText(available ? bigCap(d.totals[d.metric], d.metric) : t('нет данных'), W / 2, 530 + size * 0.78 + 96);
 
   // куча и белая карточка
   const sheetTop = H - 330;
-  pile(c, cubes, sheetTop + 6, 530 + size * 0.78 + 150, PALETTES[d.metric]);
+  pile(c, cubes, sheetTop + 6, 530 + size * 0.78 + 150, d.metric === 'sugar' ? skinFor(d.level ?? 0) : PALETTES[d.metric]);
   c.shadowColor = 'rgba(8, 20, 90, .35)'; c.shadowBlur = 70; c.shadowOffsetY = -18;
   c.fillStyle = '#fff';
   roundRect(c, 0, sheetTop, W, 420, 84); c.fill();
   c.shadowColor = 'transparent';
   c.fillStyle = '#0D1440';
   c.font = `800 50px ${FONT_D}`;
-  c.fillText('А сколько в твоей корзине?', W / 2, sheetTop + 104);
+  c.fillText(d.question ?? t('А сколько в твоей корзине?'), W / 2, sheetTop + 104);
   // сводка по показателям
   const colW = (W - 120) / METRIC_IDS.length;
   METRIC_IDS.forEach((m, i) => {
@@ -187,7 +193,7 @@ export async function renderShareCard(d: ShareCardData): Promise<Blob> {
     c.fillText(d.available.includes(m) ? bigNum(d.totals[m], m) : '—', cx, sheetTop + 192, colW - 10);
     c.fillStyle = '#6B76A8';
     c.font = `700 32px ${FONT_T}`;
-    c.fillText(`${METRICS[m].short} · ${isCubeMetric(m) ? 'куб.' : METRICS[m].unit}`, cx, sheetTop + 232, colW - 10);
+    c.fillText(m === 'kcal' ? t('Ккал') : `${t(METRICS[m].short)} · ${isCubeMetric(m) ? t('куб.') : t(METRICS[m].unit)}`, cx, sheetTop + 232, colW - 10);
   });
   c.fillStyle = '#6B76A8';
   c.font = `700 36px ${FONT_T}`;
@@ -204,7 +210,7 @@ export async function shareCard(d: ShareCardData, text: string): Promise<'shared
   const file = new File([blob], 'chek-up.png', { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] }) && navigator.share) {
     try {
-      await navigator.share({ files: [file], title: 'Чек-ап', text });
+      await navigator.share({ files: [file], title: t('Чек-ап'), text });
       return 'shared';
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') return 'cancelled';

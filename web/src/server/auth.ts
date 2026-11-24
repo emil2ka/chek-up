@@ -27,8 +27,10 @@ export class AuthError extends Error {
 
 const log = (tx: Db | Tx, userId: string, action: string) => tx.insert(audit).values({ userId, action });
 
-async function addDevice(tx: Db | Tx, userId: string, label: string): Promise<Session> {
+/** Новый токен. replaces — прежний токен этого же устройства: он больше не нужен. */
+async function addDevice(tx: Db | Tx, userId: string, label: string, replaces: Auth | null = null): Promise<Session> {
   const token = newToken();
+  if (replaces) await tx.delete(devices).where(eq(devices.id, replaces.deviceId));
   await tx.insert(devices).values({ tokenHash: hashToken(token), userId, label: label.slice(0, 60) });
   return { userId, token };
 }
@@ -77,7 +79,7 @@ export async function redeemLinkCode(db: Db, raw: string, label = '', current: A
     if (!row) return null;
     if (current && current.userId !== row.userId) await absorbGuest(tx, current.userId, row.userId);
     await log(tx, row.userId, 'device.link');
-    return addDevice(tx, row.userId, label);
+    return addDevice(tx, row.userId, label, current);
   });
 }
 
@@ -119,7 +121,7 @@ export async function signIn(db: Db, id: Identity, current: Auth | null, label =
     if (found) {
       if (current && current.userId !== found.userId) await absorbGuest(tx, current.userId, found.userId);
       await log(tx, found.userId, `signin.${id.provider}`);
-      return { ...(await addDevice(tx, found.userId, label)), created: false };
+      return { ...(await addDevice(tx, found.userId, label, current)), created: false };
     }
     // новая личность: у гостя появляется вход, иначе заводим аккаунт. Чужой вход на занятый аккаунт не вешаем.
     let userId = current?.userId ?? null;
@@ -133,7 +135,7 @@ export async function signIn(db: Db, id: Identity, current: Auth | null, label =
     }
     await tx.insert(identities).values({ provider: id.provider, subject: id.subject, email: id.email, userId });
     await log(tx, userId, `signup.${id.provider}`);
-    return { ...(await addDevice(tx, userId, label)), created: true };
+    return { ...(await addDevice(tx, userId, label, current)), created: true };
   });
 }
 

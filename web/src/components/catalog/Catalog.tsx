@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { CATS, catalogValue, searchCatalog, type Cat } from '@/lib/catalog';
 import { amountTxt, bigCap, bigNum, cubesOfValue, isCubeMetric, METRICS, pl, unitNote, type Forms } from '@/lib/engine';
+import { t } from '@/lib/i18n';
 import type { MetricId } from '@/lib/types';
 import { MetricTabs } from '@/components/ui/MetricTabs';
 import { IconArrow, IconClose, IconSearch } from '@/components/icons';
@@ -29,15 +30,12 @@ export function Catalog() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-5 text-white">
-        <h1 className="font-display text-[clamp(30px,9.4vw,38px)] leading-[.98] font-black tracking-[-.045em]">
-          <span className="rise block">Что внутри</span>
-          <span className="rise block" style={{ animationDelay: '60ms' }}><span className="hl">продуктов</span></span>
-        </h1>
+      <header className="px-5 pt-[calc(env(safe-area-inset-top)+14px)] pb-4 text-white">
+        <h1 className="rise font-display text-[28px] leading-none font-black tracking-[-.045em]">{t('Что')} <span className="hl">{t('внутри')}</span></h1>
 
-        <label className="on-light rise mt-5 flex h-14 items-center gap-3 rounded-[20px] bg-white pr-1.5 pl-4 text-ink shadow-[0_14px_30px_-12px_color-mix(in_srgb,var(--ink)_55%,transparent)] focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-white" style={{ animationDelay: '120ms' }}>
+        <label className="on-light rise mt-3.5 flex h-13 items-center gap-3 rounded-[20px] bg-white pr-1.5 pl-4 text-ink shadow-[0_14px_30px_-12px_color-mix(in_srgb,var(--ink)_55%,transparent)] focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-white" style={{ animationDelay: '120ms' }}>
           <IconSearch className="size-6 flex-none text-blue-1" />
-          <span className="sr-only">Поиск продукта</span>
+          <span className="sr-only">{t('Поиск продукта')}</span>
           <input
             type="search"
             inputMode="search"
@@ -45,17 +43,17 @@ export function Catalog() {
             autoComplete="off"
             value={query}
             onChange={e => { setQuery(e.target.value); setOpen(null); }}
-            placeholder="Кола, йогурт, печенье…"
+            placeholder={t('Кола, йогурт, печенье…')}
             className="h-full min-w-0 flex-1 bg-transparent text-[17px] font-semibold outline-none placeholder:text-mute [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
-            <button type="button" onClick={() => setQuery('')} aria-label="Очистить поиск" className="grid size-11 flex-none place-items-center rounded-2xl text-mute active:scale-[.9]">
+            <button type="button" onClick={() => setQuery('')} aria-label={t('Очистить поиск')} className="grid size-11 flex-none place-items-center rounded-2xl text-mute active:scale-[.9]">
               <IconClose className="size-5" />
             </button>
           )}
         </label>
 
-        <ul className="no-scrollbar rise -mx-5 mt-3.5 flex gap-2 overflow-x-auto px-5 pb-1" style={{ animationDelay: '170ms' }} aria-label="Разделы">
+        <ul className="no-scrollbar rise -mx-5 mt-2.5 flex gap-2 overflow-x-auto px-5 pb-1" style={{ animationDelay: '170ms' }} aria-label={t('Разделы')}>
           {CATS.map(c => {
             const active = c.id === cat;
             return (
@@ -68,25 +66,25 @@ export function Catalog() {
                     active ? 'bg-white text-blue-1' : 'btn-glass'
                   }`}
                 >
-                  {c.label}
+                  {t(c.label)}
                 </button>
               </li>
             );
           })}
         </ul>
 
-        <MetricTabs value={metric} onChange={m => { setMetric(m); setOpen(null); }} className="rise mt-3" />
+        <MetricTabs value={metric} onChange={m => { setMetric(m); setOpen(null); }} className="rise mt-2" />
       </header>
 
       <section className="on-light relative flex-1 rounded-t-sheet bg-white px-3 pt-5 pb-6 text-ink shadow-panel" aria-live="polite">
         <p className="px-2 pb-2.5 text-[13px] font-bold text-mute">
-          {items.length} {pl(items.length, PRODUCTS)} · {SORT_HINT[metric]}
+          {items.length} {pl(items.length, PRODUCTS)} · {t(SORT_HINT[metric])}
         </p>
 
         {items.length === 0 ? (
           <div className="mx-1 rounded-3xl bg-tint p-5">
-            <p className="font-display text-xl leading-tight font-black tracking-[-.03em]">Такого пока нет</p>
-            <p className="mt-1.5 text-[15px] font-semibold text-mute">Попробуй короче: «сок», «йогурт», «шоколад».</p>
+            <p className="font-display text-xl leading-tight font-black tracking-[-.03em]">{t('Такого пока нет')}</p>
+            <p className="mt-1.5 text-[15px] font-semibold text-mute">{t('Попробуй короче: «сок», «йогурт», «шоколад».')}</p>
           </div>
         ) : (
           <ul className="grid gap-2">
@@ -115,7 +113,7 @@ export function Catalog() {
                       </span>
                     ) : (
                       <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-extrabold text-good">
-                        <i className="dot good" />{val > 0 ? 'почти нет' : `без ${mdef.of}`}
+                        <i className="dot good" />{val > 0 ? t('почти нет') : t('нет')}
                       </span>
                     )}
                     {isCubeMetric(metric) && cubes > 0 && (
@@ -132,13 +130,13 @@ export function Catalog() {
                     <div className="rise grid gap-2 px-4 pb-4" style={{ animationDuration: '320ms' }}>
                       <p className="text-[15px] leading-snug font-semibold">
                         {val > 0
-                          ? <>В порции около <b>{amountTxt(val, metric)}</b> {metric === 'sugar' ? 'добавленного сахара' : mdef.of} — это <b>{pct}%</b> дневной нормы взрослого.</>
-                          : <>{metric === 'sugar' ? 'Добавленного сахара' : mdef.label} здесь нет. Можно не считать.</>}
+                          ? t('В порции около {a}, это {p}% дневной нормы взрослого.', { a: amountTxt(val, metric), p: pct })
+                          : t('Здесь этого нет, можно не считать.')}
                       </p>
                       {it.swap && (
                         <p className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2.5 text-[15px] leading-snug font-bold text-good">
                           <IconArrow className="mt-0.5 size-5 flex-none" />
-                          <span>Лучше взять: {it.swap}</span>
+                          <span>{t('Лучше взять')}: {it.swap}</span>
                         </p>
                       )}
                     </div>
@@ -150,7 +148,7 @@ export function Catalog() {
         )}
 
         <p className="mt-5 px-2 text-xs leading-relaxed font-semibold text-mute">
-          Значения примерные, по типичным товарам в магазинах. {unitNote(metric)}. Норма: {mdef.norm}.
+          {t('Значения примерные, по типичным товарам в магазинах.')} {unitNote(metric)}. {t('Норма')}: {t(mdef.norm)}.
         </p>
       </section>
     </div>

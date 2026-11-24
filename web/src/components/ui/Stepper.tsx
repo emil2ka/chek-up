@@ -1,5 +1,6 @@
 'use client';
 // Счётчик «− 2 +» для состава семьи. tone="glass" — на синем фоне, tone="light" — на белой карточке.
+import { t } from '@/lib/i18n';
 import { IconMinus, IconPlus } from '@/components/icons';
 
 type Props = {
@@ -29,13 +30,13 @@ export function Stepper({ label, hint, value, min, max, tone = 'light', onChange
         <p className="font-display text-[17px] leading-tight font-bold tracking-[-.02em]">{label}</p>
         <p className={`mt-0.5 text-[13px] font-semibold ${glass ? 'text-white/80' : 'text-mute'}`}>{hint}</p>
       </div>
-      <button type="button" aria-label={`${label}: меньше`} disabled={value <= min} onClick={() => onChange(value - 1)} className={btn}>
+      <button type="button" aria-label={`${label}: ${t('меньше')}`} disabled={value <= min} onClick={() => onChange(value - 1)} className={btn}>
         <IconMinus className="size-5.5" />
       </button>
       <output aria-live="polite" className="w-8 text-center font-display text-[26px] leading-none font-black tracking-[-.04em] tabular-nums">
         {value}
       </output>
-      <button type="button" aria-label={`${label}: больше`} disabled={value >= max} onClick={() => onChange(value + 1)} className={btn}>
+      <button type="button" aria-label={`${label}: ${t('больше')}`} disabled={value >= max} onClick={() => onChange(value + 1)} className={btn}>
         <IconPlus className="size-5.5" />
       </button>
     </div>

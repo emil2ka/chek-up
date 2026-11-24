@@ -2,11 +2,16 @@
 // Главный экран: заголовок, кнопки, живые кубики внизу, шторка с примерами и «Мои чеки».
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { SugarPile, PALETTES } from '@/lib/pile';
+import { SugarPile, PALETTES, skinFor } from '@/lib/pile';
+import { t } from '@/lib/i18n';
+import type { JobInfo } from '@/lib/outbox';
+import type { Streak } from '@/lib/streak';
 import type { HistoryEntry, Receipt } from '@/lib/types';
-import { IconCamera, IconCube, IconReceipt } from '@/components/icons';
+import { IconCamera, IconCube, IconEdit, IconImage, IconReceipt } from '@/components/icons';
+import { StreakPill } from '@/components/streak/Streak';
 import { DemoSheet } from './DemoSheet';
 import { MyChecks } from './MyChecks';
+import { OutboxCards } from './OutboxCards';
 
 const HOME_CUBES = 9;
 
@@ -14,13 +19,24 @@ type Props = {
   /** гидратация закончилась — можно запускать canvas и показывать историю */
   ready: boolean;
   entries: HistoryEntry[];
+  /** в журнале есть настоящие чеки */
+  real: boolean;
+  jobs: JobInfo[];
+  streak: Streak;
+  done: { now: number; usual: number };
+  hideMoney: boolean;
   onScan(): void;
+  onGallery(): void;
+  /** внести руками; id — чек из очереди, который не прочитался */
+  onManual(jobId?: string): void;
   onDemo(receipt: Receipt): void;
   onOpen(id: string): void;
+  onWeek(): void;
 };
 
-export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
+export function Home({ ready, entries, real, jobs, streak, done, hideMoney, onScan, onGallery, onManual, onDemo, onOpen, onWeek }: Props) {
   const hasHistory = ready && entries.length > 0;
+  const mine = ready && real;
   const heroRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -41,7 +57,7 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
       pile = new SugarPile(canvas, {
         floorRadius,
         // кубики сахара и другие фигурки
-        palette: [PALETTES.sugar, PALETTES.fat, PALETTES.carbs, PALETTES.protein],
+        palette: [skinFor(streak.level), PALETTES.fat, PALETTES.carbs, PALETTES.protein],
         onCount: n => { if (hintRef.current) hintRef.current.hidden = !(n > 0); },
       });
     } catch (err) {
@@ -64,7 +80,7 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
       ro.disconnect();
       try { pile?.destroy(); } catch { /* ничего */ }
     };
-  }, [ready, hasHistory]);
+  }, [ready, hasHistory, streak.level]);
 
   const closeSheet = (r: Receipt | null = null) => {
     picked.current = r;
@@ -88,32 +104,37 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
           className={`pointer-events-none relative z-2 flex min-w-0 flex-1 flex-col px-5 pt-[calc(env(safe-area-inset-top)+10px)] [text-shadow:0_1px_10px_color-mix(in_srgb,var(--blue-1)_55%,transparent)] ${hasHistory ? '' : 'pb-[env(safe-area-inset-bottom)]'}`}
         >
           <header className="flex min-h-12 items-center">
-            <div className="inline-flex items-center gap-2.25 font-display text-[21px] font-extrabold tracking-[-.04em] text-white" aria-label="Чек-ап">
+            <div className="inline-flex items-center gap-2.25 font-display text-[21px] font-extrabold tracking-[-.04em] text-white" aria-label={t('Чек-ап')}>
               <IconCube className="size-7.5 -rotate-8 text-white drop-shadow-[0_4px_8px_color-mix(in_srgb,var(--ink)_35%,transparent)]" />
               <span aria-hidden>чек-ап</span>
             </div>
           </header>
 
           <div className="mt-5.5 short:mt-2.5">
-            <h1 className="font-display text-[clamp(38px,12.2vw,53px)] leading-[.98] font-black tracking-[-.045em] text-balance text-white short:text-[clamp(34px,10.5vw,46px)]">
-              <span className="rise block">Что</span>
-              <span className="rise block" style={{ '--d': '60ms' } as CSSProperties}><span className="hl">прячется</span></span>
-              <span className="rise block" style={{ '--d': '120ms' } as CSSProperties}>в&nbsp;твоём</span>
-              <span className="rise block" style={{ '--d': '180ms' } as CSSProperties}>чеке?</span>
+            <h1 className={`font-display leading-[.98] font-black tracking-[-.045em] text-balance text-white ${mine ? 'text-[clamp(32px,10vw,44px)]' : 'text-[clamp(32px,10.4vw,46px)]'}`}>
+              <span className="rise block">{t('Что')} <span className="hl">{t('прячется')}</span></span>
+              <span className="rise block" style={{ '--d': '90ms' } as CSSProperties}>{t('в твоём чеке?')}</span>
             </h1>
-            <p className="rise mt-4.5 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
-              Сфоткай чек из магазина. Покажем состав покупок, сколько они стоили и что можно заменить.
-            </p>
-            <p
-              className="rise mt-4 inline-flex items-center gap-2 rounded-full bg-ink/18 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold text-white/92 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)]"
-              style={{ '--d': '280ms' } as CSSProperties}
-            >
-              <IconCube className="size-6 text-white" />
-              <span>Норма — около <b className="font-display font-extrabold">10</b> кубиков сахара в день для взрослого</span>
-            </p>
+            {!mine && (
+              <>
+                <p className="rise mt-4.5 max-w-[31ch] text-[17px] leading-[1.42] font-semibold text-white/90 short:mt-3 short:text-base" style={{ '--d': '220ms' } as CSSProperties}>
+                  {t('Сфоткай чек из магазина. Покажем состав покупок, сколько они стоили и что можно заменить.')}
+                </p>
+                <p
+                  className="rise mt-4 inline-flex items-center gap-2 rounded-full bg-ink/18 py-1.5 pr-3.5 pl-1.5 text-[13px] font-semibold text-white/92 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--white)_18%,transparent)]"
+                  style={{ '--d': '280ms' } as CSSProperties}
+                >
+                  <IconCube className="size-6 flex-none text-white" />
+                  <span>{t('Норма взрослого: 10 кубиков сахара в день')}</span>
+                </p>
+              </>
+            )}
+            {mine && <StreakPill streak={streak} done={done} onOpen={onWeek} />}
           </div>
 
-          <div className="rise mt-auto grid gap-2.5 pt-7" style={{ '--d': '320ms' } as CSSProperties}>
+          {ready && <OutboxCards jobs={jobs} onManual={onManual} />}
+
+          <div className="rise mt-auto grid gap-2.5 pt-6" style={{ '--d': '320ms' } as CSSProperties}>
             <button
               type="button"
               onClick={onScan}
@@ -122,29 +143,35 @@ export function Home({ ready, entries, onScan, onDemo, onOpen }: Props) {
               <span className="-ml-1.5 grid size-10.5 place-items-center rounded-[14px] bg-blue-1 text-white shadow-[inset_0_-3px_0_color-mix(in_srgb,var(--ink)_30%,transparent)]">
                 <IconCamera className="size-6" />
               </span>
-              <span>Сканировать чек</span>
+              <span>{t('Сфоткать чек')}</span>
             </button>
-            <button
-              ref={demoBtnRef}
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => setSheet(true)}
-              className="btn-glass pointer-events-auto inline-flex min-h-14 items-center justify-center gap-3 rounded-btn px-5.5 font-display text-base font-bold tracking-[-.01em] transition-transform duration-150 select-none active:scale-[.965]"
-            >
-              <IconReceipt className="size-6" />
-              <span>Показать на примере</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button type="button" onClick={onGallery} className="btn-glass pointer-events-auto inline-flex min-h-13 items-center justify-center gap-2.5 rounded-btn px-3 text-[15px] font-bold transition-transform duration-150 select-none active:scale-[.965]"><IconImage className="size-5.5 flex-none" /><span>{t('Из галереи')}</span></button>
+              <button type="button" onClick={() => onManual()} className="btn-glass pointer-events-auto inline-flex min-h-13 items-center justify-center gap-2.5 rounded-btn px-3 text-[15px] font-bold transition-transform duration-150 select-none active:scale-[.965]"><IconEdit className="size-5.5 flex-none" /><span>{t('Вручную')}</span></button>
+            </div>
+            {!mine && (
+              <button
+                ref={demoBtnRef}
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setSheet(true)}
+                className="pointer-events-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-btn px-4 text-[15px] font-bold text-white underline decoration-white/45 underline-offset-4 transition-transform duration-150 select-none active:scale-[.965]"
+              >
+                <IconReceipt className="size-5.5" />
+                <span>{t('Показать на примере')}</span>
+              </button>
+            )}
           </div>
 
           <div ref={stageRef} className="relative h-[calc(var(--cube)*2+46px)] flex-none">
             <p ref={hintRef} hidden className="pt-3 text-center text-[13px] font-semibold text-white/80">
-              Тапни по кубикам или наклони телефон
+              {t('Тапни по кубикам или наклони телефон')}
             </p>
           </div>
         </div>
       </div>
 
-      {hasHistory && <MyChecks entries={entries} onOpen={onOpen} />}
+      {hasHistory && <MyChecks entries={entries} hideMoney={hideMoney} onOpen={onOpen} onAll={onWeek} />}
 
       <AnimatePresence
         onExitComplete={() => {

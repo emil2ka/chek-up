@@ -1,76 +1,67 @@
 import { describe, expect, it } from 'vitest';
-import type { HistorySync, ShopSync, SyncState } from '@/lib/syncSchema';
-import { EMPTY_STATE, HISTORY_KEEP, diffState, mergeState } from './merge';
+import type { HistorySync } from '@/lib/syncSchema';
+import { canSee, canWriteEntry, clampTime, maskReceipt, mergeProfile, mergeStats, newer, nextEntry, type StoredEntry } from './merge';
 
-const NOW = Date.UTC(2026, 10, 17);
-// времена изменения — реалистичные (в пределах суток от NOW), иначе «надгробия» сочтутся древними и вычистятся
-const T = NOW - 3_600_000;
-const h = (id: string, updatedAt: number, extra: Partial<HistorySync> = {}): HistorySync =>
-  ({ id, receiptId: 'week', store: 'Magnum', date: '2026-11-16', cubes: 10, score: 60, swaps: [], updatedAt, ...extra });
-const s = (name: string, updatedAt: number, extra: Partial<ShopSync> = {}): ShopSync => ({ name, instead: '', done: false, updatedAt, ...extra });
-const state = (p: Partial<SyncState>): SyncState => ({ ...EMPTY_STATE, ...p });
+const inc = (x: Partial<HistorySync> = {}): HistorySync => ({ id: 'a', receiptId: 'r', store: '', date: '2026-11-16', cubes: 0, score: 0, swaps: [], updatedAt: 1000, ...x });
+const stored = (x: Partial<StoredEntry> = {}): StoredEntry => ({ ...inc(), authorId: 'mum', ...x });
 
-describe('mergeState', () => {
-  it('новее — побеждает, старее — игнорируется', () => {
-    const server = state({ history: [h('a', T + 100, { cubes: 5 })] });
-    const r1 = mergeState(server, { history: [h('a', T + 200, { cubes: 9 })] }, NOW);
-    expect(r1.history[0].cubes).toBe(9);
-    const r2 = mergeState(server, { history: [h('a', T + 50, { cubes: 1 })] }, NOW);
-    expect(r2.history[0].cubes).toBe(5);
+describe('время правок', () => {
+  it('часы клиента, убежавшие вперёд, не дают вечной победы', () => {
+    expect(clampTime(9_999_999, 1000)).toBe(61_000);
+    expect(clampTime(500, 1000)).toBe(500);
   });
-
-  it('при равном времени остаётся серверная версия', () => {
-    const r = mergeState(state({ history: [h('a', T + 100, { cubes: 5 })] }), { history: [h('a', T + 100, { cubes: 99 })] }, NOW);
-    expect(r.history[0].cubes).toBe(5);
-  });
-
-  it('удаление побеждает старую запись, а новая запись — старое удаление', () => {
-    const del = mergeState(state({ history: [h('a', T + 100)] }), { history: [h('a', T + 200, { deleted: true })] }, NOW);
-    expect(del.history[0].deleted).toBe(true);
-    const back = mergeState(del, { history: [h('a', T + 300)] }, NOW);
-    expect(back.history[0].deleted).toBeUndefined();
-  });
-
-  it('старые «надгробия» чистятся, свежие остаются', () => {
-    const old = NOW - 31 * 86_400_000, fresh = NOW - 86_400_000;
-    const r = mergeState(state({ shop: [s('Молоко', old, { deleted: true }), s('Хлеб', fresh, { deleted: true })] }), {}, NOW);
-    expect(r.shop.map(x => x.name)).toEqual(['Хлеб']);
-  });
-
-  it('чеки сверх лимита отбрасываются, самые старые первыми', () => {
-    const many = Array.from({ length: HISTORY_KEEP + 5 }, (_, i) => h(`h${i}`, T + 1000 + i));
-    const r = mergeState(EMPTY_STATE, { history: many }, NOW);
-    expect(r.history).toHaveLength(HISTORY_KEEP);
-    expect(r.history[0].id).toBe(`h${HISTORY_KEEP + 4}`);
-  });
-
-  it('профиль: новее побеждает, достижения объединяются', () => {
-    const server = state({ profile: { adults: 1, kids: 0, onboarded: true, seen: ['first'], updatedAt: T + 100 } });
-    const r = mergeState(server, { profile: { adults: 2, kids: 1, onboarded: true, seen: ['swap'], updatedAt: T + 200 } }, NOW);
-    expect(r.profile).toMatchObject({ adults: 2, kids: 1, updatedAt: T + 200 });
-    expect([...r.profile!.seen].sort()).toEqual(['first', 'swap']);
-    const older = mergeState(r, { profile: { adults: 5, kids: 5, onboarded: false, seen: [], updatedAt: T + 50 } }, NOW);
-    expect(older.profile).toMatchObject({ adults: 2, kids: 1 });
-  });
-
-  it('счётчики только растут', () => {
-    const r = mergeState(state({ stats: { barcodes: 5, shopDone: 1 } }), { stats: { barcodes: 2, shopDone: 4 } }, NOW);
-    expect(r.stats).toEqual({ barcodes: 5, shopDone: 4 });
-  });
-
-  it('запрос без полей ничего не меняет', () => {
-    const server = state({ history: [h('a', T + 100)], shop: [s('Хлеб', T + 100)] });
-    expect(mergeState(server, {}, NOW)).toEqual(server);
+  it('равное время — остаётся серверная версия', () => {
+    expect(newer(inc({ updatedAt: 5 }), inc({ updatedAt: 5 }))).toBe(false);
+    expect(newer(inc({ updatedAt: 6 }), inc({ updatedAt: 5 }))).toBe(true);
+    expect(newer(inc(), undefined)).toBe(true);
   });
 });
 
-describe('diffState', () => {
-  it('отдаёт только изменившееся', () => {
-    const before = state({ history: [h('a', T + 100), h('b', T + 100)] });
-    const after = mergeState(before, { history: [h('b', T + 200), h('c', T + 50)] }, NOW);
-    const d = diffState(before, after);
-    expect(d.history.upsert.map(x => x.id).sort()).toEqual(['b', 'c']);
-    expect(d.profile).toBeUndefined();
-    expect(d.stats).toBeUndefined();
+describe('права на чек', () => {
+  it('взрослый правит общее, чужое личное — нет', () => {
+    expect(canWriteEntry('adult', 'dad', stored())).toBe(true);
+    expect(canWriteEntry('owner', 'dad', stored({ priv: true }))).toBe(false);
+    expect(canWriteEntry('adult', 'mum', stored({ priv: true }))).toBe(true);
+  });
+  it('ребёнок добавляет свои и правит только их', () => {
+    expect(canWriteEntry('child', 'kid', undefined)).toBe(true);
+    expect(canWriteEntry('child', 'kid', stored())).toBe(false);
+    expect(canWriteEntry('child', 'kid', stored({ authorId: 'kid' }))).toBe(true);
+  });
+  it('автор не меняется, личным чек делает только автор', () => {
+    expect(nextEntry(inc({ priv: true }), stored(), 'dad', 2000)).toMatchObject({ authorId: 'mum', priv: false });
+    expect(nextEntry(inc({ priv: true }), stored(), 'mum', 2000)).toMatchObject({ authorId: 'mum', priv: true });
+    expect(nextEntry(inc(), undefined, 'dad', 2000)).toMatchObject({ authorId: 'dad', priv: false });
+  });
+  it('личное видит только автор', () => {
+    expect(canSee('dad', { priv: true, authorId: 'mum' })).toBe(false);
+    expect(canSee('mum', { priv: true, authorId: 'mum' })).toBe(true);
+    expect(canSee('dad', { authorId: 'mum' })).toBe(true);
+  });
+});
+
+describe('чек глазами ребёнка', () => {
+  it('без цен, суммы и алкоголя, номера позиций на месте', () => {
+    const m = maskReceipt({ id: 'r', title: '', store: 'Magnum', date: '2026-11-16', sum: 1270, items: [
+      { n: 'Кола', p: 620, s: 106, swap: { n: 'Вода', p: 280, s: 0 } }, { n: 'Пиво', p: 650, s: 0, x: 'alcohol', junk: 1 },
+    ] });
+    expect(m.masked).toBe(true);
+    expect(m.sum).toBeUndefined();
+    expect(m.items[0]).toMatchObject({ n: 'Кола', p: 0, s: 106, swap: { n: 'Вода', p: 0 } });
+    expect(m.items[1]).toEqual({ n: 'Скрыто', p: 0, s: 0, nf: 1 });
+    expect(JSON.stringify(m)).not.toMatch(/Пиво|620|650|1270/);
+  });
+});
+
+describe('профиль и счётчики', () => {
+  const p = (x: object = {}) => ({ onboarded: false, seen: ['a'], lang: 'ru' as const, updatedAt: 10, ...x });
+  it('побеждает новый, достижения объединяются, знакомство не забывается', () => {
+    expect(mergeProfile(p({ onboarded: true }), p({ seen: ['b'], lang: 'kk', updatedAt: 20 }))).toEqual({ onboarded: true, seen: ['a', 'b'], lang: 'kk', updatedAt: 20 });
+    expect(mergeProfile(p(), p({ seen: ['b'], lang: 'kk', updatedAt: 5 }))).toMatchObject({ seen: ['a', 'b'], lang: 'ru', updatedAt: 10 });
+    expect(mergeProfile(null, p())).toEqual(p());
+    expect(mergeProfile(p(), undefined)).toEqual(p());
+  });
+  it('счётчики только растут', () => {
+    expect(mergeStats({ barcodes: 5, shopDone: 1 }, { barcodes: 2, shopDone: 3 })).toEqual({ barcodes: 5, shopDone: 3 });
   });
 });

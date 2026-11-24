@@ -17,6 +17,10 @@ export const ReceiptItemSchema = SwapItemSchema.extend({
   junk: z.union([z.literal(0), z.literal(1)]).optional(),
   swap: SwapItemSchema.optional(),
   x: z.enum(['alcohol', 'energy']).optional(),
+  nf: z.literal(1).optional(),
+  w: z.number().int().min(1).max(26).optional(),
+  q: z.literal(1).optional(),
+  src: z.enum(['ref', 'ai', 'user']).optional(),
 });
 
 export const ReceiptSchema = z.object({
@@ -26,6 +30,11 @@ export const ReceiptSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   items: z.array(ReceiptItemSchema).min(1),
   approx: z.boolean().optional(),
+  refund: z.boolean().optional(),
+  fiscal: z.string().max(80).optional(),
+  time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  sum: z.number().nonnegative().optional(),
+  masked: z.boolean().optional(),
 });
 
 /** Ответ POST /api/scan */

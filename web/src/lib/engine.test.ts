@@ -40,7 +40,8 @@ describe('analyze на демо-чеках', () => {
     expect(a.cubes).toBe(a.cubesBy.sugar);
     expect(a.sugar).toBe(a.totals.sugar);
     expect(a.flagged).toMatchObject({ count: 2, sum: 1240, alcohol: 650, energy: 590 });
-    expect(a.score).toBe(45);
+    expect(a.score).toBe(51);
+    expect(a.why.map(w => w.k)).toEqual(['junk', 'sugar', 'flagged', 'fat']);
     expect(verdict(a.score).label).toBe('Так себе');
   });
 
@@ -69,6 +70,33 @@ describe('analyze на демо-чеках', () => {
 
   it('демо-чеки проходят схему сервера', () => {
     for (const r of RECEIPTS) expect(ReceiptSchema.safeParse(r).success).toBe(true);
+  });
+});
+
+describe('оценка не зависит от размера корзины', () => {
+  const times = (r: Receipt, n: number): Receipt => ({ ...r, items: Array.from({ length: n }, () => r.items).flat() });
+  it('та же еда в три раза больше — тот же балл', () => {
+    for (const r of RECEIPTS) expect(analyze(times(r, 3)).score).toBe(analyze(r).score);
+  });
+  it('запас входит недельной долей: мешок сахара впрок не делает корзину бомбой', () => {
+    const food = byId('fit').items;
+    const now: Receipt = { ...byId('fit'), items: [...food, { n: 'Сахар 1 кг', p: 500, s: 1000, k: 4000, c: 1000 }] };
+    const stock: Receipt = { ...now, items: [...food, { n: 'Сахар 1 кг', p: 500, s: 1000, k: 4000, c: 1000, w: 8 }] };
+    expect(analyze(stock).score).toBeGreaterThan(analyze(now).score + 10);
+    expect(analyze(stock).totals.sugar).toBe(analyze(now).totals.sugar); // в самом чеке сахара столько же
+  });
+  it('не еда и «не для нас» в оценку не входят, деньги не-еды считаются', () => {
+    const w = byId('week');
+    const soap: Receipt = { ...w, items: [...w.items, { n: 'Порошок', p: 9000, s: 0, nf: 1 }] };
+    expect(analyze(soap).score).toBe(analyze(w).score);
+    expect(analyze(soap).total - analyze(w).total).toBe(9000);
+    const off = analyze(w, [], w.items.map((_, i) => i));
+    expect(off).toMatchObject({ total: 0, score: 100, offCount: w.items.length, cubes: 0 });
+    expect(off.items.every(it => it.off)).toBe(true);
+  });
+  it('пустой и «водный» чек не ломают расчёт', () => {
+    expect(analyze({ id: 'x', title: '', store: '', date: '2026-01-01', items: [{ n: 'Вода', p: 200, s: 0, k: 0 }] }).score).toBe(100);
+    expect(analyze({ id: 'x', title: '', store: '', date: '2026-01-01', items: [{ n: 'Кола', p: 620, s: 106, k: 420, junk: 1 }] }).score).toBeLessThan(45);
   });
 });
 

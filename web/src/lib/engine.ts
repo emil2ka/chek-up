@@ -1,6 +1,6 @@
 // Общий расчёт для всех экранов. Этот файл — контракт между частями приложения.
 // Зеркало на Dart — mobile/lib/core/engine.dart: формулы и числа должны совпадать (это проверяют тесты).
-import type { Analysis, AnalyzedItem, MetricId, Receipt, SwapItem, Verdict } from './types';
+import type { Analysis, AnalyzedItem, MetricId, Receipt, ReceiptItem, SwapItem, Verdict, Why } from './types';
 
 export const METRIC_IDS: readonly MetricId[] = ['sugar', 'salt', 'fat', 'kcal', 'carbs', 'protein'];
 
@@ -65,36 +65,72 @@ export const cubesOfValue = (v: number, m: MetricId): number => Math.round(v / M
 
 const emptyTotals = (): Record<MetricId, number> => ({ sugar: 0, salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0 });
 
+/** На сколько недель хватает позиции: 1 — съедят на этой неделе. */
+export const MAX_WEEKS = 26;
+export const weeksOf = (it: Pick<ReceiptItem, 'w'>): number => Math.max(1, Math.min(MAX_WEEKS, Math.round(it.w ?? 1)));
+
+/** Линейный штраф: до `from` — 0, от `to` — max. */
+const ramp = (v: number, from: number, to: number, max: number): number => max * Math.max(0, Math.min(1, (v - from) / (to - from)));
+
+/** Ниже этого числа калорий плотность считать нельзя: одна бутылка воды дала бы бесконечность. */
+const KCAL_FLOOR = 400;
+
 /**
- * @param receipt  чек из data.ts
- * @param swaps    индексы позиций, для которых применена замена (Set или массив)
- *   items[i] = исходная позиция + { i, swapped, active } — active это то, что реально лежит в корзине
+ * Оценка корзины 0..100. Сахар, соль и жиры берём относительно калорий, а вредное — относительно суммы,
+ * поэтому закупка на большую семью и мелкая покупка той же еды получают одинаковый балл.
+ * Запасы (сахар, масло) входят недельной долей. Калории сами по себе оценку не снижают.
  */
-export function analyze(receipt: Receipt, swaps: Iterable<number> = []): Analysis {
-  const on = swaps instanceof Set ? swaps : new Set(swaps);
-  let total = 0, junk = 0, junkCount = 0;
-  const totals = emptyTotals();
+function scoreOf(dense: Record<MetricId, number>, share: number, flagShare: number): { score: number; why: Why[] } {
+  const kcal = Math.max(KCAL_FLOOR, dense.kcal);
+  const sugar = dense.sugar * 4 / kcal;      // доля калорий из добавленного сахара; ВОЗ: меньше 10%, лучше 5%
+  const fat = dense.fat * 9 / kcal;          // доля калорий из насыщенных жиров; ВОЗ: меньше 10%
+  const salt = dense.salt / kcal * 1000;     // граммов соли на 1000 ккал; ВОЗ: 5 г на 2000 ккал
+  const raw: Why[] = [
+    { k: 'sugar', pts: ramp(sugar, 0.05, 0.2, 35), value: sugar },
+    { k: 'fat', pts: ramp(fat, 0.08, 0.2, 18), value: fat },
+    { k: 'salt', pts: ramp(salt, 2, 6, 15), value: salt },
+    { k: 'junk', pts: ramp(share, 0, 0.5, 25), value: share },
+    { k: 'flagged', pts: ramp(flagShare, 0, 0.3, 10), value: flagShare },
+  ];
+  const lost = raw.reduce((n, w) => n + w.pts, 0);
+  const why = raw.map(w => ({ ...w, pts: Math.round(w.pts) })).filter(w => w.pts > 0).sort((x, y) => y.pts - x.pts);
+  return { score: Math.max(0, Math.min(100, Math.round(100 - lost))), why };
+}
+
+/**
+ * @param receipt  чек
+ * @param swaps    индексы позиций, для которых включена замена (план)
+ * @param off      индексы позиций «не для нас»
+ *   items[i] = исходная позиция + { i, swapped, off, active } — active это то, что лежало бы в корзине с заменой
+ */
+export function analyze(receipt: Receipt, swaps: Iterable<number> = [], off: Iterable<number> = []): Analysis {
+  const on = swaps instanceof Set ? swaps as Set<number> : new Set(swaps);
+  const skip = off instanceof Set ? off as Set<number> : new Set(off);
+  let total = 0, food = 0, junk = 0, junkCount = 0, offCount = 0;
+  const totals = emptyTotals(), dense = emptyTotals();
   const flagged = { count: 0, sum: 0, alcohol: 0, energy: 0 };
   const items: AnalyzedItem[] = receipt.items.map((it, i) => {
     const swapped = on.has(i) && !!it.swap;
     const active = swapped && it.swap ? { ...it.swap, junk: 0 as const } : it;
+    const isOff = skip.has(i);
+    const row: AnalyzedItem = { ...it, i, swapped, off: isOff, active };
+    if (isOff) { offCount++; return row; }
     total += active.p;
-    for (const m of METRIC_IDS) totals[m] += valueOf(active, m);
+    if (it.nf) return row;
+    food += active.p;
+    const weeks = weeksOf(it);
+    for (const m of METRIC_IDS) { const v = valueOf(active, m); totals[m] += v; dense[m] += v / weeks; }
     if (active.junk) { junk += active.p; junkCount++; }
     if (active.x) { flagged.count++; flagged.sum += active.p; flagged[active.x] += active.p; }
-    return { ...it, i, swapped, active };
+    return row;
   });
   for (const m of METRIC_IDS) totals[m] = Math.round(totals[m] * 10) / 10;
-  const share = total ? junk / total : 0;
-  const flagShare = total ? flagged.sum / total : 0;
-  // Оценка корзины 0..100. Штрафы: доля вредного в сумме чека, сахар, соль, насыщенные жиры, алкоголь и энергетики.
-  // Калории в оценку не входят: еда должна быть калорийной, важно, откуда они.
-  const penalty = share * 40 + Math.min(20, totals.sugar / 17.5) + Math.min(10, totals.salt / 3.5) + Math.min(10, totals.fat / 15) + Math.min(10, flagShare * 30);
-  const score = Math.max(0, Math.min(100, Math.round(100 - penalty)));
+  const share = food ? junk / food : 0;
+  const { score, why } = scoreOf(dense, share, food ? flagged.sum / food : 0);
   const cubesBy = Object.fromEntries(METRIC_IDS.map(m => [m, cubesOfValue(totals[m], m)])) as Record<MetricId, number>;
   return {
-    items, total, sugar: totals.sugar, cubes: cubesBy.sugar, totals, cubesBy, flagged,
-    junk, junkCount, share, score, days: totals.sugar / DAILY_G,
+    items, total, food, offCount, sugar: totals.sugar, cubes: cubesBy.sugar, totals, cubesBy, flagged,
+    junk, junkCount, share, score, why, days: totals.sugar / DAILY_G,
   };
 }
 

@@ -1,5 +1,7 @@
 // Общие мелочи для route handlers: лимит запросов, IP, JSON-ошибки, чтение тела с потолком размера.
 import type { ZodType } from 'zod';
+import { authenticate, type Auth } from './auth';
+import { getDb, type Db } from './db';
 
 export const fail = (status: number, code: string, message: string) => Response.json({ error: { code, message } }, { status });
 
@@ -32,4 +34,29 @@ export async function readJson<T>(request: Request, schema: ZodType<T>, maxBytes
   const parsed = schema.safeParse(json);
   if (!parsed.success) return { ok: false, res: fail(400, 'bad_request', 'Данные не по схеме') };
   return { ok: true, data: parsed.data };
+}
+
+const noStore = { 'cache-control': 'no-store' };
+export const ok = (data: unknown = { ok: true }, status = 200) => Response.json(data, { status, headers: noStore });
+
+/** Ошибка с кодом и текстом, понятным человеку (AuthError, FamilyError). */
+type Known = { status: number; code: string; message: string };
+const isKnown = (e: unknown): e is Known => e instanceof Error && 'status' in e && 'code' in e && typeof (e as unknown as Known).status === 'number' && typeof (e as unknown as Known).code === 'string';
+
+/** Обёртка route handler: БД, вход, понятные ошибки. */
+export async function withAuth(request: Request, tag: string, fn: (ctx: { db: Db; me: Auth }) => Promise<Response>): Promise<Response> {
+  return guarded(tag, async db => {
+    const me = await authenticate(db, request);
+    return me ? fn({ db, me }) : fail(401, 'unauthorized', 'Нужен вход');
+  });
+}
+
+export async function guarded(tag: string, fn: (db: Db) => Promise<Response>): Promise<Response> {
+  try {
+    return await fn(await getDb());
+  } catch (err) {
+    if (isKnown(err)) return fail(err.status, err.code, err.message);
+    console.error(`[${tag}]`, err);
+    return fail(503, 'unavailable', 'Сервер данных недоступен. Попробуй позже');
+  }
 }

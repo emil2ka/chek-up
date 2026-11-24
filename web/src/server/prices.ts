@@ -77,13 +77,13 @@ function perCategory(points: PricePoint[]) {
 const daysAgo = (n: number, now = new Date()) => new Date(now.getTime() - n * 86_400_000).toISOString().slice(0, 10);
 
 /** Записать цены чека (старые цены этого чека заменяются) или удалить их, если чек удалён. */
-export async function recordPrices(tx: Db | Tx, userId: string, h: HistorySync): Promise<void> {
-  await tx.delete(pricePoints).where(and(eq(pricePoints.userId, userId), eq(pricePoints.entryId, h.id)));
+export async function recordPrices(tx: Db | Tx, familyId: string, h: HistorySync): Promise<void> {
+  await tx.delete(pricePoints).where(and(eq(pricePoints.familyId, familyId), eq(pricePoints.entryId, h.id)));
   const r = h.receipt;
   // только отсканированные чеки (approx): цены демо-чеков выдуманы, их в сравнение не берём
-  if (h.deleted || !r || !r.approx) return;
+  if (h.deleted || !r || !r.approx || r.refund) return;
   const store = normalizeStore(r.store);
-  const rows = perCategory(pricePointsOf(r.items)).map(p => ({ userId, entryId: h.id, category: p.category, store, unitPrice: p.unitPrice, unit: p.unit, seenOn: r.date }));
+  const rows = perCategory(pricePointsOf(r.items)).map(p => ({ familyId, entryId: h.id, category: p.category, store, unitPrice: p.unitPrice, unit: p.unit, seenOn: r.date }));
   if (rows.length) await tx.insert(pricePoints).values(rows).onConflictDoNothing();
 }
 

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../core/i18n.dart';
 import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
@@ -25,8 +26,9 @@ class _ShopListPageState extends State<ShopListPage> {
   void _submit() {
     final t = _add.text.trim();
     if (t.isEmpty) return;
-    if (store.addToShop([ShopItem(name: t)]) == 0)
+    if (store.addToShop([ShopItem(name: t)]) == 0) {
       showToast('Это уже есть в списке');
+    }
     _add.clear();
   }
 
@@ -34,7 +36,7 @@ class _ShopListPageState extends State<ShopListPage> {
     final left = store.shop.where((s) => !s.done).toList();
     if (left.isEmpty) return;
     final text =
-        'Список покупок из «Чек-ап»:\n${left.map((s) => '• ${s.name}${s.instead.isEmpty ? '' : ' (вместо: ${s.instead})'}').join('\n')}';
+        '${t('Список покупок из «Чек-ап»')}:\n${left.map((s) => '• ${s.name}${s.instead.isEmpty ? '' : ' (${t('вместо')}: ${s.instead})'}').join('\n')}';
     SharePlus.instance.share(ShareParams(text: text)).catchError((_) {
       showToast('Не получилось поделиться');
       return const ShareResult('', ShareResultStatus.unavailable);
@@ -77,14 +79,14 @@ class _ShopListPageState extends State<ShopListPage> {
                                 children: [
                                   BarButton(
                                     Icons.arrow_back_ios_new_rounded,
-                                    'Назад',
+                                    t('Назад'),
                                     () => Navigator.of(context).pop(),
                                   ),
                                   const Spacer(),
                                   if (left > 0)
                                     BarButton(
                                       Icons.ios_share_rounded,
-                                      'Отправить список',
+                                      t('Отправить список'),
                                       _share,
                                     ),
                                 ],
@@ -95,7 +97,7 @@ class _ShopListPageState extends State<ShopListPage> {
                                   fit: BoxFit.scaleDown,
                                   alignment: Alignment.centerLeft,
                                   child: Text(
-                                    'В следующий',
+                                    t('В следующий'),
                                     style: disp(
                                       34,
                                       color: Colors.white,
@@ -112,9 +114,9 @@ class _ShopListPageState extends State<ShopListPage> {
                                   alignment: Alignment.centerLeft,
                                   child: Row(
                                     children: [
-                                      Hl('поход', disp(34, h: 1, ls: -.045)),
+                                      Hl(t('поход'), disp(34, h: 1, ls: -.045)),
                                       Text(
-                                        ' возьми',
+                                        ' ${t('возьми')}',
                                         style: disp(
                                           34,
                                           color: Colors.white,
@@ -131,10 +133,15 @@ class _ShopListPageState extends State<ShopListPage> {
                                 delay: 120,
                                 child: Text(
                                   list.isEmpty
-                                      ? 'Включи замены в чеке и нажми «В список» — они появятся здесь.'
+                                      ? t(
+                                          'Отметь замены в чеке и нажми «В список», они появятся здесь.',
+                                        )
                                       : left == 0
-                                      ? 'Всё куплено — отличный поход.'
-                                      : 'Осталось купить: $left. Отмечай прямо в магазине.',
+                                      ? t('Всё куплено, отличный поход.')
+                                      : t(
+                                          'Осталось купить: {n}. Отмечай прямо в магазине.',
+                                          {'n': left},
+                                        ),
                                   style: body(
                                     16,
                                     color: Colors.white.withValues(alpha: .9),
@@ -188,7 +195,9 @@ class _ShopListPageState extends State<ShopListPage> {
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
                                       isCollapsed: true,
-                                      hintText: 'Добавить своё: молоко, хлеб…',
+                                      hintText: t(
+                                        'Добавить своё: молоко, хлеб…',
+                                      ),
                                       hintStyle: body(16, color: mute),
                                     ),
                                   ),
@@ -197,7 +206,7 @@ class _ShopListPageState extends State<ShopListPage> {
                               const SizedBox(width: 8),
                               Press(
                                 scale: .92,
-                                label: 'Добавить в список',
+                                label: t('Добавить в список'),
                                 onTap: _submit,
                                 child: Container(
                                   width: 54,
@@ -227,12 +236,14 @@ class _ShopListPageState extends State<ShopListPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Список пока пустой',
+                                    t('Список пока пустой'),
                                     style: disp(20, h: 1.2, ls: -.03),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Открой любой чек, отметь замены — и одной кнопкой отправь их сюда. В магазине не придётся вспоминать, что брать вместо колы.',
+                                    t(
+                                      'Открой любой чек, отметь замены и одной кнопкой отправь их сюда. Список общий на всю семью.',
+                                    ),
                                     style: body(15, color: mute),
                                   ),
                                 ],
@@ -333,7 +344,7 @@ class _ShopListPageState extends State<ShopListPage> {
                                                   ),
                                                   if (s.instead.isNotEmpty)
                                                     Text(
-                                                      'вместо: ${s.instead}',
+                                                      '${t('вместо')}: ${s.instead}',
                                                       style: body(
                                                         13,
                                                         color: mute,
@@ -357,7 +368,7 @@ class _ShopListPageState extends State<ShopListPage> {
                                   vertical: 12,
                                 ),
                                 child: Text(
-                                  'Убрать купленное ($done)',
+                                  '${t('Убрать купленное')} ($done)',
                                   textAlign: TextAlign.center,
                                   style: body(14, w: 700, color: blue1),
                                 ),
@@ -367,7 +378,7 @@ class _ShopListPageState extends State<ShopListPage> {
                             Padding(
                               padding: const EdgeInsets.only(top: 6),
                               child: Text(
-                                'Смахни пункт влево, чтобы удалить.',
+                                t('Смахни пункт влево, чтобы удалить.'),
                                 textAlign: TextAlign.center,
                                 style: body(12, color: mute),
                               ),

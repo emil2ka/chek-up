@@ -3,6 +3,7 @@
 //   flutter test test/sync_live_test.dart --dart-define=API_URL=http://localhost:5197
 // Без API_URL тест пропускается.
 import 'package:chek_up/core/api.dart';
+import 'package:chek_up/core/calendar.dart';
 import 'package:chek_up/core/data.dart';
 import 'package:chek_up/core/engine.dart';
 import 'package:chek_up/core/models.dart';
@@ -25,7 +26,7 @@ void main() {
           id: 'live-${phone.newId()}',
           receiptId: r.id,
           store: r.store,
-          date: isoOf(DateTime.now()),
+          date: todayIso(),
           cubes: a.cubes,
           score: a.score,
           swaps: [1],
@@ -36,9 +37,9 @@ void main() {
       phone.addToShop([
         const ShopItem(name: 'Минералка (live-тест)', instead: 'Кола, 1 л'),
       ]);
-      phone.updateProfile(
-        phone.profile.copyWith(adults: 2, kids: 1, onboarded: true),
-      );
+      phone.updateFamily(adults: 2, kids: 1);
+      phone.updateMe(onboarded: true);
+      phone.setMark(weekOf(todayIso()), 'closed');
       await phone.sync();
       expect(phone.syncStatus.value, SyncStatus.idle, reason: phone.syncError);
 
@@ -58,6 +59,8 @@ void main() {
       expect(other.shop.map((s) => s.name), contains('Минералка (live-тест)'));
       expect(other.profile.adults, 2);
       expect(other.profile.kids, 1);
+      expect(other.streak.current, 1);
+      expect(other.family.streak?.current, 1);
 
       // второе устройство удаляет чек и отмечает покупку → телефон это видит
       other.removeEntry(other.history.first.id);
@@ -84,12 +87,72 @@ void main() {
   );
 
   test(
+    'семья: приглашение, личный чек, ребёнок, выход',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final mum = AppStore();
+      await mum.load();
+      await mum.sync();
+      await mum.rename('Айгуль');
+      Receipt r(String id, num price) => Receipt(
+        id: id,
+        title: 'Чек',
+        store: 'Magnum',
+        date: todayIso(),
+        items: [
+          Item(n: 'Кола 1 л', p: price, s: 106, k: 420, junk: true),
+          const Item(n: 'Вино', p: 3000, s: 0, k: 400, x: 'alcohol'),
+        ],
+      );
+      mum.saveReceipt(r('live-a-${mum.newId()}', 600));
+      final own = mum.saveReceipt(r('live-b-${mum.newId()}', 1700));
+      mum.saveEntry(mum.entry(own.id)!.copyWith(priv: true));
+      await mum.sync();
+      final code = await mum.createInvite('child');
+
+      SharedPreferences.setMockInitialValues({});
+      final kid = AppStore();
+      await kid.load();
+      await kid.sync();
+      final info = await kid.previewInvite(code);
+      expect((info.role, info.invitedBy, info.members), ('child', 'Айгуль', 1));
+      await kid.joinFamily(code, share: true);
+      expect(kid.isChild, isTrue);
+      expect(kid.history, hasLength(1), reason: 'личный чек не виден');
+      final seen = kid.history.single;
+      expect(seen.receipt!.masked, isTrue);
+      expect(seen.receipt!.items.every((it) => it.p == 0), isTrue);
+      expect(seen.receipt!.items.any((it) => it.n.contains('Вино')), isFalse);
+      expect(kid.authorOf(seen), 'Айгуль');
+      expect(kid.bestStreak, mum.bestStreak);
+
+      // чек ребёнка виден маме
+      kid.saveReceipt(r('live-c-${kid.newId()}', 450));
+      await kid.sync();
+      await mum.sync();
+      expect(mum.history, hasLength(3));
+      expect(mum.history.where((e) => !mum.isMine(e)), hasLength(1));
+
+      // вышел: свои чеки с ним, чужих нет
+      await kid.leaveFamily();
+      expect(kid.isChild, isFalse);
+      expect(kid.history.every(kid.isMine), isTrue);
+      expect(kid.history, hasLength(1));
+      await mum.deleteAccount();
+      expect(mum.history, isEmpty);
+      await kid.deleteAccount();
+    },
+    skip: apiUrl.isEmpty ? 'нужен API_URL' : false,
+    timeout: const Timeout(Duration(seconds: 60)),
+  );
+
+  test(
     'цены между магазинами: чек одного человека помогает другому',
     () async {
       SharedPreferences.setMockInitialValues({});
       final a = AppStore();
       await a.load();
-      final today = isoOf(DateTime.now());
+      final today = todayIso();
       // отсканированный чек из «Small»: с солью, жирами, калориями и алкоголем
       final scanned = Receipt(
         id: 'scan-live-${a.newId()}',

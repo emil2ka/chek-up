@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/models.dart';
 import 'kit.dart';
 import 'food_piece.dart';
@@ -16,14 +17,15 @@ Future<Uint8List> _render({
   required Map<MetricId, int> cubesBy,
   required Map<MetricId, double> totals,
   required Set<MetricId> available,
-  required int score,
-  required String verdictLow,
+  required String pill,
   required Tone tone,
+  String? kick,
+  int level = 0,
   required String where,
 }) async {
   const w = 1080.0, h = 1350.0;
   final cubes = cubesBy[metric]!;
-  final pal = pilePalettes[metric]!;
+  final pal = metric == MetricId.sugar ? skinFor(level) : pilePalettes[metric]!;
   final rec = ui.PictureRecorder();
   final c = Canvas(rec, const Rect.fromLTWH(0, 0, w, h));
   c.drawRect(
@@ -61,7 +63,7 @@ Future<Uint8List> _render({
 
   text('чек-ап', disp(54, w: 800, color: Colors.white), 80);
   text(
-    'В моём чеке',
+    kick ?? t('В моём чеке'),
     body(46, w: 700, color: Colors.white.withValues(alpha: .88)),
     220,
   );
@@ -82,7 +84,9 @@ Future<Uint8List> _render({
     270,
   );
   text(
-    available.contains(metric) ? bigCap(totals[metric]!, metric) : 'нет данных',
+    available.contains(metric)
+        ? bigCap(totals[metric]!, metric)
+        : t('нет данных'),
     disp(64, w: 500, color: Colors.white, ls: -.01),
     280 + nh,
   );
@@ -127,13 +131,7 @@ Future<Uint8List> _render({
     16,
     Paint()..color = toneColor(tone),
   );
-  text(
-    '$score из 100 · $verdictLow',
-    body(44, w: 800),
-    h - 258,
-    x: 144,
-    maxW: w - 224,
-  );
+  text(pill, body(44, w: 800), h - 258, x: 144, maxW: w - 224);
   final colW = (w - 120) / metricIds.length;
   for (final (i, m) in metricIds.indexed) {
     final cx = 60 + colW * (i + .5);
@@ -151,7 +149,9 @@ Future<Uint8List> _render({
       align: TextAlign.center,
     );
     text(
-      '${m == MetricId.carbs ? 'Углев.' : metrics[m]!.label} · ${isCubeMetric(m) ? 'куб.' : metrics[m]!.unit}',
+      m == MetricId.kcal
+          ? t('Ккал')
+          : '${t(m == MetricId.carbs ? 'Углев.' : metrics[m]!.label)} · ${isCubeMetric(m) ? t('куб.') : t(metrics[m]!.unit)}',
       body(23, w: 700, color: mute),
       h - 112,
       x: cx - colW / 2,
@@ -179,21 +179,24 @@ Future<void> shareResult({
   required Map<MetricId, int> cubesBy,
   required Map<MetricId, double> totals,
   required Set<MetricId> available,
-  required int score,
+  required String pill,
+  required Tone tone,
   required String where,
   required String text,
+  String? kick,
+  int level = 0,
 }) async {
-  final v = verdict(score);
   try {
     final png = await _render(
       metric: metric,
       cubesBy: cubesBy,
       totals: totals,
       available: available,
-      score: score,
-      verdictLow: v.label.toLowerCase(),
-      tone: v.tone,
+      pill: pill,
+      tone: tone,
       where: where,
+      kick: kick,
+      level: level,
     );
     await SharePlus.instance.share(
       ShareParams(
@@ -208,7 +211,7 @@ Future<void> shareResult({
     try {
       await SharePlus.instance.share(ShareParams(text: text));
     } catch (_) {
-      showToast('Не получилось поделиться');
+      showToast(t('Не получилось поделиться'));
     }
   }
 }

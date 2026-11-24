@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../core/catalog.dart';
+import '../core/i18n.dart';
 import '../core/engine.dart';
 import '../core/models.dart';
 import '../ui/kit.dart';
@@ -55,13 +56,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Rise(child: Text('Что внутри', style: h1)),
                       Rise(
-                        delay: 60,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Row(children: [Hl('продуктов', h1)]),
+                          child: Row(children: [Hl(t('Что внутри'), h1)]),
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -107,14 +106,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                         decoration: InputDecoration(
                                           border: InputBorder.none,
                                           isCollapsed: true,
-                                          hintText: 'Кола, йогурт, печенье…',
+                                          hintText: t('Кола, йогурт, печенье…'),
                                           hintStyle: body(17, color: mute),
                                         ),
                                       ),
                                     ),
                                     if (_q.text.isNotEmpty)
                                       IconButton(
-                                        tooltip: 'Очистить поиск',
+                                        tooltip: t('Очистить поиск'),
                                         onPressed: () =>
                                             setState(() => _q.clear()),
                                         icon: const Icon(
@@ -130,7 +129,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                             const SizedBox(width: 8),
                             Press(
                               scale: .92,
-                              label: 'Проверить товар по штрихкоду',
+                              label: t('Проверить товар по штрихкоду'),
                               onTap: () => openBarcode(context),
                               child: Container(
                                 width: 56,
@@ -169,7 +168,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       itemCount: cats.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
                       itemBuilder: (_, i) {
                         final (id, label) = cats[i];
                         final on = id == _cat;
@@ -195,7 +194,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                               ),
                             ),
                             child: Text(
-                              label,
+                              t(label),
                               style: body(
                                 14,
                                 w: 800,
@@ -237,7 +236,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
                           child: Text(
-                            '${items.length} ${pl(items.length, productsF)} · ${const {MetricId.sugar: 'сначала самые сладкие', MetricId.salt: 'сначала самые солёные', MetricId.fat: 'сначала самые жирные', MetricId.kcal: 'сначала самые калорийные', MetricId.carbs: 'сначала больше углеводов', MetricId.protein: 'сначала больше белка'}[_metric]}',
+                            '${items.length} ${pl(items.length, productsF)} · ${t(const {MetricId.sugar: 'сначала самые сладкие', MetricId.salt: 'сначала самые солёные', MetricId.fat: 'сначала самые жирные', MetricId.kcal: 'сначала самые калорийные', MetricId.carbs: 'сначала больше углеводов', MetricId.protein: 'сначала больше белка'}[_metric]!)}',
                             style: body(13, w: 700, color: mute),
                           ),
                         ),
@@ -252,12 +251,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Такого пока нет',
+                                  t('Такого пока нет'),
                                   style: disp(20, h: 1.2, ls: -.03),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  'Попробуй короче: «сок», «йогурт», «шоколад». Или проверь товар по штрихкоду.',
+                                  t(
+                                    'Попробуй короче: «сок», «йогурт», «шоколад».',
+                                  ),
                                   style: body(15, color: mute),
                                 ),
                               ],
@@ -269,7 +270,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            'Значения примерные, по типичным товарам в магазинах. ${unitNote(_metric)}. Норма: ${mdef.norm}.',
+                            '${t('Значения примерные, по типичным товарам в магазинах.')} ${unitNote(_metric)}. ${t('Норма')}: ${t(mdef.norm)}.',
                             style: body(12, color: mute, h: 1.5),
                           ),
                         ),
@@ -315,10 +316,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            it.name,
+                            t(it.name),
                             style: disp(16, w: 700, ls: -.02, h: 1.25),
                           ),
-                          Text(it.portion, style: body(13, color: mute)),
+                          Text(t(it.portion), style: body(13, color: mute)),
                         ],
                       ),
                     ),
@@ -347,7 +348,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                             const ToneDot(Tone.good),
                             const SizedBox(width: 8),
                             Text(
-                              val > 0 ? 'почти нет' : 'без ${mdef.of}',
+                              val > 0 ? t('почти нет') : t('нет'),
                               style: body(13, w: 800, color: good),
                             ),
                           ],
@@ -396,8 +397,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   const SizedBox(height: 12),
                   Text(
                     val > 0
-                        ? 'В порции около ${amountTxt(val, _metric)} ${_metric == MetricId.sugar ? 'добавленного сахара' : mdef.of} — это ${(val / mdef.adult * 100).round()}% дневной нормы взрослого.'
-                        : '${_metric == MetricId.sugar ? 'Добавленного сахара' : mdef.label} здесь нет. Можно не считать.',
+                        ? t(
+                            'В порции около {a}, это {p}% дневной нормы взрослого.',
+                            {
+                              'a': amountTxt(val, _metric),
+                              'p': (val / mdef.adult * 100).round(),
+                            },
+                          )
+                        : t('Здесь этого нет, можно не считать.'),
                     style: body(15),
                   ),
                   if (it.swap != null)
@@ -422,7 +429,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Лучше взять: ${it.swap}',
+                              '${t('Лучше взять')}: ${t(it.swap!)}',
                               style: body(15, w: 700, color: good),
                             ),
                           ),

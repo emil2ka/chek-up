@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { analyze } from '../engine';
 import { ReceiptSchema } from '../schema';
-import { applyCorrection, buildItem, buildReceipt as build, lineOf, needsModel, rawKey, storeKey } from './build';
+import { applyCorrection, buildItem, buildReceipt as build, lineOf, needsModel, rawKey, reprice, storeKey } from './build';
 import type { Extracted } from './parse';
 import type { Estimate } from './parse';
 import { amountFromName, findReference, isNonFood } from './reference';
 
-const buildReceipt = (x: Partial<Extracted> & Pick<Extracted, 'lines'>, _e: unknown = null, today?: string) => build({ store: '', date: '', time: '', total: 0, refund: false, ...x }, undefined, { today });
+const buildReceipt = (x: Partial<Extracted> & Pick<Extracted, 'lines'>, _unused: unknown = null, today?: string) => build({ store: '', date: '', time: '', total: 0, refund: false, ...x }, undefined, { today });
 
 const est = (o: Partial<Estimate> & { sugar: number }): Estimate => ({ salt: 0, fat: 0, kcal: 0, carbs: 0, protein: 0, name: '', food: true, flag: null, junk: false, swap: null, ...o });
 
@@ -271,5 +271,19 @@ describe('исправления', () => {
   it('ключи магазина и строки не зависят от регистра, кавычек и формы собственности', () => {
     expect(storeKey('ТОО «MAGNUM Cash&Carry»')).toBe(storeKey('magnum cash carry'));
     expect(rawKey('МОЛ ПРОСТ 3,2%  1Л')).toBe(rawKey('мол прост 3 2 1л'));
+  });
+});
+
+describe('цена замены', () => {
+  it('у позиции без цены её нет, а когда цену ввели — считается', () => {
+    const it0 = buildItem(lineOf({ n: 'Кола 1 л', p: 0 }));
+    expect(it0.swap?.p).toBe(0);
+    const it620 = reprice(it0, 620);
+    expect(it620.p).toBe(620);
+    expect(it620.swap!.p).toBe(buildItem(lineOf({ n: 'Кола 1 л', p: 620 })).swap!.p);
+  });
+  it('замена от модели меняется пропорционально', () => {
+    expect(reprice({ n: 'Нечто', p: 1000, s: 50, swap: { n: 'Другое', p: 700, s: 0 } }, 500).swap!.p).toBe(350);
+    expect(reprice({ n: 'Нечто', p: 1000, s: 50 }, 500)).toEqual({ n: 'Нечто', p: 500, s: 50 });
   });
 });

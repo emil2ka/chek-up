@@ -1,119 +1,126 @@
-// Экран результата в стиле «Гора сахара»: цифра, куча кубиков, замены, источники, «вредное».
+// Экран результата: гора → одна мысль → три лучшие замены → остальное под «Подробнее».
+// Замены — это план: гора уменьшается на экране, но в факт и экономию они попадают, когда их подтвердит чек.
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/insights.dart';
 import '../core/models.dart';
 import '../core/store.dart';
+import '../ui/forms.dart';
 import '../ui/kit.dart';
 import '../ui/pile_hero.dart';
 import '../ui/share_card.dart';
+import 'edit.dart';
 import 'prices_card.dart';
 import 'shell.dart';
 
 class ResultPage extends StatefulWidget {
-  final Receipt receipt;
   final String entryId;
-  final List<int> swaps;
-  const ResultPage({
-    super.key,
-    required this.receipt,
-    required this.entryId,
-    required this.swaps,
-  });
+  const ResultPage({super.key, required this.entryId});
   @override
   State<ResultPage> createState() => _ResultPageState();
 }
 
 class _ResultPageState extends State<ResultPage> {
-  late Set<int> _on = widget.swaps.toSet();
+  static const _top = 3;
   MetricId _metric = MetricId.sugar;
-  late ResultModel _m = resultModel(widget.receipt, _on, _metric);
-  List<SwapRow> get _rows => swapRows(widget.receipt, _metric);
-  int get _maxCubes => resultModel(widget.receipt, const [], _metric).maxCubes;
-  bool _srcReady = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _saveEntry());
-    Future.delayed(
-      const Duration(milliseconds: 800),
-      () => mounted ? setState(() => _srcReady = true) : null,
-    );
-  }
-
-  void _saveEntry() {
-    final r = widget.receipt, a = _m.analysis;
-    store.saveEntry(
-      HistoryEntry(
-        id: widget.entryId,
-        receiptId: r.id,
-        store: r.store,
-        date: r.date,
-        cubes: a.cubes,
-        score: a.score,
-        swaps: _m.swaps,
-        savedAt: DateTime.now().millisecondsSinceEpoch,
-        receipt: demoById(r.id) == null ? r : null,
-      ),
-    );
-  }
+  bool _more = false, _allSwaps = false, _srcReady = false;
+  late HistoryEntry _e;
+  late Receipt _r;
+  late ResultModel _m;
 
   void _toggle(int i) {
-    setState(() {
-      _on = {..._on};
-      _on.contains(i) ? _on.remove(i) : _on.add(i);
-      _m = resultModel(widget.receipt, _on, _metric);
-    });
-    _saveEntry();
+    final on = {..._e.swaps};
+    on.contains(i) ? on.remove(i) : on.add(i);
+    store.saveEntry(_e.copyWith(swaps: on.toList()..sort()));
   }
 
-  void _setMetric(MetricId m) => setState(() {
-    _metric = m;
-    _m = resultModel(widget.receipt, _on, m);
-  });
-
-  void _share() {
-    final a = _m.analysis;
-    shareResult(
-      metric: _metric,
-      cubesBy: a.cubesBy,
-      totals: a.totals,
-      available: {
-        for (final metric in metricIds)
-          if (a.items.any((item) => hasMetricData(item.active, metric))) metric,
-      },
-      score: a.score,
-      where: '${widget.receipt.store} · ${dateRu(widget.receipt.date)}',
-      text: _m.shareText,
-    );
-  }
+  void _share() => shareResult(
+    metric: _metric,
+    cubesBy: _m.base.cubesBy,
+    totals: _m.base.totals,
+    available: _m.available,
+    pill: _m.pill,
+    tone: _m.tone,
+    where: '${_r.store} · ${dateRu(_r.date)}',
+    text: _m.shareText,
+    level: store.streak.level,
+  );
 
   void _toList() {
-    // в список уходят все включённые замены, а не только видимые на этой вкладке
+    // в список уходят все замены плана, а не только видимые на этой вкладке
     final items = [
-      for (final i in _on.toList()..sort())
-        if (widget.receipt.items[i].swap != null)
-          ShopItem(
-            name: widget.receipt.items[i].swap!.n,
-            instead: widget.receipt.items[i].n,
-          ),
+      for (final i in _e.swaps)
+        if (i < _r.items.length && _r.items[i].swap != null)
+          ShopItem(name: _r.items[i].swap!.n, instead: _r.items[i].n),
     ];
     final n = store.addToShop(items);
     showToast(
-      n > 0 ? 'В списке на следующий поход: +$n' : 'Эти замены уже в списке',
+      n > 0
+          ? t('В списке на следующий поход: +{n}', {'n': n})
+          : t('Эти замены уже в списке'),
     );
   }
 
+  Future<void> _edit() async {
+    final e = _e;
+    final nav = Navigator.of(context);
+    final r = await editReceipt(
+      context,
+      receipt: _r,
+      off: e.off,
+      onDelete: () {
+        nav.pop();
+        store.removeEntry(e.id);
+        showToast(t('Чек удалён'));
+      },
+    );
+    if (r == null) return;
+    store.editReceipt(e, r.receipt, r.off);
+    showToast(t('Чек исправлен'));
+    await store.sendCorrections(r.receipt.store, r.corrections);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: store,
+    builder: (context, _) {
+      final e = store.entry(widget.entryId);
+      final r = e == null ? null : receiptOf(e);
+      if (e == null || r == null) {
+        return const Scaffold(
+          body: DecoratedBox(
+            decoration: BoxDecoration(gradient: sky),
+            child: SizedBox.expand(),
+          ),
+        );
+      }
+      _e = e;
+      _r = r;
+      _m = resultModel(r, e.swaps, metric: _metric, off: e.off, score: e.score);
+      return _page(context);
+    },
+  );
+
+  Widget _page(BuildContext context) {
     final mq = MediaQuery.of(context);
     final a = _m.analysis;
-    final eq = equivalents(a.totals[_metric]!, _metric);
-    final mdef = metrics[_metric]!;
+    final demo = isDemo(_e), mine = store.isMine(_e);
+    final editable = !demo && !_r.masked && (mine || !store.isChild);
+    final rows = swapRows(_r, _metric, _e.off);
+    final shown = [
+      for (final (k, x) in rows.indexed)
+        if (_allSwaps || k < _top || _e.swaps.contains(x.i)) x,
+    ];
+    final planned = _e.swaps.any((i) => rows.any((x) => x.i == i));
+    final unsure = _r.items.where((it) => it.q).length;
+    final gap = _r.sum == null || _r.masked
+        ? 0
+        : (_r.items.fold<num>(0, (n, it) => n + it.p) - _r.sum!).round();
+    final who = store.authorOf(_e);
 
     return Scaffold(
       body: DecoratedBox(
@@ -124,20 +131,22 @@ class _ResultPageState extends State<ResultPage> {
               children: [
                 PileHero(
                   height: max(440.0, box.maxHeight * .62),
-                  kick: 'В твоём чеке',
+                  kick: planned
+                      ? t('Будет в следующий раз')
+                      : t('В твоём чеке'),
                   target: pileCount(a.totals[_metric]!, _metric),
-                  maxCubes: min(220, _maxCubes),
-                  value:
-                      a.items.any((item) => hasMetricData(item.active, _metric))
+                  maxCubes: min(220, _m.maxCubes),
+                  value: _m.available.contains(_metric)
                       ? a.totals[_metric]!
                       : null,
                   metric: _metric,
-                  onMetric: _setMetric,
+                  level: store.streak.level,
+                  onMetric: (m) => setState(() => _metric = m),
                   bar: Row(
                     children: [
                       BarButton(
                         Icons.arrow_back_ios_new_rounded,
-                        'Назад',
+                        t('Назад'),
                         () => Navigator.of(context).pop(),
                       ),
                       Expanded(
@@ -148,7 +157,7 @@ class _ResultPageState extends State<ResultPage> {
                       ),
                       BarButton(
                         Icons.ios_share_rounded,
-                        'Поделиться результатом',
+                        t('Поделиться результатом'),
                         _share,
                       ),
                     ],
@@ -164,241 +173,121 @@ class _ResultPageState extends State<ResultPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (widget.receipt.approx) ...[
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          margin: const EdgeInsets.only(bottom: 22),
-                          decoration: BoxDecoration(
-                            color: mid.withValues(alpha: .14),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'Чек распознан по фото: состав и замены оценены приблизительно, по типичным товарам.',
-                            style: body(14),
-                          ),
+                      if (editable && (unsure > 0 || gap != 0))
+                        _check(unsure, gap),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          conclusion(_r, _m.base, guests: _e.guests),
+                          style: disp(21, w: 800, h: 1.2, ls: -.03),
                         ),
-                      ],
-                      // ── замены ──
-                      SecTitle(
-                        isCubeMetric(_metric)
-                            ? 'Замени — и кубики исчезнут'
-                            : 'Что изменится с заменой',
                       ),
-                      if (_rows.isEmpty)
-                        _empty('Нет замен, которые меняют этот показатель.')
-                      else
-                        for (final r in _rows)
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          [
+                            _r.store,
+                            dateRu(_r.date),
+                            if (!_r.masked) money(_m.base.total),
+                            if (who.isNotEmpty) t('внесено: {n}', {'n': who}),
+                            if (demo) t('пример, в учёт не идёт'),
+                            if (_m.base.offCount > 0)
+                              t('не считаем: {n}', {'n': _m.base.offCount}),
+                          ].join(' · '),
+                          style: body(13, color: mute),
+                        ),
+                      ),
+                      if (!_r.refund) ...[
+                        const SizedBox(height: 28),
+                        SecTitle(t('В следующий раз возьми')),
+                        if (rows.isEmpty)
+                          _empty(
+                            t('Нет замен, которые меняют этот показатель.'),
+                          ),
+                        for (final x in shown)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _swapRow(r),
+                            child: _swapRow(x),
                           ),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topCenter,
-                        child: _m.summary == null
-                            ? const SizedBox(width: double.infinity)
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 4),
-                                    padding: const EdgeInsets.fromLTRB(
-                                      14,
-                                      12,
-                                      14,
-                                      12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: good.withValues(alpha: .12),
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.check_rounded,
-                                          color: good,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text.rich(
-                                            TextSpan(
-                                              children: [
-                                                const TextSpan(
-                                                  text: 'С заменами: ',
-                                                ),
-                                                TextSpan(
-                                                  text: _m.summary!.points,
-                                                  style: body(15, w: 800),
-                                                ),
-                                                TextSpan(
-                                                  text:
-                                                      ', ${_m.summary!.label} ',
-                                                ),
-                                                TextSpan(
-                                                  text: _m.summary!.money,
-                                                  style: body(15, w: 800),
-                                                ),
-                                              ],
-                                            ),
-                                            style: body(15),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Press(
-                                    onTap: _toList,
-                                    child: Container(
-                                      height: 54,
-                                      decoration: BoxDecoration(
-                                        color: blue1,
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.playlist_add_check_rounded,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Flexible(
-                                            child: FittedBox(
-                                              fit: BoxFit.scaleDown,
-                                              child: Text(
-                                                'В список на следующий поход',
-                                                style: disp(
-                                                  14,
-                                                  w: 700,
-                                                  color: Colors.white,
-                                                  ls: -.01,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                      // ── это как… ──
-                      if (eq.isNotEmpty) ...[
-                        const SizedBox(height: 30),
-                        const SecTitle('Это как…'),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
+                        if (rows.length > shown.length)
+                          FlatBtn(
+                            t('Ещё замены: {n}', {
+                              'n': rows.length - shown.length,
+                            }),
+                            white: true,
+                            color: blue1,
+                            onTap: () => setState(() => _allSwaps = true),
+                          ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: _m.summary == null
+                              ? const SizedBox(width: double.infinity)
+                              : _summary(),
+                        ),
+                      ],
+                      if (editable) ...[
+                        const SizedBox(height: 24),
+                        RowBtn(
+                          t('Изменить чек'),
+                          icon: Icons.edit_rounded,
+                          onTap: _edit,
+                        ),
+                        SwitchRow(
+                          t('Для гостей'),
+                          hint: t('деньги посчитаем, норму не тронем'),
+                          value: _e.guests,
+                          onChanged: (v) =>
+                              store.saveEntry(_e.copyWith(guests: v)),
+                        ),
+                        if (mine)
+                          SwitchRow(
+                            t('Личный чек'),
+                            hint: t('семья его не увидит'),
+                            value: _e.priv,
+                            onChanged: (v) =>
+                                store.saveEntry(_e.copyWith(priv: v)),
+                          ),
+                      ],
+                      const SizedBox(height: 16),
+                      Press(
+                        scale: .98,
+                        onTap: () {
+                          setState(() => _more = !_more);
+                          Future.delayed(
+                            const Duration(milliseconds: 60),
+                            () => mounted
+                                ? setState(() => _srcReady = true)
+                                : null,
+                          );
+                        },
+                        child: Container(
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: tint,
+                            borderRadius: BorderRadius.circular(17),
+                          ),
                           child: Row(
-                            key: ValueKey(
-                              '${_metric.name}${a.totals[_metric]}',
-                            ),
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              for (final (i, e) in eq.indexed) ...[
-                                if (i > 0) const SizedBox(width: 8),
-                                Expanded(child: _equiv(e)),
-                              ],
+                              Text(
+                                t('Подробнее'),
+                                style: body(15, w: 800, color: blue1),
+                              ),
+                              Icon(
+                                _more
+                                    ? Icons.expand_less_rounded
+                                    : Icons.expand_more_rounded,
+                                color: blue1,
+                              ),
                             ],
                           ),
                         ),
-                      ],
-                      // ── источники ──
-                      const SizedBox(height: 30),
-                      SecTitle('Откуда ${mdef.label.toLowerCase()}'),
-                      if (_m.sources.isEmpty)
-                        _empty('Нет данных об этом показателе.')
-                      else
-                        for (final s in _m.sources) _source(s),
-                      // ── вредное ──
-                      // ── цена вреда ──
-                      const SizedBox(height: 22),
-                      SecTitle(
-                        isHarmfulMetric(_metric)
-                            ? 'Цена вреда'
-                            : 'Сколько это стоит',
                       ),
-                      if (_m.harm.total == 0)
-                        _empty('Нет позиций с учтённым количеством ${mdef.of}.')
-                      else
-                        _harm(_m.harm, mdef),
-                      const SizedBox(height: 22),
-                      const SecTitle('На вредное'),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: tint,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _m.junkSum,
-                                    style: disp(34, ls: -.05),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: toneColor(
-                                      _m.junkTone,
-                                    ).withValues(alpha: .16),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Text(
-                                    _m.junkShare,
-                                    style: body(13, w: 800),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            _meter(a.share, toneColor(_m.junkTone)),
-                            const SizedBox(height: 10),
-                            Text(_m.junkOf, style: body(14, color: mute)),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.calendar_month_rounded,
-                                  color: blue1,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _m.junkDays,
-                                    style: body(14, w: 700),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_m.flagged.isNotEmpty) ...[
-                        const SizedBox(height: 22),
-                        const SecTitle('Алкоголь и энергетики'),
-                        _flagged(_m, a),
-                      ],
-                      // ── где дешевле ──
-                      const SizedBox(height: 22),
-                      const SecTitle('Где дешевле'),
-                      PricesCard(receipt: widget.receipt),
-                      const SizedBox(height: 26),
+                      if (_more) ..._details(),
+                      const SizedBox(height: 24),
                       Press(
                         onTap: () => openCamera(context),
                         child: Container(
@@ -419,7 +308,7 @@ class _ResultPageState extends State<ResultPage> {
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
                                   child: Text(
-                                    'Сканировать новый чек',
+                                    t('Внести ещё чек'),
                                     style: disp(
                                       16,
                                       w: 700,
@@ -434,34 +323,17 @@ class _ResultPageState extends State<ResultPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Press(
+                      FlatBtn(
+                        t('Поделиться'),
+                        icon: Icons.ios_share_rounded,
+                        color: blue1,
+                        height: 56,
                         onTap: _share,
-                        child: Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: tint,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.ios_share_rounded,
-                                color: blue1,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Поделиться',
-                                style: disp(15, w: 700, color: blue1, ls: -.01),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        '$unitsNote Оценка примерная и не заменяет консультацию врача.',
+                        '${_more ? '${t(unitsNote)} ' : ''}${t('Оценка примерная и не заменяет консультацию врача.')}',
+                        textAlign: TextAlign.center,
                         style: body(12, color: mute, h: 1.5),
                       ),
                     ],
@@ -475,6 +347,183 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
+  Widget _check(int unsure, int gap) => Padding(
+    padding: const EdgeInsets.only(bottom: 18),
+    child: Press(
+      scale: .985,
+      onTap: _edit,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: mid.withValues(alpha: .16),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                [
+                  if (unsure > 0)
+                    t('Проверь {n} {w}: прочитались плохо.', {
+                      'n': unsure,
+                      'w': pl(unsure, positionsF),
+                    }),
+                  if (gap < 0)
+                    t('Не хватает {n} до суммы на чеке.', {'n': money(-gap)}),
+                  if (gap > 0)
+                    t('На {n} больше суммы на чеке.', {'n': money(gap)}),
+                ].join(' '),
+                style: body(14, w: 700),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(t('Проверить'), style: body(14, w: 800, color: blue1)),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _summary() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Container(
+        margin: const EdgeInsets.only(top: 4),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: good.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_rounded, color: good, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: '${t('В плане')}: '),
+                    TextSpan(text: _m.summary!.points, style: body(15, w: 800)),
+                    if (_m.summary!.label.isNotEmpty)
+                      TextSpan(text: ', ${_m.summary!.label}'),
+                    if (_m.summary!.money.isNotEmpty)
+                      TextSpan(
+                        text: ' ${_m.summary!.money}',
+                        style: body(15, w: 800),
+                      ),
+                    TextSpan(text: '. ${t('Засчитаем, когда купишь.')}'),
+                  ],
+                ),
+                style: body(15),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 8),
+      FlatBtn(
+        t('В список на следующий поход'),
+        primary: true,
+        icon: Icons.playlist_add_check_rounded,
+        height: 54,
+        onTap: _toList,
+      ),
+    ],
+  );
+
+  List<Widget> _details() {
+    final mdef = metrics[_metric]!;
+    final a = _m.base;
+    final eq = equivalents(a.totals[_metric]!, _metric);
+    return [
+      if (eq.isNotEmpty) ...[
+        const SizedBox(height: 26),
+        SecTitle(t('Это как…')),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final (i, e) in eq.indexed) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: _equiv(e)),
+            ],
+          ],
+        ),
+      ],
+      const SizedBox(height: 28),
+      SecTitle('${t('Откуда')}: ${t(mdef.label).toLowerCase()}'),
+      if (_m.sources.isEmpty)
+        _empty(t('Нет данных об этом показателе.'))
+      else
+        for (final s in _m.sources) _source(s),
+      if (!_r.masked) ...[
+        const SizedBox(height: 22),
+        SecTitle(
+          isHarmfulMetric(_metric) ? t('Цена вреда') : t('Сколько это стоит'),
+        ),
+        if (_m.harm.total == 0)
+          _empty(t('Таких позиций в чеке нет.'))
+        else
+          _harm(_m.harm, mdef),
+        const SizedBox(height: 22),
+        SecTitle(t('На вредное')),
+        Tile(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(_m.junkSum, style: disp(34, ls: -.05)),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: toneColor(_m.junkTone).withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(_m.junkShare, style: body(13, w: 800)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _meter(a.share, toneColor(_m.junkTone)),
+              const SizedBox(height: 10),
+              Text(_m.junkOf, style: body(14, color: mute)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_month_rounded,
+                    color: blue1,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_m.junkDays, style: body(14, w: 700))),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (_m.flagged.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          SecTitle(t('Алкоголь и энергетики')),
+          _flagged(_m, a),
+        ],
+        const SizedBox(height: 22),
+        SecTitle(t('Где дешевле')),
+        PricesCard(key: ValueKey(_r.id), receipt: _r),
+      ],
+    ];
+  }
+
   Widget _harm(HarmPrice h, MetricDef mdef) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -485,23 +534,26 @@ class _ResultPageState extends State<ResultPage> {
           children: [
             Text(money(h.perUnit), style: disp(34, ls: -.04)),
             Text(
-              'за ${isCubeMetric(mdef.id)
-                  ? 'кубик'
+              isCubeMetric(mdef.id)
+                  ? t('за кубик сахара')
                   : mdef.id == MetricId.kcal
-                  ? '100 ккал'
-                  : mdef.unit}${mdef.id == MetricId.kcal ? '' : ' ${mdef.of}'}',
+                  ? t('за 100 ккал')
+                  : t('за грамм'),
               style: body(15, color: mute),
             ),
             const SizedBox(height: 8),
             Text(
-              'На эти покупки ушло ${money(h.spend)}, в них ${metricTxt(h.total, mdef.id)}.',
+              t('На эти покупки ушло {m}, в них {x}.', {
+                'm': money(h.spend),
+                'x': metricTxt(h.total, mdef.id),
+              }),
               style: body(14, color: mute, h: 1.4),
             ),
           ],
         ),
       ),
       const SizedBox(height: 12),
-      for (final t in h.top)
+      for (final x in h.top)
         Container(
           margin: const EdgeInsets.only(bottom: 6),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -513,12 +565,14 @@ class _ResultPageState extends State<ResultPage> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Expanded(child: Text(t.name, style: body(14, h: 1.3))),
+              Expanded(child: Text(x.name, style: body(14, h: 1.3))),
               const SizedBox(width: 12),
-              Text(money(t.price), style: disp(14, w: 800, ls: -.02)),
+              Text(money(x.price), style: disp(14, w: 800, ls: -.02)),
               const SizedBox(width: 6),
               Text(
-                metricTxt(t.value, mdef.id),
+                isCubeMetric(mdef.id)
+                    ? '${bigNum(x.value, mdef.id)} ${t('куб.')}'
+                    : amountTxt(x.value, mdef.id),
                 style: body(13, w: 700, color: mute),
               ),
             ],
@@ -528,7 +582,7 @@ class _ResultPageState extends State<ResultPage> {
   );
 
   Widget _flagged(ResultModel m, Analysis a) {
-    final share = a.total > 0 ? (a.flaggedSum / a.total * 100).round() : 0;
+    final share = a.food > 0 ? (a.flaggedSum / a.food * 100).round() : 0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -544,7 +598,10 @@ class _ResultPageState extends State<ResultPage> {
               Expanded(
                 child: Text(money(a.flaggedSum), style: disp(30, ls: -.04)),
               ),
-              Text('$share% чека', style: disp(15, w: 800, color: bad, ls: 0)),
+              Text(
+                t('{n}% еды', {'n': share}),
+                style: disp(15, w: 800, color: bad, ls: 0),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -553,16 +610,7 @@ class _ResultPageState extends State<ResultPage> {
               padding: const EdgeInsets.only(top: 6),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${l.kind == 'alcohol' ? 'Алкоголь' : 'Энергетик'} · ${l.name}'
-                          .replaceFirst(
-                            RegExp(r'^Энергетик · (?=Энергетик)'),
-                            '',
-                          ),
-                      style: body(14, h: 1.35),
-                    ),
-                  ),
+                  Expanded(child: Text(l.name, style: body(14, h: 1.35))),
                   Text(money(l.price), style: disp(14, w: 800, ls: -.02)),
                 ],
               ),
@@ -602,7 +650,7 @@ class _ResultPageState extends State<ResultPage> {
   );
 
   Widget _swapRow(SwapRow r) {
-    final on = _on.contains(r.i);
+    final on = _e.swaps.contains(r.i);
     return Semantics(
       toggled: on,
       child: Press(
@@ -737,7 +785,7 @@ class _ResultPageState extends State<ResultPage> {
     padding: const EdgeInsets.only(bottom: 14),
     child: AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
-      opacity: s.off ? .5 : 1,
+      opacity: s.swapped ? .5 : 1,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -746,9 +794,11 @@ class _ResultPageState extends State<ResultPage> {
             children: [
               Expanded(
                 child: Text(
-                  s.name,
+                  s.weeks > 1
+                      ? '${s.name} · ${t('запас на {n} нед.', {'n': s.weeks})}'
+                      : s.name,
                   style: body(15, w: 700).copyWith(
-                    decoration: s.off ? TextDecoration.lineThrough : null,
+                    decoration: s.swapped ? TextDecoration.lineThrough : null,
                   ),
                 ),
               ),
@@ -770,13 +820,13 @@ class _ResultPageState extends State<ResultPage> {
                 curve: Curves.easeOutCubic,
                 widthFactor: _srcReady ? s.width / 100 : 0.0,
                 child: CustomPaint(
-                  painter: _Cells(s.cells, s.off ? mute : blue1),
+                  painter: _Cells(s.cells, s.swapped ? mute : blue1),
                   child: const SizedBox.expand(),
                 ),
               ),
             ),
           ),
-          if (s.off)
+          if (s.swapped)
             Padding(
               padding: const EdgeInsets.only(top: 5),
               child: Row(

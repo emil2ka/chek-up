@@ -2,9 +2,15 @@
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
+
+/// Слова заголовка по одному: плашка переносится вместе с ними.
+List<Widget> _words(String text, TextStyle st) => [
+  for (final w in text.split(' ')) Text('$w ', style: st),
+];
 
 class Onboarding extends StatefulWidget {
   final VoidCallback onDone;
@@ -61,14 +67,13 @@ class _OnboardingState extends State<Onboarding> {
           const SizedBox(height: 36),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text('Чек знает, что ты ', style: h1),
-              Hl('ешь', h1),
-            ],
+            children: [..._words(t('Чек знает, что ты'), h1), Hl(t('ешь'), h1)],
           ),
           const SizedBox(height: 16),
           Text(
-            'Сфоткай чек из магазина — покажем состав покупок: от сахара и соли до калорий, углеводов и белков. Подскажем, что заменить.',
+            t(
+              'Сфоткай чек из магазина. Покажем, сколько в нём сахара, соли и жиров, и подскажем, что заменить.',
+            ),
             style: sub,
           ),
         ],
@@ -97,13 +102,16 @@ class _OnboardingState extends State<Onboarding> {
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Сахар считаем ', style: h1),
-              Hl('кубиками', h1),
+              ..._words(t('Сахар считаем'), h1),
+              Hl(t('кубиками'), h1),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'Один кубик — 5 г сахара. В литре колы около $cola кубиков, а дневной ориентир для взрослого — до $norm ${pl(norm, cubesF)}. У других показателей свои шкалы.',
+            t(
+              'Один кубик: 5 г сахара. В литре колы около {a} {w}, а взрослому хватит {b} в день.',
+              {'a': cola, 'w': pl(cola, cubesF), 'b': norm},
+            ),
             style: sub,
           ),
         ],
@@ -115,49 +123,54 @@ class _OnboardingState extends State<Onboarding> {
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Кто ест из этой ', style: h1),
-              Hl('корзины', h1),
+              ..._words(t('Кто ест из этой'), h1),
+              Hl(t('корзины'), h1),
               Text('?', style: h1),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'От этого зависит норма сахара на неделю. Изменить можно в профиле.',
+            t('От этого зависит норма на неделю. Изменить можно в профиле.'),
             style: sub,
           ),
           const SizedBox(height: 24),
           StepperRow(
             glass: true,
-            label: 'Взрослые',
-            hint:
-                'до ${metrics[MetricId.sugar]!.adult.round()} г сахара и ${metrics[MetricId.salt]!.adult.round()} г соли в день',
+            label: t('Взрослые'),
+            hint: t('до {a} г сахара и {b} г соли в день', {
+              'a': metrics[MetricId.sugar]!.adult.round(),
+              'b': metrics[MetricId.salt]!.adult.round(),
+            }),
             value: p.adults,
             min: 1,
             max: maxAdults,
-            onChange: (v) => store.updateProfile(p.copyWith(adults: v)),
+            onChange: (v) => store.updateFamily(adults: v),
           ),
           const SizedBox(height: 10),
           StepperRow(
             glass: true,
-            label: 'Дети',
-            hint:
-                'до ${metrics[MetricId.sugar]!.kid.round()} г сахара и ${metrics[MetricId.salt]!.kid.round()} г соли в день',
+            label: t('Дети'),
+            hint: t('до {a} г сахара и {b} г соли в день', {
+              'a': metrics[MetricId.sugar]!.kid.round(),
+              'b': metrics[MetricId.salt]!.kid.round(),
+            }),
             value: p.kids,
             min: 0,
             max: maxKids,
-            onChange: (v) => store.updateProfile(p.copyWith(kids: v)),
+            onChange: (v) => store.updateFamily(kids: v),
           ),
           const SizedBox(height: 20),
           Text.rich(
             TextSpan(
               children: [
-                const TextSpan(text: 'Норма семьи — '),
+                TextSpan(text: '${t('Норма семьи')}: '),
                 TextSpan(
                   text: '${familyDailyCubes(p)}',
                   style: disp(20, color: Colors.white, h: 1.3),
                 ),
                 TextSpan(
-                  text: ' ${pl(familyDailyCubes(p), cubesF)} сахара в день',
+                  text:
+                      ' ${pl(familyDailyCubes(p), sugarCubesF)} ${t('в день')}',
                 ),
               ],
             ),
@@ -202,13 +215,25 @@ class _OnboardingState extends State<Onboarding> {
                             ),
                           ),
                         const Spacer(),
+                        Press(
+                          onTap: () => store.updateMe(
+                            lang: p.lang == 'kk' ? 'ru' : 'kk',
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              p.lang == 'kk' ? 'Русский' : 'Қазақша',
+                              style: body(15, w: 800, color: Colors.white),
+                            ),
+                          ),
+                        ),
                         if (!last)
                           Press(
                             onTap: widget.onDone,
                             child: Padding(
                               padding: const EdgeInsets.all(8),
                               child: Text(
-                                'Пропустить',
+                                t('Пропустить'),
                                 style: body(
                                   15,
                                   w: 700,
@@ -243,7 +268,7 @@ class _OnboardingState extends State<Onboarding> {
                     ),
                   ),
                   WhiteButton(
-                    last ? 'Начать' : 'Дальше',
+                    last ? t('Начать') : t('Дальше'),
                     trailing: Icons.arrow_forward_rounded,
                     height: 64,
                     onTap: () =>

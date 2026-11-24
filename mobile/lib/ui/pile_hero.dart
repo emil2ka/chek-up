@@ -2,12 +2,13 @@
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/models.dart';
 import 'kit.dart';
 import 'pile.dart';
 
 const heroHeadH =
-    320.0; // место под шапку, вкладки показателей, подпись и цифру
+    278.0; // место под шапку, вкладки показателей, подпись и цифру
 
 class PileHero extends StatefulWidget {
   final double height;
@@ -28,6 +29,9 @@ class PileHero extends StatefulWidget {
 
   /// переключатель показателей под шапкой (null — без него)
   final ValueChanged<MetricId>? onMetric;
+
+  /// вид кубика сахара по стрику
+  final int level;
   const PileHero({
     super.key,
     required this.height,
@@ -39,6 +43,7 @@ class PileHero extends StatefulWidget {
     this.capSuffix = '',
     this.metric = MetricId.sugar,
     this.onMetric,
+    this.level = 0,
   });
 
   @override
@@ -68,10 +73,14 @@ class _PileHeroState extends State<PileHero> {
           if (amount != null)
             Positioned.fill(
               child: Semantics(
-                label: pileHints[metric],
+                label: t(pileHints[metric]!),
                 child: SugarPile(
-                  key: ValueKey(metric),
-                  palettes: [pilePalettes[metric]!],
+                  key: ValueKey((metric, widget.level)),
+                  palettes: [
+                    metric == MetricId.sugar
+                        ? skinFor(widget.level)
+                        : pilePalettes[metric]!,
+                  ],
                   target: widget.target,
                   cubeSize: (size) => metricPileSize(
                     metric,
@@ -86,7 +95,7 @@ class _PileHeroState extends State<PileHero> {
           Positioned(
             left: 10,
             right: 10,
-            top: top + 62 + (widget.onMetric != null ? 94 : 0),
+            top: top + 62 + (widget.onMetric != null ? 56 : 0),
             child: IgnorePointer(
               child: ValueListenableBuilder(
                 valueListenable: _n,
@@ -143,7 +152,7 @@ class _PileHeroState extends State<PileHero> {
                       ),
                       Text(
                         value == null
-                            ? 'нет данных в этом чеке'
+                            ? t('нет данных в этом чеке')
                             : '${bigCap(value, widget.metric)}${widget.capSuffix}',
                         style: disp(
                           17,
@@ -158,7 +167,7 @@ class _PileHeroState extends State<PileHero> {
                           child: Padding(
                             padding: const EdgeInsets.only(top: 5),
                             child: Text(
-                              hint,
+                              t(hint),
                               style: body(
                                 11,
                                 w: 800,

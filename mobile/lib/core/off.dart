@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'i18n.dart';
 import 'models.dart';
 
 class ShelfProduct {
@@ -31,7 +32,7 @@ class ShelfProduct {
     return v == null ? null : (amount == null ? v : v * amount! / 100);
   }
 
-  String get basis => amount == null ? 'в 100 г' : 'в упаковке';
+  String get basis => amount == null ? t('в 100 г') : t('в упаковке');
 }
 
 class ShelfError implements Exception {
@@ -46,8 +47,9 @@ double? _num(Object? v) => v is num
     : null;
 
 Future<ShelfProduct> lookupBarcode(String code) async {
-  if (!RegExp(r'^\d{8,14}$').hasMatch(code))
+  if (!RegExp(r'^\d{8,14}$').hasMatch(code)) {
     throw const ShelfError('Это не похоже на штрихкод товара: нужно 8–13 цифр');
+  }
   final uri = Uri.parse(
     'https://world.openfoodfacts.org/api/v2/product/$code?fields=product_name,product_name_ru,brands,quantity,product_quantity,nutriments',
   );
@@ -67,10 +69,11 @@ Future<ShelfProduct> lookupBarcode(String code) async {
     final j = jsonDecode(utf8.decode(res.bodyBytes));
     if (j is Map && j['product'] is Map) p = j['product'];
   } catch (_) {}
-  if (p == null)
+  if (p == null) {
     throw const ShelfError(
       'Этого товара пока нет в базе. Поищи похожий в справочнике',
     );
+  }
 
   final nu = p['nutriments'] is Map ? p['nutriments'] as Map : const {};
   final per100 = <MetricId, double?>{
@@ -93,7 +96,7 @@ Future<ShelfProduct> lookupBarcode(String code) async {
   final amount = _num(p['product_quantity']);
   return ShelfProduct(
     code: code,
-    name: name.isEmpty ? 'Товар $code' : name,
+    name: name.isEmpty ? '${t('Товар')} $code' : name,
     brand: s('brands').split(',').first.trim(),
     quantity: s('quantity'),
     per100: per100,

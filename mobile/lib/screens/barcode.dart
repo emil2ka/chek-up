@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../core/i18n.dart';
 import '../core/engine.dart';
 import '../core/models.dart';
 import '../core/off.dart';
@@ -57,7 +58,7 @@ class _BarcodePageState extends State<BarcodePage> {
         builder: (_) => _ProductSheet(p),
       );
     } on ShelfError catch (e) {
-      showToast(e.message);
+      showToast(t(e.message));
     } finally {
       if (mounted) setState(() => _busy = false);
       // тот же код можно будет считать снова через пару секунд
@@ -92,12 +93,12 @@ class _BarcodePageState extends State<BarcodePage> {
                     children: [
                       BarButton(
                         Icons.arrow_back_ios_new_rounded,
-                        'Назад',
+                        t('Назад'),
                         () => Navigator.of(context).pop(),
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'До кассы',
+                        t('До кассы'),
                         style: disp(22, w: 800, color: Colors.white),
                       ),
                     ],
@@ -108,7 +109,7 @@ class _BarcodePageState extends State<BarcodePage> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Проверь товар',
+                        t('Проверь товар'),
                         style: disp(34, color: Colors.white, h: 1, ls: -.045),
                       ),
                     ),
@@ -121,7 +122,7 @@ class _BarcodePageState extends State<BarcodePage> {
                       child: Row(
                         children: [
                           Text(
-                            'по ',
+                            '${t('по')} ',
                             style: disp(
                               34,
                               color: Colors.white,
@@ -129,7 +130,7 @@ class _BarcodePageState extends State<BarcodePage> {
                               ls: -.045,
                             ),
                           ),
-                          Hl('штрихкоду', disp(34, h: 1, ls: -.045)),
+                          Hl(t('штрихкоду'), disp(34, h: 1, ls: -.045)),
                         ],
                       ),
                     ),
@@ -138,7 +139,9 @@ class _BarcodePageState extends State<BarcodePage> {
                   Rise(
                     delay: 120,
                     child: Text(
-                      'Наведи камеру на штрихкод прямо у полки — покажем сахар кубиками до покупки.',
+                      t(
+                        'Наведи камеру на штрихкод прямо у полки: покажем сахар кубиками до покупки.',
+                      ),
                       style: body(
                         16,
                         color: Colors.white.withValues(alpha: .9),
@@ -178,7 +181,7 @@ class _BarcodePageState extends State<BarcodePage> {
                               _last = v;
                               _check(v);
                             },
-                            errorBuilder: (_, __) => Padding(
+                            errorBuilder: (_, _) => Padding(
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -190,7 +193,9 @@ class _BarcodePageState extends State<BarcodePage> {
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Камера недоступна. Введи цифры под штрихкодом вручную.',
+                                    t(
+                                      'Камера недоступна. Введи цифры под штрихкодом вручную.',
+                                    ),
                                     textAlign: TextAlign.center,
                                     style: body(
                                       14,
@@ -218,7 +223,7 @@ class _BarcodePageState extends State<BarcodePage> {
                   ),
                   const SizedBox(height: 22),
                   Text(
-                    'Или введи цифры под штрихкодом',
+                    t('Или введи цифры под штрихкодом'),
                     style: body(
                       14,
                       w: 700,
@@ -264,7 +269,7 @@ class _BarcodePageState extends State<BarcodePage> {
                       const SizedBox(width: 8),
                       Press(
                         scale: .92,
-                        label: 'Проверить',
+                        label: t('Проверить'),
                         onTap: _busy ? null : () => _check(_code.text),
                         child: Container(
                           width: 56,
@@ -284,7 +289,9 @@ class _BarcodePageState extends State<BarcodePage> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'База — Open Food Facts. Сахар в ней с этикетки целиком (и добавленный, и природный); соль, насыщенные жиры и калории тоже с этикетки.',
+                    t(
+                      'База: Open Food Facts. Сахар в ней с этикетки целиком, и добавленный, и природный. Соль, насыщенные жиры и калории тоже с этикетки.',
+                    ),
                     style: body(
                       12,
                       color: Colors.white.withValues(alpha: .75),
@@ -325,17 +332,17 @@ class _ProductSheetState extends State<_ProductSheet> {
         ? Tone.mid
         : Tone.bad;
     final say = _metric == MetricId.carbs || _metric == MetricId.protein
-        ? 'На этикетке'
+        ? t('На этикетке')
         : _metric == MetricId.kcal
         ? switch (tone) {
-            Tone.good => 'Лёгкий продукт',
-            Tone.mid => 'Заметная порция калорий',
-            Tone.bad => 'Очень калорийно',
+            Tone.good => t('Лёгкий продукт'),
+            Tone.mid => t('Заметная порция калорий'),
+            Tone.bad => t('Очень калорийно'),
           }
         : switch (tone) {
-            Tone.good => 'Можно брать',
-            Tone.mid => 'Терпимо, но не каждый день',
-            Tone.bad => 'Лучше оставить на полке',
+            Tone.good => t('Можно брать'),
+            Tone.mid => t('Терпимо, но не каждый день'),
+            Tone.bad => t('Лучше оставить на полке'),
           };
     final sub = [p.brand, p.quantity].where((s) => s.isNotEmpty).join(' · ');
 
@@ -454,13 +461,13 @@ class _ProductSheetState extends State<_ProductSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        val == null ? 'На этикетке не указано' : say,
+                        val == null ? t('На этикетке не указано') : say,
                         style: body(16, w: 800),
                       ),
                       Text(
                         val == null
-                            ? 'В базе нет данных про ${mdef.of} для этого товара'
-                            : '${amountTxt(val, _metric)} ${mdef.of} ${p.basis} — ${(share * 100).round()}% дневной нормы взрослого',
+                            ? t('Для этого товара в базе нет данных о показателе')
+                            : '${amountTxt(val, _metric)} ${p.basis}: ${t('{n}% дневной нормы взрослого', {'n': (share * 100).round()})}',
                         style: body(13, color: mute),
                       ),
                     ],
@@ -480,7 +487,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Text(
-                'Проверить ещё товар',
+                t('Проверить ещё товар'),
                 style: disp(15, w: 700, color: Colors.white, ls: -.01),
               ),
             ),

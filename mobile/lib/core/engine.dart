@@ -2,6 +2,8 @@
 // Меняешь здесь — меняй там: расхождение ловят тесты на демо-чеках.
 import 'dart:math';
 
+import 'calendar.dart';
+import 'i18n.dart';
 import 'models.dart';
 
 const metricIds = MetricId.values;
@@ -94,7 +96,7 @@ const metrics = <MetricId, MetricDef>{
     250,
     190,
     0xFF7B5CE5,
-    'ориентир: около 250 г в день взрослому, 190 г ребёнку',
+    'ориентир: около 250 г углеводов в день взрослому (половина калорий), 190 г ребёнку',
   ),
   MetricId.protein: MetricDef(
     MetricId.protein,
@@ -105,7 +107,7 @@ const metrics = <MetricId, MetricDef>{
     60,
     40,
     0xFF1FA891,
-    'ориентир: около 60 г в день взрослому, 40 г ребёнку',
+    'ориентир: около 60 г белка в день взрослому, 40 г ребёнку',
   ),
 };
 
@@ -120,58 +122,108 @@ const maxKids = 8;
 
 int cubesOfValue(num v, MetricId m) => (v / metrics[m]!.cubeG).round();
 
-Analysis analyze(Receipt receipt, [Iterable<int> swaps = const []]) {
-  final on = swaps.toSet();
-  num total = 0, junk = 0, flagged = 0, alcohol = 0, energy = 0;
-  var junkCount = 0, flaggedCount = 0;
+/// Линейный штраф: до `from` — 0, от `to` — max.
+double _ramp(double v, double from, double to, double max) =>
+    max * ((v - from) / (to - from)).clamp(0.0, 1.0);
+
+/// Ниже этого числа калорий плотность считать нельзя: одна бутылка воды дала бы бесконечность.
+const _kcalFloor = 400.0;
+
+/// Оценка корзины 0..100: сахар, соль и жиры — относительно калорий, вредное и алкоголь — относительно суммы на еду,
+/// поэтому большая закупка и мелкая покупка той же еды получают одинаковый балл. Запасы входят недельной долей.
+(int, List<Why>) _scoreOf(
+  Map<MetricId, double> dense,
+  double share,
+  double flagShare,
+) {
+  final kcal = max(_kcalFloor, dense[MetricId.kcal]!);
+  final sugar = dense[MetricId.sugar]! * 4 / kcal;
+  final fat = dense[MetricId.fat]! * 9 / kcal;
+  final salt = dense[MetricId.salt]! / kcal * 1000;
+  final raw = [
+    ('sugar', _ramp(sugar, .05, .2, 35), sugar),
+    ('fat', _ramp(fat, .08, .2, 18), fat),
+    ('salt', _ramp(salt, 2, 6, 15), salt),
+    ('junk', _ramp(share, 0, .5, 25), share),
+    ('flagged', _ramp(flagShare, 0, .3, 10), flagShare),
+  ];
+  final lost = raw.fold<double>(0, (n, w) => n + w.$2);
+  final why = [
+    for (final w in raw)
+      if (w.$2.round() > 0) Why(w.$1, w.$2.round(), w.$3),
+  ];
+  // порядок равных — как в списке (в Dart сортировка неустойчивая)
+  final order = {for (final (i, w) in why.indexed) w.k: i};
+  why.sort(
+    (x, y) => y.pts != x.pts ? y.pts - x.pts : order[x.k]! - order[y.k]!,
+  );
+  return ((100 - lost).round().clamp(0, 100), why);
+}
+
+/// [swaps] — включённые замены (план), [off] — позиции «не для нас».
+Analysis analyze(
+  Receipt receipt, [
+  Iterable<int> swaps = const [],
+  Iterable<int> off = const [],
+]) {
+  final on = swaps.toSet(), skip = off.toSet();
+  num total = 0, food = 0, junk = 0, flagged = 0, alcohol = 0, energy = 0;
+  var junkCount = 0, flaggedCount = 0, offCount = 0;
   final totals = {for (final m in metricIds) m: 0.0};
+  final dense = {for (final m in metricIds) m: 0.0};
   final items = <AnalyzedItem>[];
   for (var i = 0; i < receipt.items.length; i++) {
     final it = receipt.items[i];
     final swapped = on.contains(i) && it.swap != null;
     final active = swapped ? it.swap! : it;
-    final activeJunk = !swapped && it.junk;
-    // у замены алкоголя нет, поэтому флаг берём только у исходной позиции
-    final flag = swapped ? null : it.x;
-    total += active.p;
-    for (final m in metricIds) {
-      totals[m] = totals[m]! + active.valueOf(m);
+    final isOff = skip.contains(i);
+    items.add(AnalyzedItem(it, i, swapped, isOff, active));
+    if (isOff) {
+      offCount++;
+      continue;
     }
-    if (activeJunk) {
+    total += active.p;
+    if (it.nf) continue;
+    food += active.p;
+    for (final m in metricIds) {
+      final v = active.valueOf(m);
+      totals[m] = totals[m]! + v;
+      dense[m] = dense[m]! + v / it.weeks;
+    }
+    if (!swapped && it.junk) {
       junk += active.p;
       junkCount++;
     }
+    // у замены алкоголя нет, поэтому флаг берём только у исходной позиции
+    final flag = swapped ? null : it.x;
     if (flag != null) {
       flaggedCount++;
       flagged += active.p;
       flag == 'alcohol' ? alcohol += active.p : energy += active.p;
     }
-    items.add(AnalyzedItem(it, i, swapped, active, activeJunk));
   }
   for (final m in metricIds) {
     totals[m] = (totals[m]! * 10).round() / 10;
   }
-  final share = total > 0 ? junk / total : 0.0;
-  final flagShare = total > 0 ? flagged / total : 0.0;
-  // Оценка корзины 0..100: доля вредного в чеке, сахар, соль, насыщенные жиры, алкоголь и энергетики.
-  // Калории в оценку не входят: еда должна быть калорийной, важно, откуда они.
-  final penalty =
-      share * 40 +
-      min(20.0, totals[MetricId.sugar]! / 17.5) +
-      min(10.0, totals[MetricId.salt]! / 3.5) +
-      min(10.0, totals[MetricId.fat]! / 15) +
-      min(10.0, flagShare * 30);
-  final score = (100 - penalty).round().clamp(0, 100);
+  final share = food > 0 ? junk / food : 0.0;
+  final (score, why) = _scoreOf(
+    dense,
+    share.toDouble(),
+    food > 0 ? (flagged / food).toDouble() : 0,
+  );
   final cubesBy = {for (final m in metricIds) m: cubesOfValue(totals[m]!, m)};
   return Analysis(
     items: items,
     total: total,
+    food: food,
+    offCount: offCount,
     sugar: totals[MetricId.sugar]!,
     cubes: cubesBy[MetricId.sugar]!,
     junk: junk,
     junkCount: junkCount,
     share: share.toDouble(),
     score: score,
+    why: why,
     days: totals[MetricId.sugar]! / dailyG,
     totals: totals,
     cubesBy: cubesBy,
@@ -183,10 +235,10 @@ Analysis analyze(Receipt receipt, [Iterable<int> swaps = const []]) {
 }
 
 Verdict verdict(int score) {
-  if (score >= 80) return const Verdict('Отлично', Tone.good);
-  if (score >= 60) return const Verdict('Неплохо', Tone.good);
-  if (score >= 40) return const Verdict('Так себе', Tone.mid);
-  return const Verdict('Корзина-бомба', Tone.bad);
+  if (score >= 80) return Verdict(t('Отлично'), Tone.good);
+  if (score >= 60) return Verdict(t('Неплохо'), Tone.good);
+  if (score >= 40) return Verdict(t('Так себе'), Tone.mid);
+  return Verdict(t('Корзина-бомба'), Tone.bad);
 }
 
 typedef Forms = (String, String, String);
@@ -194,13 +246,17 @@ typedef Forms = (String, String, String);
 /// pl(21, cubesF) → 'кубик'
 String pl(num n, Forms f) {
   final a = n.abs().round() % 100, b = a % 10;
-  if (a > 10 && a < 20) return f.$3;
-  if (b == 1) return f.$1;
-  if (b >= 2 && b <= 4) return f.$2;
-  return f.$3;
+  if (a > 10 && a < 20) return t(f.$3);
+  if (b == 1) return t(f.$1);
+  if (b >= 2 && b <= 4) return t(f.$2);
+  return t(f.$3);
 }
 
 const Forms cubesF = ('кубик', 'кубика', 'кубиков');
+const Forms sugarCubesF = ('кубик сахара', 'кубика сахара', 'кубиков сахара');
+const Forms weeksF = ('неделя', 'недели', 'недель');
+const Forms freezesF = ('заморозка', 'заморозки', 'заморозок');
+const Forms positionsF = ('позицию', 'позиции', 'позиций');
 const Forms daysF = ('день', 'дня', 'дней');
 const Forms pointsF = ('балл', 'балла', 'баллов');
 const Forms junkF = ('вредный товар', 'вредных товара', 'вредных товаров');
@@ -224,36 +280,14 @@ String group(num n) {
 /// money(3490) → '3 490 ₸'
 String money(num n) => '${group(n)} ₸';
 
-const _months = [
-  'января',
-  'февраля',
-  'марта',
-  'апреля',
-  'мая',
-  'июня',
-  'июля',
-  'августа',
-  'сентября',
-  'октября',
-  'ноября',
-  'декабря',
-];
-
 /// dateRu('2026-11-16') → '16 ноября'
-String dateRu(String iso) {
-  final d = DateTime.tryParse(iso);
-  return d == null ? iso : '${d.day} ${_months[d.month - 1]}';
-}
-
-String isoOf(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+String dateRu(String iso) => dayTxt(iso);
 
 int cubesOf(num g) => (g / cubeG).round();
 String cubesTxt(int n) => '$n ${pl(n, cubesF)}';
 
 /// подпись под большой цифрой: «кубика сахара»
-String capOf(int n, [MetricId m = MetricId.sugar]) =>
-    '${pl(n, cubesF)} ${metrics[m]!.of}';
+String capOf(int n) => pl(n, sugarCubesF);
 
 bool isCubeMetric(MetricId m) => m == MetricId.sugar;
 bool hasMetricData(Item item, MetricId m) => switch (m) {
@@ -280,12 +314,12 @@ String bigNum(num value, MetricId m) => isCubeMetric(m)
     : '${value.round()}';
 
 String bigCap(num value, MetricId m) => switch (m) {
-  MetricId.sugar => capOf(cubesOfValue(value, m), m),
-  MetricId.fat => 'г насыщенных жиров',
-  MetricId.salt => 'г соли',
-  MetricId.kcal => 'ккал',
-  MetricId.carbs => 'г углеводов',
-  MetricId.protein => 'г белка',
+  MetricId.sugar => capOf(cubesOfValue(value, m)),
+  MetricId.fat => t('г насыщенных жиров'),
+  MetricId.salt => t('г соли'),
+  MetricId.kcal => t('ккал'),
+  MetricId.carbs => t('г углеводов'),
+  MetricId.protein => t('г белка'),
 };
 
 String metricTxt(num value, MetricId m) =>
@@ -299,15 +333,15 @@ String num1(num n) => ((n * 10).round() / 10)
 
 /// Количество показателя с единицей: «106 г», «0,5 г», «460 ккал»
 String amountTxt(num v, MetricId m) =>
-    '${m == MetricId.kcal ? v.round() : num1(v)} ${metrics[m]!.unit}';
+    '${m == MetricId.kcal ? v.round() : num1(v)} ${t(metrics[m]!.unit)}';
 
 String unitNote(MetricId m) => switch (m) {
-  MetricId.sugar => '1 кубик = 5 г добавленного сахара',
-  MetricId.salt => 'крупинки показывают количество соли, число — в граммах',
-  MetricId.fat => '1 фигурка масла = 2 г насыщенных жиров',
-  MetricId.kcal => '1 уголёк = 200 ккал',
-  MetricId.carbs => '1 фигурка батона = 10 г углеводов',
-  MetricId.protein => '1 яйцо = 6 г белка',
+  MetricId.sugar => t('1 кубик = 5 г добавленного сахара'),
+  MetricId.salt => t('крупинки показывают количество соли, число — в граммах'),
+  MetricId.fat => t('1 фигурка масла = 2 г насыщенных жиров'),
+  MetricId.kcal => t('1 уголёк = 200 ккал'),
+  MetricId.carbs => t('1 фигурка батона = 10 г углеводов'),
+  MetricId.protein => t('1 яйцо = 6 г белка'),
 };
 
 const unitsNote =

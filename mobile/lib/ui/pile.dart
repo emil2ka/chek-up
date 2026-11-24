@@ -53,6 +53,36 @@ const pileSugar = PilePalette(
   edge: Color(0xFFD9E2FC),
   grain: Color(0x5590A4E6),
 );
+
+/// Вид кубиков за стрик: рафинад → тростниковый → нават → кристалл (как CUBE_SKINS на сайте).
+const _skins = <int, PilePalette>{
+  4: PilePalette(
+    top: Color(0xFFF3D3A0),
+    side: Color(0xFFB9803A),
+    edge: Color(0xFFDDAE6B),
+    grain: Color(0x66966024),
+  ),
+  12: PilePalette(
+    top: Color(0xFFFFE08A),
+    side: Color(0xFFE79A12),
+    edge: Color(0xFFFFCF5C),
+    grain: Color(0x77FFF6CD),
+  ),
+  26: PilePalette(
+    top: Color(0xFFE6F9FF),
+    side: Color(0xFF79CBEF),
+    edge: Color(0xFFBFE9FA),
+    grain: Color(0x88FFFFFF),
+  ),
+  52: PilePalette(
+    top: Color(0xFFF7E8FF),
+    side: Color(0xFFBE86EE),
+    edge: Color(0xFFE2C4F8),
+    grain: Color(0x88FFFFFF),
+  ),
+};
+PilePalette skinFor(int level) => _skins[level] ?? pileSugar;
+
 const pileSalt = PilePalette(
   shape: FoodShape.salt,
   top: Color(0xFFFFF1F5),
@@ -180,8 +210,9 @@ class SugarPileState extends State<SugarPile>
   }
 
   void _listenSensors() {
-    if (kIsWeb)
+    if (kIsWeb) {
       return; // в браузере датчики требуют отдельного разрешения — там хватает тапов
+    }
     try {
       _accSub =
           accelerometerEventStream(
@@ -273,10 +304,11 @@ class SugarPileState extends State<SugarPile>
     }
     _walls = walls;
     _wake();
-    if (fresh)
+    if (fresh) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => mounted ? _setTarget(widget.target) : null,
       );
+    }
   }
 
   // ── количество ──
@@ -513,8 +545,9 @@ class SugarPileState extends State<SugarPile>
         _downAt = null;
         if (d != null &&
             (e.localPosition - d).distance < 12 &&
-            DateTime.now().millisecondsSinceEpoch - _downT < 450)
+            DateTime.now().millisecondsSinceEpoch - _downT < 450) {
           tossAt(e.localPosition);
+        }
       },
       onPointerCancel: (_) => _downAt = null,
       child: paint,

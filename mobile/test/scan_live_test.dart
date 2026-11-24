@@ -1,31 +1,32 @@
-// Живая проверка распознавания через сервер «Чек-апа». Запуск:
+// Живая проверка распознавания: фото → сервер → чек. Нужны работающий сервер с ключом и фото:
 //   flutter test test/scan_live_test.dart --dart-define=API_URL=http://localhost:5197 --dart-define=PHOTO=/путь/к/чеку.jpg
-// Без API_URL тест пропускается.
 import 'dart:io';
 
-import 'package:chek_up/core/engine.dart';
 import 'package:chek_up/core/api.dart';
+import 'package:chek_up/core/engine.dart';
 import 'package:chek_up/core/scan.dart';
+import 'package:chek_up/core/store.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _photo = String.fromEnvironment('PHOTO');
 
 void main() {
   test(
-    'фото чека → чек с сахаром',
+    'чек читается через общий сервер, ручная позиция получает показатели',
     () async {
-      HttpOverrides.global =
-          null; // в тестах Flutter сеть по умолчанию заглушена
-      final (r, notice) = await recognize(XFile(_photo));
-      final a = analyze(r);
-      // ignore: avoid_print
-      print(
-        '${r.store}: ${r.items.length} позиций, ${money(a.total)}, ${a.cubes} кубиков, оценка ${a.score}, approx=${r.approx}, notice=$notice',
+      SharedPreferences.setMockInitialValues({});
+      await store.load();
+      final r = await recognize([await File(_photo).readAsBytes()], null);
+      final a = analyze(r.receipt);
+      debugPrint(
+        '${r.receipt.store}: ${r.receipt.items.length} поз., ${a.cubes} куб., оценка ${a.score}, ждут уточнения ${r.pending.length}',
       );
-      expect(r.items, isNotEmpty);
-      expect(r.approx, isTrue);
-      expect(notice, isNull);
+      expect(r.receipt.items, isNotEmpty);
+      expect(r.receipt.approx, isTrue);
+      final it = await itemByName('Кола 1 л', 600);
+      expect((it.s, it.src), (106, 'ref'));
     },
     skip: apiUrl.isEmpty || _photo.isEmpty ? 'нужны API_URL и PHOTO' : false,
     timeout: const Timeout(Duration(seconds: 90)),

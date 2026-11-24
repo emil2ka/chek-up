@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
@@ -28,25 +29,29 @@ class _PricesCardState extends State<PricesCard> {
   @override
   Widget build(BuildContext context) {
     if (!store.syncEnabled) {
-      return _note(
-        'Сравнение цен работает с сервером «Чек-апа»: собери приложение с адресом сервера (API_URL).',
-      );
+      return _note(t('Сравнение цен работает только с сервером «Чек-апа».'));
     }
     return FutureBuilder<PriceCompare?>(
       future: _f,
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done)
-          return _note('Сравниваю с другими магазинами…');
+        if (snap.connectionState != ConnectionState.done) {
+          return _note(t('Сравниваю с другими магазинами…'));
+        }
         final r = snap.data;
-        if (r == null)
+        if (r == null) {
           return _note(
-            'Сравнение цен сейчас недоступно: нет связи с сервером.',
+            t('Сравнение цен сейчас недоступно: нет связи с сервером.'),
           );
+        }
         if (r.offers.isEmpty) {
           return _note(
             r.compared > 0
-                ? 'В других магазинах такие же покупки пока не дешевле — по тем чекам, что есть у «Чек-апа».'
-                : 'Пока мало данных: цены сравниваются по чекам пользователей «Чек-апа». Отсканируй чеки из других магазинов — и здесь появятся сравнения.',
+                ? t(
+                    'В других магазинах такие же покупки пока не дешевле по тем чекам, что есть у «Чек-апа».',
+                  )
+                : t(
+                    'Пока мало данных: цены сравниваем по чекам пользователей «Чек-апа».',
+                  ),
           );
         }
         return Column(
@@ -57,9 +62,12 @@ class _PricesCardState extends State<PricesCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('до ${money(r.total)}', style: disp(34, ls: -.04)),
                   Text(
-                    'можно сэкономить на тех же покупках',
+                    t('до {m}', {'m': money(r.total)}),
+                    style: disp(34, ls: -.04),
+                  ),
+                  Text(
+                    t('можно сэкономить на тех же покупках'),
                     style: body(15, color: mute),
                   ),
                 ],
@@ -85,7 +93,14 @@ class _PricesCardState extends State<PricesCard> {
                         children: [
                           Text(o.name, style: body(14, h: 1.3)),
                           Text(
-                            '${money(o.yourPrice)}/${o.unit} здесь · ${o.store} ${money(o.bestPrice)}/${o.unit} (по ${o.n} ${pl(o.n, receiptsDatF)})',
+                            t('{a}/{u} здесь · {s} {b}/{u} (по {n} {w})', {
+                              'a': money(o.yourPrice),
+                              'u': t(o.unit),
+                              's': o.store,
+                              'b': money(o.bestPrice),
+                              'n': o.n,
+                              'w': pl(o.n, receiptsDatF),
+                            }),
                             style: body(12, color: mute, h: 1.35),
                           ),
                         ],
@@ -107,7 +122,9 @@ class _PricesCardState extends State<PricesCard> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
               child: Text(
-                'Цены — медиана по чекам других пользователей за 90 дней, приблизительно.',
+                t(
+                  'Цены: медиана по чекам других пользователей за 90 дней, приблизительно.',
+                ),
                 style: body(13, color: mute, h: 1.4),
               ),
             ),

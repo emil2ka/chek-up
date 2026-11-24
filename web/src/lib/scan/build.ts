@@ -44,6 +44,14 @@ export function lineOf(it: Pick<ReceiptItem, 'n' | 'p'>): Line {
   return { name: it.n, qty: 1, price: it.p };
 }
 
+/** Изменили цену позиции — цена замены меняется вместе с ней (у введённой без цены её ещё не было). */
+export function reprice(it: ReceiptItem, p: number): ReceiptItem {
+  if (!it.swap) return { ...it, p };
+  const ref = buildItem(lineOf({ n: it.n, p })).swap;
+  const price = ref?.n === it.swap.n ? ref.p : it.p ? Math.max(1, Math.round(it.swap.p * p / it.p)) : it.swap.p;
+  return { ...it, p, swap: { ...it.swap, p: price } };
+}
+
 /** Нужна ли модель: категория неизвестна и это не бытовая химия. */
 export const needsModel = (it: Pick<ReceiptItem, 'n' | 'src' | 'nf'>): boolean => !it.nf && it.src === undefined;
 
@@ -93,7 +101,7 @@ export function buildItem(line: Line, est?: Estimate): ReceiptItem {
       const rs = ref.swap;
       const cand = { s: Math.round(rs.per100 * (mass ?? 0) / 100), t: round1(fromRef(rs.salt100)), f: round1(fromRef(rs.fat100)) };
       if (harm(cand) < harm(own)) {
-        swap = { n: swapName(rs.n, amountFromName(line.name)), p: Math.max(1, Math.round(line.price * rs.priceK)), ...cand, k: Math.round(fromRef(rs.kcal100)), c: Math.round(Math.max(cand.s, fromRef(rs.carbs100))), b: Math.round(fromRef(rs.protein100)) };
+        swap = { n: swapName(rs.n, amountFromName(line.name)), p: line.price ? Math.max(1, Math.round(line.price * rs.priceK)) : 0, ...cand, k: Math.round(fromRef(rs.kcal100)), c: Math.round(Math.max(cand.s, fromRef(rs.carbs100))), b: Math.round(fromRef(rs.protein100)) };
       }
     }
   }

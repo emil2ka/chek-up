@@ -28,7 +28,7 @@ export function swapRows(receipt: Receipt, m: MetricId = 'sugar', off: readonly 
       from: nb(it.n),
       to: nb(it.swap.n),
       cubes: signed(delta, v => isCubeMetric(m) ? cubesTxt(v) : amountTxt(v, m)),
-      price: receipt.masked ? '' : signed(it.p - it.swap.p, money), // «−340 ₸» или «+150 ₸»
+      price: receipt.masked || !it.p ? '' : signed(it.p - it.swap.p, money), // «−340 ₸» или «+150 ₸»
     });
   });
   return rows.sort((a, b) => b.delta - a.delta);
@@ -99,7 +99,7 @@ export function conclusion(receipt: Receipt, a: Analysis, tag?: 'guests'): strin
     case 'junk': {
       const junk = food.filter(it => it.junk);
       if (receipt.masked) return t('Сладостей и снеков здесь {n}.', { n: junk.length });
-      return t('{p}% денег на еду ушло на вредное, больше всего на «{n}».', { p: Math.round(a.share * 100), n: shortName([...junk].sort((x, y) => y.p - x.p)[0]?.n ?? '') });
+      return t('{p}% денег на еду ушло на вредное. Дороже всего: {n}.', { p: Math.round(a.share * 100), n: shortName([...junk].sort((x, y) => y.p - x.p)[0]?.n ?? '') });
     }
     case 'flagged': return receipt.masked ? t('Оценку снизили энергетики.') : t('Оценку снизили алкоголь и энергетики: {m}.', { m: money(a.flagged.sum) });
   }

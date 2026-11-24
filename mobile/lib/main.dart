@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'core/outbox.dart';
+import 'core/reminder.dart';
 import 'core/store.dart';
 import 'screens/shell.dart';
 import 'ui/kit.dart';
@@ -12,7 +14,15 @@ Future<void> main() async {
   store.onToast = showToast;
   await store.load();
   // вернулся в приложение — подтянуть изменения с другого устройства
-  AppLifecycleListener(onResume: () => store.syncSoon());
+  AppLifecycleListener(
+    onResume: () {
+      store.syncSoon();
+      outbox.run();
+      reminder.refresh();
+    },
+  );
+  outbox.load();
+  reminder.load();
   runApp(const ChekUpApp());
 }
 
@@ -22,6 +32,7 @@ class ChekUpApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Чек-ап',
+    navigatorKey: rootNav,
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,

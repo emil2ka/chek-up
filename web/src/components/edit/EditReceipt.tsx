@@ -7,7 +7,7 @@ import { CATALOG } from '@/lib/catalog';
 import { amountTxt, analyze, METRICS, money, pl, SUGAR_CUBES, type Forms } from '@/lib/engine';
 import { isDemo, receiptOf } from '@/lib/insights';
 import { t } from '@/lib/i18n';
-import { buildItem, lineOf, type Correction } from '@/lib/scan/build';
+import { buildItem, lineOf, reprice, type Correction } from '@/lib/scan/build';
 import type { HistoryEntry, MetricId, Receipt, ReceiptItem } from '@/lib/types';
 import { IconChevron, IconPlus, IconTrash } from '@/components/icons';
 import { Sheet } from '@/components/ui/Sheet';
@@ -160,7 +160,7 @@ export function EditReceipt({ receipt, off, manual, entries, onSave, onClose, on
                     <input className={inputCls} defaultValue={r.it.n} maxLength={120} onBlur={e => { if (e.target.value.trim() !== r.it.n) rename(r.key, e.target.value); }} placeholder={t('Кефир 2,5% 1 л')} />
                   </label>
                   {r.it.raw && r.it.raw !== r.it.n && <p className="px-1 text-[13px] font-semibold text-mute">{t('На чеке')}: {r.it.raw}</p>}
-                  <NumField label={t('Цена')} unit="₸" value={r.it.p} onChange={v => set(r.key, x => ({ ...x, it: { ...x.it, p: Math.round(v), q: undefined } }))} />
+                  <NumField label={t('Цена')} unit="₸" value={r.it.p} onChange={v => set(r.key, x => ({ ...x, it: { ...reprice(x.it, Math.round(v)), q: undefined } }))} />
                   <Switch label={t('Не для нас')} hint={t('подарок, для соседей: не считать')} checked={r.off} onChange={v => set(r.key, x => ({ ...x, off: v }))} />
                   <Switch label={t('Не еда')} checked={!!r.it.nf} onChange={v => patch(r.key, v ? { nf: 1 } : { nf: undefined })} />
                   {!r.it.nf && (

@@ -1,13 +1,21 @@
-// Оболочка: разделы с нижней навигацией и переходы «скан → результат».
+// Оболочка: разделы с нижней навигацией, переходы «скан → результат», очередь чеков, правка.
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/i18n.dart';
 import '../core/insights.dart';
 import '../core/models.dart';
+import '../core/outbox.dart';
 import '../core/store.dart';
+import '../ui/forms.dart';
 import '../ui/kit.dart';
+import 'account.dart';
 import 'barcode.dart';
 import 'catalog.dart';
+import 'edit.dart';
 import 'home.dart';
 import 'onboarding.dart';
 import 'profile.dart';
@@ -22,8 +30,8 @@ double tabBarSpace(BuildContext context) =>
 Route<T> _route<T>(Widget page) => PageRouteBuilder<T>(
   transitionDuration: const Duration(milliseconds: 280),
   reverseTransitionDuration: const Duration(milliseconds: 220),
-  pageBuilder: (_, __, ___) => page,
-  transitionsBuilder: (_, a, __, child) {
+  pageBuilder: (_, _, _) => page,
+  transitionsBuilder: (_, a, _, child) {
     final c = CurvedAnimation(parent: a, curve: const Cubic(.2, .8, .2, 1));
     return FadeTransition(
       opacity: c,
@@ -38,64 +46,147 @@ Route<T> _route<T>(Widget page) => PageRouteBuilder<T>(
   },
 );
 
+/// Главный навигатор: нужен уведомлениям о чеках, прочитанных в фоне.
+final rootNav = GlobalKey<NavigatorState>();
+
 // ── Переходы (их вызывают все экраны) ──
-Future<void> openCamera(BuildContext context) async {
-  final nav = Navigator.of(context);
-  XFile? file;
+const _side = 2000.0; // px: текст чека читается, а файл в разы легче
+
+Future<XFile?> _shoot() async {
   final picker = ImagePicker();
   try {
-    file = await picker.pickImage(
+    return await picker.pickImage(
       source: ImageSource.camera,
-      maxWidth: 1600,
-      maxHeight: 1600,
+      maxWidth: _side,
+      maxHeight: _side,
       imageQuality: 85,
     );
   } catch (_) {
     // камеры нет (симулятор, компьютер) — берём фото из галереи
     try {
-      file = await picker.pickImage(
+      return await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1600,
-        maxHeight: 1600,
+        maxWidth: _side,
+        maxHeight: _side,
         imageQuality: 85,
       );
     } catch (_) {
-      showToast('Не получилось открыть камеру');
+      showToast(t('Не получилось открыть камеру'));
+      return null;
     }
   }
-  if (file == null) return;
+}
+
+void _scan(NavigatorState nav, List<XFile> photos) {
   nav.popUntil((r) => r.isFirst);
-  nav.push(_route(ScanPage(photo: file)));
+  nav.push(_route(ScanPage(photos: photos)));
+}
+
+Future<void> openCamera(BuildContext context) async {
+  final nav = Navigator.of(context);
+  final file = await _shoot();
+  if (file != null) _scan(nav, [file]);
+}
+
+/// Доснять кадр длинного чека.
+Future<XFile?> shootMore() => _shoot();
+
+void scanAgain(NavigatorState nav, List<XFile> photos) => _scan(nav, photos);
+
+Future<void> openGallery(BuildContext context) async {
+  final nav = Navigator.of(context);
+  List<XFile> files;
+  try {
+    files = await ImagePicker().pickMultiImage(
+      maxWidth: _side,
+      maxHeight: _side,
+      imageQuality: 85,
+    );
+  } catch (_) {
+    showToast(t('Не получилось открыть галерею'));
+    return;
+  }
+  if (files.isEmpty) return;
+  if (files.length == 1) {
+    _scan(nav, files);
+    return;
+  }
+  if (!context.mounted) return;
+  final one = await showSheet<bool>(
+    context,
+    title: t('Выбрано фото: {n}', {'n': files.length}),
+    builder: (context) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FlatBtn(
+          t('Это разные чеки'),
+          primary: true,
+          onTap: () => Navigator.pop(context, false),
+        ),
+        const SizedBox(height: 8),
+        FlatBtn(
+          t('Это один длинный чек'),
+          onTap: files.length > 3 ? null : () => Navigator.pop(context, true),
+        ),
+        if (files.length > 3)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              t('Длинный чек: до трёх кадров. Разных чеков за раз: до десяти.'),
+              style: body(13, color: mute),
+            ),
+          ),
+      ],
+    ),
+  );
+  if (one == null) return;
+  if (one) {
+    _scan(nav, files);
+    return;
+  }
+  for (final f in files.take(10)) {
+    await outbox.enqueue([f.path], [await f.readAsBytes()]);
+  }
+  showToast(t('Чеки в очереди: читаю по одному, можно закрыть телефон'));
+}
+
+/// Внести чек руками; jobId — чек из очереди, который не прочитался.
+Future<void> openManual(BuildContext context, {String? jobId}) async {
+  final r = await editReceipt(context, receipt: blankReceipt(), manual: true);
+  if (r == null) return;
+  final s = store.saveReceipt(r.receipt, off: r.off);
+  if (jobId != null) await outbox.remove(jobId);
+  if (context.mounted) openSaved(context, s.id);
+  if (s.duplicate) {
+    showToast(t('Этот чек уже есть в журнале, второй раз не считаем'));
+  }
 }
 
 void openDemo(BuildContext context, Receipt receipt) =>
     Navigator.of(context).push(_route(ScanPage(receipt: receipt)));
 
-void openResult(
-  NavigatorState nav,
-  Receipt receipt,
-  String id,
-  List<int> swaps, {
-  bool replace = false,
-}) {
-  final route = _route(ResultPage(receipt: receipt, entryId: id, swaps: swaps));
+void openResult(NavigatorState nav, String id, {bool replace = false}) {
+  final e = store.entry(id);
+  if (e == null || receiptOf(e) == null) {
+    showToast(t('Этот чек не получилось открыть'));
+    return;
+  }
+  final route = _route<void>(ResultPage(entryId: id));
   replace ? nav.pushReplacement(route) : nav.push(route);
 }
 
-void openSaved(BuildContext context, String id) {
-  final e = store.entry(id);
-  final receipt = e == null ? null : receiptOf(e);
-  if (e == null || receipt == null) {
-    showToast('Этот чек не получилось открыть');
-    return;
-  }
-  openResult(Navigator.of(context), receipt, e.id, e.swaps);
-}
+void openSaved(BuildContext context, String id) =>
+    openResult(Navigator.of(context), id);
 
 void openBarcode(BuildContext context) =>
     Navigator.of(context).push(_route(const BarcodePage()));
 void openShopList(BuildContext context) =>
     Navigator.of(context).push(_route(const ShopListPage()));
+
+const _asked = 'chekup.askedLogin';
+
+/// после какого чека предлагаем войти
+const _askAfter = 3;
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
@@ -105,7 +196,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int _tab = 0;
-  bool _replayIntro = false;
+  bool _replayIntro = false, _asking = false;
 
   static const _tabs = [
     (Icons.photo_camera_rounded, 'Чек'),
@@ -115,12 +206,72 @@ class _ShellState extends State<Shell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    outbox.onBackground = (o) {
+      if (o.kind == 'error') {
+        showToast(scanErrorText(o.code));
+      } else if (o.kind == 'demo') {
+        showToast(t(o.notice ?? ''));
+      } else {
+        showToast(
+          o.kind == 'duplicate'
+              ? t('Этот чек уже есть в журнале')
+              : t('Чек прочитан: {s}', {'s': o.receipt!.store}),
+          action: (
+            label: t('Открыть'),
+            run: () {
+              final nav = rootNav.currentState;
+              if (nav != null) openResult(nav, o.entryId!);
+            },
+          ),
+        );
+      }
+    };
+    store.addListener(_maybeAsk);
+  }
+
+  @override
+  void dispose() {
+    store.removeListener(_maybeAsk);
+    super.dispose();
+  }
+
+  /// После третьего чека один раз предлагаем войти, если вход подключён.
+  Future<void> _maybeAsk() async {
+    if (_asking ||
+        !store.syncEnabled ||
+        !store.profile.onboarded ||
+        store.family.id.isEmpty ||
+        store.family.me.email.isNotEmpty ||
+        store.real.length < _askAfter) {
+      return;
+    }
+    _asking = true;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      if (sp.getBool(_asked) ?? false) return;
+      if (!await store.emailSignInAvailable()) return;
+      // не перебиваем другой экран: спросим, когда человек на главной
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted || _tab != 0 || rootNav.currentState?.canPop() == true) {
+        _asking = false;
+        return;
+      }
+      await sp.setBool(_asked, true);
+      if (mounted) await openSignIn(context);
+    } catch (_) {
+      _asking = false; // спросим в другой раз
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
       final intro = !store.profile.onboarded || _replayIntro;
       final screen = switch (_tab) {
-        0 => const HomeScreen(),
+        0 => HomeScreen(onWeek: () => setState(() => _tab = 1)),
         1 => WeekScreen(onProfile: () => setState(() => _tab = 3)),
         2 => const CatalogScreen(),
         _ => ProfileScreen(
@@ -147,7 +298,10 @@ class _ShellState extends State<Shell> {
                       child: child,
                     ),
                   ),
-                  child: KeyedSubtree(key: ValueKey(_tab), child: screen),
+                  child: KeyedSubtree(
+                    key: ValueKey((_tab, store.profile.lang)),
+                    child: screen,
+                  ),
                 ),
               ),
               Positioned(
@@ -160,9 +314,7 @@ class _ShellState extends State<Shell> {
                 Positioned.fill(
                   child: Onboarding(
                     onDone: () {
-                      store.updateProfile(
-                        store.profile.copyWith(onboarded: true),
-                      );
+                      store.updateMe(onboarded: true);
                       setState(() => _replayIntro = false);
                     },
                   ),
@@ -195,7 +347,7 @@ class _ShellState extends State<Shell> {
           Expanded(
             child: Press(
               scale: .93,
-              label: _tabs[i].$2,
+              label: t(_tabs[i].$2),
               onTap: () => setState(() => _tab = i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
@@ -214,7 +366,8 @@ class _ShellState extends State<Shell> {
                       color: i == _tab ? blue1 : mute,
                     ),
                     Text(
-                      _tabs[i].$2,
+                      t(_tabs[i].$2),
+                      maxLines: 1,
                       style: body(
                         12,
                         w: 800,
@@ -231,3 +384,8 @@ class _ShellState extends State<Shell> {
     ),
   );
 }
+
+/// Прочитать снимки в память.
+Future<List<Uint8List>> bytesOf(List<XFile> files) async => [
+  for (final f in files) await f.readAsBytes(),
+];

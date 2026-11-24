@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/models.dart';
 
 // ── Токены (те же, что в web/src/app/globals.css) ──
@@ -34,7 +35,7 @@ Color toneColor(Tone t) => switch (t) {
   Tone.bad => bad,
 };
 
-/// Unbounded — цифры и заголовки.
+/// Unbounded — цифры и заголовки (в казахском Montserrat: в Unbounded нет его букв).
 TextStyle disp(
   double size, {
   int w = 900,
@@ -42,7 +43,8 @@ TextStyle disp(
   double h = 1.0,
   double ls = -.04,
 }) => TextStyle(
-  fontFamily: 'Unbounded',
+  fontFamily: lang == Lang.kk ? 'Montserrat' : 'Unbounded',
+  fontFamilyFallback: const ['Montserrat'],
   fontSize: size,
   fontWeight: FontWeight.values[(w ~/ 100 - 1).clamp(0, 8)],
   fontVariations: [FontVariation('wght', w.toDouble())],
@@ -52,14 +54,15 @@ TextStyle disp(
   fontFeatures: const [FontFeature.tabularFigures()],
 );
 
-/// Manrope — текст и подписи.
+/// Manrope — текст и подписи (в казахском Golos Text).
 TextStyle body(
   double size, {
   int w = 600,
   Color color = ink,
   double h = 1.35,
 }) => TextStyle(
-  fontFamily: 'Manrope',
+  fontFamily: lang == Lang.kk ? 'GolosText' : 'Manrope',
+  fontFamilyFallback: const ['GolosText'],
   fontSize: size,
   fontWeight: FontWeight.values[(w ~/ 100 - 1).clamp(0, 8)],
   fontVariations: [FontVariation('wght', w.toDouble())],
@@ -317,7 +320,7 @@ class GlassButton extends StatelessWidget {
     onTap: onTap,
     child: Container(
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: .16),
         borderRadius: BorderRadius.circular(18),
@@ -332,7 +335,7 @@ class GlassButton extends StatelessWidget {
         children: [
           if (icon != null)
             Padding(
-              padding: const EdgeInsets.only(right: 10),
+              padding: const EdgeInsets.only(right: 8),
               child: Icon(icon, color: Colors.white, size: 23),
             ),
           Flexible(
@@ -340,7 +343,7 @@ class GlassButton extends StatelessWidget {
               text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: disp(15, w: 700, color: Colors.white, ls: -.01),
+              style: body(15, w: 700, color: Colors.white),
             ),
           ),
         ],
@@ -388,7 +391,7 @@ class SecTitle extends StatelessWidget {
     child: Row(
       children: [
         Expanded(child: Text(text, style: disp(19, w: 800, h: 1.15, ls: -.02))),
-        if (trailing != null) trailing!,
+        ?trailing,
       ],
     ),
   );
@@ -485,7 +488,7 @@ class StepperRow extends StatelessWidget {
 
   Widget _btn(IconData icon, bool on, int next) => Press(
     scale: .9,
-    label: icon == Icons.add_rounded ? '$label: больше' : '$label: меньше',
+    label: '$label: ${icon == Icons.add_rounded ? t('больше') : t('меньше')}',
     onTap: on ? () => onChange(next) : null,
     child: Container(
       width: 46,
@@ -573,12 +576,13 @@ class Glow extends StatelessWidget {
 }
 
 // ── Уведомления: очередь, чтобы одно не затирало другое ──
-final toasts = ValueNotifier<List<(int, String)>>(const []);
+typedef ToastAction = ({String label, VoidCallback run});
+final toasts = ValueNotifier<List<(int, String, ToastAction?)>>(const []);
 int _toastSeq = 0;
 
-void showToast(String text) => toasts.value = [
+void showToast(String text, {ToastAction? action}) => toasts.value = [
   ...toasts.value.skip(max(0, toasts.value.length - 2)),
-  (++_toastSeq, text),
+  (++_toastSeq, text, action),
 ];
 
 class ToastHost extends StatefulWidget {
@@ -674,14 +678,39 @@ class _ToastHostState extends State<ToastHost> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(
-                                  cur.$2,
-                                  style: body(14, color: Colors.white),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cur.$2,
+                                      style: body(14, color: Colors.white),
+                                    ),
+                                    if (cur.$3 != null)
+                                      Press(
+                                        onTap: () {
+                                          cur.$3!.run();
+                                          _close();
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          child: Text(
+                                            cur.$3!.label,
+                                            style: body(
+                                              14,
+                                              w: 800,
+                                              color: blue3,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                               IconButton(
                                 onPressed: _close,
-                                tooltip: 'Закрыть уведомление',
+                                tooltip: t('Закрыть уведомление'),
                                 icon: Icon(
                                   Icons.close_rounded,
                                   size: 20,
@@ -701,7 +730,7 @@ class _ToastHostState extends State<ToastHost> {
   );
 }
 
-/// Переключатель показателей: Сахар · Соль · Жиры · Калории. [light] — для белой карточки.
+/// Переключатель показателей одной строкой. [light] — для белой карточки.
 class MetricTabs extends StatelessWidget {
   final MetricId value;
   final ValueChanged<MetricId> onChange;
@@ -715,92 +744,83 @@ class MetricTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
+    height: 48,
     decoration: BoxDecoration(
       color: light ? tint : Colors.white.withValues(alpha: .16),
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       border: light
           ? null
           : Border.all(color: Colors.white.withValues(alpha: .22)),
     ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final row in [metricIds.take(3), metricIds.skip(3)])
-          Row(
-            children: [
-              for (final m in row)
-                Expanded(
-                  child: Semantics(
-                    selected: m == value,
-                    button: true,
-                    label: metrics[m]!.label,
-                    child: Press(
-                      scale: .95,
-                      onTap: () => onChange(m),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: m == value ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(22),
-                          boxShadow: m == value
-                              ? [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF06126E,
-                                    ).withValues(alpha: .35),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 6),
-                                    spreadRadius: -6,
+    clipBehavior: Clip.antiAlias,
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: [
+          for (final m in metricIds)
+            Builder(
+              builder: (context) => Semantics(
+                selected: m == value,
+                button: true,
+                label: t(metrics[m]!.label),
+                excludeSemantics: true,
+                child: Press(
+                  scale: .95,
+                  onTap: () {
+                    onChange(m);
+                    Scrollable.ensureVisible(
+                      context,
+                      alignment: .5,
+                      duration: const Duration(milliseconds: 220),
+                    );
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: m == value
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Color(metrics[m]!.color),
+                            shape: BoxShape.circle,
+                            border: m == value
+                                ? null
+                                : Border.all(
+                                    color: Colors.white.withValues(alpha: .85),
+                                    width: 1.5,
                                   ),
-                                ]
-                              : null,
+                          ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: Color(metrics[m]!.color),
-                                shape: BoxShape.circle,
-                                border: m == value
-                                    ? null
-                                    : Border.all(
-                                        color: Colors.white.withValues(
-                                          alpha: .85,
-                                        ),
-                                        width: 1.5,
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Flexible(
-                              child: Text(
-                                metrics[m]!.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: body(
-                                  13,
-                                  w: 800,
-                                  color: m == value
-                                      ? ink
-                                      : (light ? mute : Colors.white),
-                                  h: 1.1,
-                                ),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 6),
+                        Text(
+                          t(metrics[m]!.label),
+                          style: body(
+                            13,
+                            w: 800,
+                            color: m == value
+                                ? ink
+                                : (light ? mute : Colors.white),
+                            h: 1.1,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
-            ],
-          ),
-      ],
+              ),
+            ),
+        ],
+      ),
     ),
   );
 }

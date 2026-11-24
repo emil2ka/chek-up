@@ -2,18 +2,22 @@
 import 'package:flutter/material.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
+import '../core/insights.dart';
 import '../core/models.dart';
+import '../core/reminder.dart';
 import '../core/store.dart';
+import '../ui/forms.dart';
 import '../ui/kit.dart';
+import 'account.dart';
 import 'shell.dart';
-import 'sync_section.dart';
 
 const _badgeIcons = {
   'receipt': Icons.receipt_long_rounded,
   'stack': Icons.layers_rounded,
   'swap': Icons.swap_horiz_rounded,
   'leaf': Icons.eco_rounded,
-  'bomb': Icons.local_fire_department_rounded,
+  'flame': Icons.local_fire_department_rounded,
   'coin': Icons.savings_rounded,
   'minus': Icons.remove_circle_outline_rounded,
   'shield': Icons.verified_user_rounded,
@@ -33,51 +37,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _picked;
   bool _how = false, _confirm = false;
 
+  Widget _normTile(Profile p, MetricId m) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FittedBox(
+          child: Text(
+            bigNum(familyDaily(p, m), m),
+            style: disp(20, color: Colors.white, ls: -.05),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Color(metrics[m]!.color),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: .85),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                m == MetricId.kcal
+                    ? t('Ккал')
+                    : '${t(m == MetricId.carbs ? 'Углев.' : metrics[m]!.label)}, ${isCubeMetric(m) ? t('куб.') : t(metrics[m]!.unit)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: body(
+                  13,
+                  w: 700,
+                  color: Colors.white.withValues(alpha: .88),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
     final p = store.profile;
     final list = store.badgeList;
     final done = list.where((b) => b.done).length;
-    final normCubes = familyDailyCubes(p);
+    final week = familyDailyCubes(p) * 7;
+    final child = store.isChild;
     final picked = list.where((b) => b.id == _picked).firstOrNull;
-    final n = store.history.length;
-
-    Widget row(
-      IconData icon,
-      String text,
-      VoidCallback? onTap, {
-      Color iconColor = blue1,
-      Widget? trailing,
-    }) => Press(
-      scale: .985,
-      onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 60),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: tint,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: iconColor, size: 21),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(text, style: body(16, w: 700))),
-            trailing ??
-                const Icon(Icons.chevron_right_rounded, color: mute, size: 22),
-          ],
-        ),
-      ),
-    );
+    final n = store.history.where((e) => store.isMine(e) || isDemo(e)).length;
 
     return SingleChildScrollView(
       child: Column(
@@ -94,7 +114,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Rise(
                         child: Text(
-                          'Профиль',
+                          store.family.me.name.isEmpty
+                              ? t('Профиль')
+                              : store.family.me.name,
                           style: disp(22, w: 800, color: Colors.white),
                         ),
                       ),
@@ -109,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Дневные ориентиры для семьи',
+                                    t('Ориентиры на день для семьи'),
                                     style: body(
                                       15,
                                       color: Colors.white.withValues(
@@ -118,66 +140,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  Wrap(
-                                    spacing: 20,
-                                    runSpacing: 10,
-                                    children: [
-                                      for (final m in metricIds)
-                                        SizedBox(
-                                          width: 110,
-                                          child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Container(
-                                                width: 10,
-                                                height: 10,
-                                                decoration: BoxDecoration(
-                                                  color: Color(
-                                                    metrics[m]!.color,
-                                                  ),
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: Colors.white
-                                                        .withValues(alpha: .85),
-                                                    width: 1.5,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                bigNum(familyDaily(p, m), m),
-                                                style: disp(
-                                                  23,
-                                                  color: Colors.white,
-                                                  h: 1,
-                                                  ls: -.05,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Flexible(
-                                                child: Text(
-                                                  '${metrics[m]!.label} · ${isCubeMetric(m) ? 'куб.' : metrics[m]!.unit}',
-                                                  maxLines: 2,
-                                                  style: body(
-                                                    13,
-                                                    w: 700,
-                                                    color: Colors.white
-                                                        .withValues(alpha: .88),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                  for (final row in [
+                                    metricIds.take(3),
+                                    metricIds.skip(3),
+                                  ])
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          for (final (i, m) in row.indexed) ...[
+                                            if (i > 0) const SizedBox(width: 8),
+                                            Expanded(child: _normTile(p, m)),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                                 ],
                               ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.only(bottom: 8),
-                              child: CubeIcon(64, angle: 12),
                             ),
                           ],
                         ),
@@ -193,39 +172,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── семья ──
-                const SecTitle('Кто ест из корзины'),
-                StepperRow(
-                  label: 'Взрослые',
-                  hint:
-                      'до ${metrics[MetricId.sugar]!.adult.round()} г сахара, ${metrics[MetricId.salt]!.adult.round()} г соли, ${metrics[MetricId.fat]!.adult.round()} г жиров в день',
-                  value: p.adults,
-                  min: 1,
-                  max: maxAdults,
-                  onChange: (v) => store.updateProfile(p.copyWith(adults: v)),
-                ),
-                const SizedBox(height: 8),
-                StepperRow(
-                  label: 'Дети',
-                  hint:
-                      'до ${metrics[MetricId.sugar]!.kid.round()} г сахара, ${metrics[MetricId.salt]!.kid.round()} г соли, ${metrics[MetricId.fat]!.kid.round()} г жиров в день',
-                  value: p.kids,
-                  min: 0,
-                  max: maxKids,
-                  onChange: (v) => store.updateProfile(p.copyWith(kids: v)),
+                // ── состав ──
+                SecTitle(t('Кто ест из корзины')),
+                IgnorePointer(
+                  ignoring: child,
+                  child: Opacity(
+                    opacity: child ? .6 : 1,
+                    child: Column(
+                      children: [
+                        StepperRow(
+                          label: t('Взрослые'),
+                          hint: t('до {a} г сахара и {b} г соли в день', {
+                            'a': metrics[MetricId.sugar]!.adult.round(),
+                            'b': metrics[MetricId.salt]!.adult.round(),
+                          }),
+                          value: p.adults,
+                          min: 1,
+                          max: maxAdults,
+                          onChange: (v) => store.updateFamily(adults: v),
+                        ),
+                        const SizedBox(height: 8),
+                        StepperRow(
+                          label: t('Дети'),
+                          hint: t('до {a} г сахара и {b} г соли в день', {
+                            'a': metrics[MetricId.sugar]!.kid.round(),
+                            'b': metrics[MetricId.salt]!.kid.round(),
+                          }),
+                          value: p.kids,
+                          min: 0,
+                          max: maxKids,
+                          onChange: (v) => store.updateFamily(kids: v),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
                   child: Text(
-                    'На всю семью в день выходит до ${amountTxt(familyDaily(p, MetricId.sugar), MetricId.sugar)} сахара, ${amountTxt(familyDaily(p, MetricId.salt), MetricId.salt)} соли, ${amountTxt(familyDaily(p, MetricId.fat), MetricId.fat)} насыщенных жиров и около ${familyDaily(p, MetricId.kcal)} ккал, ${familyDaily(p, MetricId.carbs)} г углеводов и ${familyDaily(p, MetricId.protein)} г белка. Это ${normCubes * 7} ${pl(normCubes * 7, cubesF)} сахара в неделю; с нормами сравнивается раздел «Неделя».',
+                    child
+                        ? t('Состав семьи меняет взрослый.')
+                        : t('На неделю это до {n} {w} сахара.', {
+                            'n': week,
+                            'w': pl(week, cubesF),
+                          }),
                     style: body(14, color: mute),
                   ),
                 ),
                 // ── достижения ──
                 const SizedBox(height: 32),
                 SecTitle(
-                  'Достижения',
-                  trailing: CountPill('$done из ${list.length}'),
+                  t('Достижения'),
+                  trailing: CountPill('$done ${t('из')} ${list.length}'),
                 ),
                 GridView.count(
                   crossAxisCount: 3,
@@ -240,7 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Press(
                         scale: .95,
                         label:
-                            '${b.title}: ${b.done ? 'получено' : 'ещё нет'}. ${b.desc}',
+                            '${t(b.title)}: ${b.done ? t('получено') : t('ещё нет')}. ${t(b.desc)}',
                         onTap: () => setState(
                           () => _picked = _picked == b.id ? null : b.id,
                         ),
@@ -285,7 +283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               const SizedBox(height: 8),
                               Expanded(
                                 child: Text(
-                                  b.title,
+                                  t(b.title),
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -326,42 +324,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: picked == null
                       ? Text(
-                          'Нажми на значок, чтобы узнать, как его получить.',
+                          t('Нажми на значок, чтобы узнать, как его получить.'),
                           style: body(14, color: mute),
                         )
                       : Text.rich(
                           TextSpan(
                             children: [
                               TextSpan(
-                                text: '${picked.title}. ',
+                                text: '${t(picked.title)}. ',
                                 style: body(14, w: 800),
                               ),
                               TextSpan(
                                 text:
-                                    '${picked.desc}${picked.progress != null && !picked.done ? ' — ${picked.progress!.$1} из ${picked.progress!.$2}' : ''}${picked.done ? ' — получено.' : '.'}',
+                                    '${t(picked.desc)}. ${picked.done
+                                        ? t('Получено.')
+                                        : picked.progress != null
+                                        ? t('Сейчас {a} из {b}.', {'a': picked.progress!.$1, 'b': picked.progress!.$2})
+                                        : ''}',
                               ),
                             ],
                           ),
                           style: body(14),
                         ),
                 ),
-                // ── один аккаунт ──
                 const SizedBox(height: 32),
-                const SecTitle('Один аккаунт'),
-                const SyncSection(),
+                const AccountSection(),
                 // ── приложение ──
-                const SizedBox(height: 32),
-                const SecTitle('Приложение'),
-                row(
-                  Icons.checklist_rounded,
-                  'Список на следующий поход',
-                  () => openShopList(context),
+                const SizedBox(height: 28),
+                SecTitle(t('Приложение')),
+                Segmented(
+                  value: p.lang,
+                  options: const [('ru', 'Русский'), ('kk', 'Қазақша')],
+                  onChange: (v) => store.updateMe(lang: v),
                 ),
                 const SizedBox(height: 8),
-                row(
-                  Icons.info_outline_rounded,
-                  'Как считается оценка',
-                  () => setState(() => _how = !_how),
+                if (reminder.supported)
+                  ListenableBuilder(
+                    listenable: reminder,
+                    builder: (context, _) => SwitchRow(
+                      t('Напомнить закрыть неделю'),
+                      hint: t('в воскресенье в 18:00, если она ещё открыта'),
+                      value: reminder.on,
+                      onChanged: (v) async {
+                        if (!await reminder.set(v)) {
+                          showToast(
+                            t('Разреши уведомления в настройках телефона'),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                RowBtn(
+                  t('Список на следующий поход'),
+                  icon: Icons.checklist_rounded,
+                  onTap: () => openShopList(context),
+                ),
+                RowBtn(
+                  t('Как считаем'),
+                  icon: Icons.info_outline_rounded,
+                  onTap: () => setState(() => _how = !_how),
                   trailing: AnimatedRotation(
                     turns: _how ? .25 : 0,
                     duration: const Duration(milliseconds: 200),
@@ -379,114 +400,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: !_how
                       ? const SizedBox(width: double.infinity)
                       : Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                          padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Оценка корзины — от 0 до 100. Её снижают доля вредных товаров в сумме чека, количество добавленного сахара, соли и насыщенных жиров, а ещё траты на алкоголь и энергетики. Калории в оценку не входят: еда должна быть калорийной, важно, откуда они.',
-                                style: body(15),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '$unitsNote Сахар в цельных фруктах не считается.',
-                                style: body(15),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Цифры примерные: это ориентир для покупок, а не медицинская рекомендация.',
-                                style: body(15, color: mute),
-                              ),
+                              for (final text in [
+                                t(
+                                  'Оценка от 0 до 100 не зависит от размера корзины: сахар, соль и жиры сравниваем с калориями, вредное и алкоголь с суммой на еду. Запасы вроде сахара и масла делим на недели.',
+                                ),
+                                t(
+                                  'Замены в чеке это план. В экономию и минус кубиков они попадут, когда следующий чек подтвердит покупку.',
+                                ),
+                                t(
+                                  'Стрик: неделя засчитана, если отмечено, что внесены все чеки или что покупок не было. Прошлую неделю можно закрыть до вечера понедельника. За четыре недели даётся заморозка на пропуск, запас до двух.',
+                                ),
+                                '${t(unitsNote)} ${t('Сахар только добавленный, из цельных фруктов не считаем.')}',
+                                t(
+                                  'Цифры примерные: это ориентир для покупок, а не медицинская рекомендация.',
+                                ),
+                              ])
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(text, style: body(15)),
+                                ),
                             ],
                           ),
                         ),
                 ),
-                const SizedBox(height: 8),
-                row(
-                  Icons.replay_rounded,
-                  'Показать знакомство заново',
-                  widget.onReplayIntro,
+                RowBtn(
+                  t('Показать знакомство заново'),
+                  icon: Icons.replay_rounded,
+                  onTap: widget.onReplayIntro,
                 ),
-                const SizedBox(height: 8),
                 if (_confirm)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: bad.withValues(alpha: .1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Удалить $n ${pl(n, receiptsF)} из истории? Вернуть их не получится.',
-                          style: body(15, w: 700),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Press(
-                                onTap: () => setState(() => _confirm = false),
-                                child: Container(
-                                  height: 48,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: line, width: 1.5),
-                                  ),
-                                  child: Text(
-                                    'Оставить',
-                                    style: body(15, w: 700),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Press(
-                                onTap: () {
-                                  setState(() => _confirm = false);
-                                  store.clearHistory();
-                                  showToast('История очищена');
-                                },
-                                child: Container(
-                                  height: 48,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: bad,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Text(
-                                    'Удалить',
-                                    style: body(
-                                      15,
-                                      w: 700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                  ConfirmBox(
+                    text: t('Удалить {n} {w}? Вернуть их не получится.', {
+                      'n': n,
+                      'w': pl(n, receiptsF),
+                    }),
+                    no: t('Оставить'),
+                    yes: t('Удалить'),
+                    onNo: () => setState(() => _confirm = false),
+                    onYes: () {
+                      setState(() => _confirm = false);
+                      store.clearMine();
+                      showToast(t('Твои чеки удалены'));
+                    },
                   )
                 else
-                  row(
-                    Icons.delete_outline_rounded,
-                    'Очистить историю чеков',
-                    n == 0 ? null : () => setState(() => _confirm = true),
+                  RowBtn(
+                    t('Удалить все мои чеки'),
+                    icon: Icons.delete_outline_rounded,
                     iconColor: bad,
+                    onTap: n == 0
+                        ? null
+                        : () => setState(() => _confirm = true),
                     trailing: const SizedBox.shrink(),
                   ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 18),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    'Чек-ап, версия 0.2. Чеки и профиль хранятся на этом телефоне и, если подключён сервер, в твоём аккаунте на нём (без фото чеков). Оценки примерные и не заменяют консультацию врача.',
+                    t(
+                      'Чек-ап, версия {v}. Чеки и профиль хранятся на этом устройстве и в твоём аккаунте на сервере. Фото чеков не храним. Оценки примерные и не заменяют консультацию врача.',
+                      {'v': '0.2'},
+                    ),
                     style: body(12, color: mute, h: 1.5),
                   ),
                 ),

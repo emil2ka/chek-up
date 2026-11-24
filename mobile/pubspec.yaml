@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.12.1
@@ -42,6 +42,9 @@ dependencies:
   mobile_scanner: ^7.5.0
   http: ^1.6.0
   http_parser: ^4.1.2
+  path_provider: ^2.1.6
+  flutter_local_notifications: ^23.0.4
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +75,27 @@ flutter:
     - family: Manrope
       fonts:
         - asset: assets/fonts/Manrope.ttf
+    # казахский: в Unbounded и Manrope нет букв ә ғ қ ң ө ұ ү һ
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-500.ttf
+          weight: 500
+        - asset: assets/fonts/Montserrat-700.ttf
+          weight: 700
+        - asset: assets/fonts/Montserrat-800.ttf
+          weight: 800
+        - asset: assets/fonts/Montserrat-900.ttf
+          weight: 900
+    - family: GolosText
+      fonts:
+        - asset: assets/fonts/GolosText-500.ttf
+          weight: 500
+        - asset: assets/fonts/GolosText-600.ttf
+          weight: 600
+        - asset: assets/fonts/GolosText-700.ttf
+          weight: 700
+        - asset: assets/fonts/GolosText-800.ttf
+          weight: 800
 
   # To add assets to your application, add an assets section, like this:
   # assets:

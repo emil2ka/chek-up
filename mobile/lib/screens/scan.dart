@@ -8,8 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/engine.dart';
+import '../core/i18n.dart';
 import '../core/models.dart';
-import '../core/scan.dart';
+import '../core/outbox.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
 import 'shell.dart';
@@ -21,13 +22,15 @@ const _wait = [
   'Разбираю сокращения кассы',
   'Сверяю со справочником',
   'Считаю сахар, соль и жиры',
+  'Ещё немного',
 ];
 const _lines = [.92, .64, .80, .48, .86, .70, .58, .90, .44, .76, .66, .84];
 
 class ScanPage extends StatefulWidget {
-  final XFile? photo;
+  /// снимки чека (до трёх кадров) или пусто для демо
+  final List<XFile> photos;
   final Receipt? receipt;
-  const ScanPage({super.key, this.photo, this.receipt});
+  const ScanPage({super.key, this.photos = const [], this.receipt});
   @override
   State<ScanPage> createState() => _ScanPageState();
 }
@@ -48,91 +51,115 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   (int, String, String)? _tick;
   int _count = 0, _waitI = 0;
 
+  final _jobId = Outbox.newId();
+  bool _slow = false;
+
   @override
   void initState() {
     super.initState();
     _found = widget.receipt;
-    widget.photo
-        ?.readAsBytes()
-        .then((b) => mounted ? setState(() => _bytes = b) : null)
-        .catchError((_) => null);
     _waiter = Timer.periodic(
       const Duration(milliseconds: 1700),
       (_) => setState(() => _waitI = (_waitI + 1) % _wait.length),
     );
-    _run();
+    _later(900, () => setState(() => _slow = true));
+    if (widget.receipt != null) {
+      _show(widget.receipt!, ScanOutcome('demo', receipt: widget.receipt));
+    } else {
+      outbox.waitFor(_jobId, _arrived);
+      _start();
+    }
   }
 
-  Future<void> _run() async {
-    final t0 = DateTime.now();
-    int since() => DateTime.now().difference(t0).inMilliseconds;
+  Future<void> _start() async {
     try {
-      final (r, notice) = widget.receipt != null
-          ? (widget.receipt!, null)
-          : await recognize(widget.photo!);
-      _waiter?.cancel();
-      if (!mounted) return;
-      setState(() => _found = r);
-      final a = analyze(r);
-      // позиции, где чего-то хотя бы кубик; для каждой показываем самый выраженный показатель
-      const scanned = [MetricId.sugar, MetricId.salt, MetricId.fat];
-      ({MetricId m, num v, int c}) worst(AnalyzedItem it) {
-        final list = [
-          for (final m in scanned)
-            (
-              m: m,
-              v: it.active.valueOf(m),
-              c: cubesOfValue(it.active.valueOf(m), m),
-            ),
-        ]..sort((x, y) => y.c.compareTo(x.c));
-        return list.first;
-      }
-
-      final sweet = a.items.where((it) => worst(it).c >= 1).toList();
-      final all = scanned.fold<int>(0, (sum, m) => sum + a.cubesBy[m]!);
-      final startAt = max(150, since());
-      // если ответ пришёл поздно, всё равно даём позициям время, чтобы их успели прочитать
-      final span = max(
-        min(1600, sweet.length * 320),
-        _duration - startAt - 450,
+      final bytes = await bytesOf(widget.photos);
+      if (mounted) setState(() => _bytes = bytes.first);
+      await outbox.enqueue(
+        [for (final f in widget.photos) f.path],
+        bytes,
+        id: _jobId,
       );
-      final step = sweet.isEmpty ? span : span / sweet.length;
-      for (final (k, it) in sweet.indexed) {
-        _later(startAt - since() + (k * step).round(), () {
-          tick();
-          setState(() {
-            final w = worst(it);
-            _tick = (
-              k,
-              it.active.n,
-              '${amountTxt(w.v, w.m)} ${metrics[w.m]!.of}',
-            );
-            _count = (all * (k + 1) / sweet.length).round();
-          });
-        });
-      }
-      _later(max(_duration, startAt + span.round() + 450) - since(), () {
-        final nav = Navigator.of(context);
-        final prev = store.findByReceipt(r.id);
-        openResult(
-          nav,
-          r,
-          prev?.id ?? store.newId(),
-          prev?.swaps ?? const [],
-          replace: true,
-        );
-        if (notice != null) showToast(notice);
-      });
-    } catch (e) {
+    } catch (_) {
+      _arrived(const ScanOutcome('error', code: 'bad_request'));
+    }
+  }
+
+  void _arrived(ScanOutcome o) {
+    if (!mounted) return;
+    if (o.kind == 'error') {
       _waiter?.cancel();
-      if (!mounted) return;
       showToast(
-        e is ScanError
-            ? e.message
-            : 'Не получилось прочитать чек. Попробуй ещё раз',
+        o.code == 'unavailable' || o.code == 'rate_limit'
+            ? t('Чек в очереди: прочитаем, как только получится')
+            : scanErrorText(o.code),
       );
       Navigator.of(context).pop();
+      return;
     }
+    _show(o.receipt!, o);
+  }
+
+  final _t0 = DateTime.now();
+
+  void _show(Receipt r, ScanOutcome o) {
+    _waiter?.cancel();
+    setState(() => _found = r);
+    final a = analyze(r);
+    // позиции, где чего-то хотя бы кубик; для каждой показываем самый выраженный показатель
+    const scanned = [MetricId.sugar, MetricId.salt, MetricId.fat];
+    ({MetricId m, num v, int c}) worst(AnalyzedItem it) {
+      final list = [
+        for (final m in scanned)
+          (m: m, v: it.item.valueOf(m), c: cubesOfValue(it.item.valueOf(m), m)),
+      ]..sort((x, y) => y.c.compareTo(x.c));
+      return list.first;
+    }
+
+    final sweet = a.items
+        .where((it) => it.counted && worst(it).c >= 1)
+        .take(8)
+        .toList();
+    final startAt = max(150, DateTime.now().difference(_t0).inMilliseconds);
+    // позиции успевают прочитать, но готовый чек зря не держим
+    final span = max(min(1400, sweet.length * 280), _duration - startAt - 450);
+    final step = sweet.isEmpty ? span : span / sweet.length;
+    for (final (k, it) in sweet.indexed) {
+      _later((k * step).round(), () {
+        tick();
+        setState(() {
+          final w = worst(it);
+          _tick = (
+            k,
+            it.item.n,
+            '${amountTxt(w.v, w.m)} ${t(metrics[w.m]!.of)}',
+          );
+          _count = (a.cubes * (k + 1) / sweet.length).round();
+        });
+      });
+    }
+    _later(max(_duration - startAt, span + 250), () {
+      final nav = Navigator.of(context);
+      var id = o.entryId;
+      if (id == null) {
+        final prev = store.findByReceipt(r.id);
+        id = prev?.id ?? store.saveReceipt(r).id;
+      }
+      openResult(nav, id, replace: true);
+      if (o.kind == 'duplicate') {
+        showToast(t('Этот чек уже есть в журнале, второй раз не считаем'));
+      }
+      if (o.notice != null) showToast(t(o.notice!));
+    });
+  }
+
+  Future<void> _more() async {
+    final nav = Navigator.of(context);
+    final f = await shootMore();
+    if (f == null) return;
+    outbox.stopWaiting(_jobId);
+    await outbox.remove(_jobId);
+    scanAgain(nav, [...widget.photos, f].take(3).toList());
   }
 
   void _later(int ms, VoidCallback fn) => _timers.add(
@@ -141,6 +168,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    outbox.stopWaiting(_jobId);
     _waiter?.cancel();
     for (final t in _timers) {
       t.cancel();
@@ -274,7 +302,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
               Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _beam,
-                  builder: (_, __) => CustomPaint(
+                  builder: (_, _) => CustomPaint(
                     painter: _BeamPainter(
                       Curves.easeInOut.transform(_beam.value),
                     ),
@@ -308,8 +336,11 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                       alignment: Alignment.centerLeft,
                       child: Press(
                         scale: .92,
-                        label: 'Отменить сканирование',
-                        onTap: () => Navigator.of(context).pop(),
+                        label: t('Отменить'),
+                        onTap: () {
+                          if (_found == null) outbox.remove(_jobId);
+                          Navigator.of(context).pop();
+                        },
                         child: Container(
                           width: 44,
                           height: 44,
@@ -326,7 +357,11 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                       ),
                     ),
                     Text(
-                      'СКАНИРУЮ',
+                      [
+                        t('Сканирую'),
+                        if (widget.photos.length > 1)
+                          t('кадров: {n}', {'n': widget.photos.length}),
+                      ].join(' · ').toUpperCase(),
                       style: body(
                         12,
                         w: 800,
@@ -390,14 +425,15 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                 ),
               ),
               Text(
-                'Читаю чек…',
+                t('Читаю чек…'),
                 style: disp(30, color: Colors.white, h: .95, ls: -.045),
               ),
               SizedBox(
                 height: 66,
                 child: Center(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 260),
+                    duration: const Duration(milliseconds: 240),
+                    reverseDuration: const Duration(milliseconds: 60),
                     transitionBuilder: (child, a) => FadeTransition(
                       opacity: a,
                       child: SlideTransition(
@@ -410,7 +446,8 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                     ),
                     child: _tick == null
                         ? Text(
-                            _wait[_waitI],
+                            t(_wait[_waitI]),
+                            textAlign: TextAlign.center,
                             key: ValueKey('w$_waitI'),
                             style: body(
                               15,
@@ -447,7 +484,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                                   child: Text.rich(
                                     TextSpan(
                                       children: [
-                                        TextSpan(text: '${_tick!.$2} — '),
+                                        TextSpan(text: '${_tick!.$2}: '),
                                         TextSpan(
                                           text: _tick!.$3.replaceAll(' ', ' '),
                                           style: disp(
@@ -496,13 +533,47 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 6),
               Text(
-                '${pl(_count, cubesF)} сахара, соли и жиров найдено',
+                pl(_count, sugarCubesF),
                 style: body(
                   14,
                   w: 700,
                   color: Colors.white.withValues(alpha: .86),
                 ),
               ),
+              if (widget.receipt == null && _found == null)
+                AnimatedOpacity(
+                  opacity: _slow ? 1 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        GlassButton(
+                          t('Продолжить в фоне'),
+                          height: 50,
+                          onTap: () => Navigator.of(context).pop(),
+                        ),
+                        if (widget.photos.length < 3)
+                          Press(
+                            onTap: _more,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(
+                                t('Чек длинный? Добавь ещё кадр'),
+                                textAlign: TextAlign.center,
+                                style: body(14, w: 700, color: Colors.white)
+                                    .copyWith(
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Colors.white54,
+                                    ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

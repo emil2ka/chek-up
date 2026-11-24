@@ -1,224 +1,210 @@
+// Фигурки показателей (перенос web/src/lib/pieces.ts: те же силуэты и цвета).
+// Одна семья с кубиком сахара: простой силуэт, мягкий свет сверху-слева, максимум одна деталь.
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-enum FoodShape { salt, butter, bread, egg, ember }
+import '../core/models.dart';
 
-const _hulls = {
-  FoodShape.butter: [
-    Offset(-.51, -.09),
-    Offset(-.29, -.33),
-    Offset(.51, -.22),
-    Offset(.52, .05),
-    Offset(.31, .28),
-    Offset(-.50, .15),
-  ],
-  FoodShape.bread: [
-    Offset(-.52, .02),
-    Offset(-.39, -.21),
-    Offset(-.09, -.30),
-    Offset(.28, -.27),
-    Offset(.49, -.14),
-    Offset(.53, .05),
-    Offset(.38, .23),
-    Offset(-.29, .26),
-  ],
-  FoodShape.egg: [
-    Offset(-.37, .10),
-    Offset(-.23, -.32),
-    Offset(0, -.48),
-    Offset(.23, -.32),
-    Offset(.37, .10),
-    Offset(.28, .36),
-    Offset(0, .47),
-    Offset(-.28, .36),
-  ],
-  FoodShape.ember: [
-    Offset(-.47, -.04),
-    Offset(-.32, -.31),
-    Offset(.02, -.43),
-    Offset(.33, -.29),
-    Offset(.47, -.03),
-    Offset(.39, .23),
-    Offset(.11, .39),
-    Offset(-.30, .31),
-  ],
+enum FoodShape { crystal, drop, flame, grain, egg }
+
+const shapeOf = {
+  MetricId.salt: FoodShape.crystal,
+  MetricId.fat: FoodShape.drop,
+  MetricId.kcal: FoodShape.flame,
+  MetricId.carbs: FoodShape.grain,
+  MetricId.protein: FoodShape.egg,
 };
-const _saltOutlines = [
-  [
-    Offset(-.50, -.09),
-    Offset(-.23, -.42),
-    Offset(.16, -.46),
-    Offset(.43, -.22),
-    Offset(.49, .11),
-    Offset(.21, .39),
-    Offset(-.19, .42),
-    Offset(-.46, .23),
-  ],
-  [
-    Offset(-.52, .08),
-    Offset(-.34, -.30),
-    Offset(-.04, -.46),
-    Offset(.34, -.35),
-    Offset(.50, -.02),
-    Offset(.32, .24),
-    Offset(-.06, .40),
-    Offset(-.39, .33),
-  ],
-  [
-    Offset(-.46, -.15),
-    Offset(-.13, -.44),
-    Offset(.18, -.39),
-    Offset(.50, -.13),
-    Offset(.42, .18),
-    Offset(.07, .45),
-    Offset(-.31, .32),
-    Offset(-.48, .07),
-  ],
-  [
-    Offset(-.50, .00),
-    Offset(-.24, -.32),
-    Offset(.09, -.39),
-    Offset(.41, -.25),
-    Offset(.50, .05),
-    Offset(.31, .29),
-    Offset(-.04, .38),
-    Offset(-.40, .24),
-  ],
+
+class Piece {
+  /// силуэт в квадрате 100×100 с центром в нуле (строка SVG)
+  final String body;
+  final List<Color> colors;
+
+  /// единственная деталь: вторая форма, линия или грани
+  final String? inner, line;
+  final List<Color> innerColors;
+  final Color lineColor;
+  final double lineWidth, edge;
+  final List<(String, double)> facets;
+  final Color rim;
+
+  /// выпуклый контур для столкновений, в долях стороны
+  final List<Offset> hull;
+  const Piece({
+    required this.body,
+    required this.colors,
+    required this.rim,
+    required this.hull,
+    this.inner,
+    this.innerColors = const [],
+    this.line,
+    this.lineColor = Colors.transparent,
+    this.lineWidth = 0,
+    this.edge = 10,
+    this.facets = const [],
+  });
+}
+
+const pieces = <FoodShape, Piece>{
+  FoodShape.crystal: Piece(
+    body:
+        'M-4 -46Q0 -50 4 -46L25 -27Q29 -23 29 -17L29 15Q29 21 25 25L4 46Q0 50 -4 46L-25 25Q-29 21 -29 15L-29 -17Q-29 -23 -25 -27Z',
+    colors: [Color(0xFFFFF6F9), Color(0xFFFFD3E0), Color(0xFFEE8FAD)],
+    rim: Color(0x3DA83460),
+    edge: 5.0,
+    facets: [
+      ('M0 -50L-29 -22L-13 -14L0 -27Z', 0.75),
+      ('M0 -50L29 -22L13 -14L0 -27Z', 0.34),
+      ('M-29 -22L-29 20L-13 12L-13 -14Z', 0.42),
+      ('M29 -22L29 20L13 12L13 -14Z', -0.16),
+      ('M-29 20L0 50L0 25L-13 12Z', -0.06),
+      ('M29 20L0 50L0 25L13 12Z', -0.3),
+      ('M0 -27L13 -14L13 12L0 25L-13 12L-13 -14Z', 0.66),
+    ],
+    hull: [
+      Offset(-0.29, -0.2),
+      Offset(0.0, -0.48),
+      Offset(0.29, -0.2),
+      Offset(0.29, 0.19),
+      Offset(0.0, 0.48),
+      Offset(-0.29, 0.19),
+    ],
+  ),
+  FoodShape.drop: Piece(
+    body:
+        'M0 -48C4 -48 6 -45 9 -40C18 -24 37 -8 37 14C37 34 21 48 0 48C-21 48 -37 34 -37 14C-37 -8 -18 -24 -9 -40C-6 -45 -4 -48 0 -48Z',
+    colors: [Color(0xFFFFF3B8), Color(0xFFFFCE45), Color(0xFFF39B0E)],
+    rim: Color(0x42A05600),
+    hull: [
+      Offset(-0.36, 0.06),
+      Offset(-0.22, -0.22),
+      Offset(0.0, -0.48),
+      Offset(0.22, -0.22),
+      Offset(0.36, 0.06),
+      Offset(0.3, 0.33),
+      Offset(0.0, 0.48),
+      Offset(-0.3, 0.33),
+    ],
+  ),
+  FoodShape.flame: Piece(
+    body:
+        'M3 -47C5 -49 9 -47 10 -44C15 -28 38 -16 38 13C38 34 21 48 0 48C-21 48 -38 34 -38 12C-38 -2 -31 -12 -25 -20C-23 -23 -19 -22 -18 -19C-16 -14 -14 -11 -10 -9C-13 -23 -9 -37 3 -47Z',
+    colors: [Color(0xFFFFC58A), Color(0xFFFF7F45), Color(0xFFE8412A)],
+    rim: Color(0x3D8C1808),
+    edge: 6.0,
+    inner:
+        'M2 -4C3 -6 6 -6 7 -4C10 6 21 11 21 25C21 38 12 46 0 46C-12 46 -21 38 -21 25C-21 16 -16 11 -12 6C-10 4 -8 5 -7 7C-6 9 -5 10 -3 11C-4 5 -2 0 2 -4Z',
+    innerColors: [Color(0xFFFFF4C7), Color(0xFFFFDB73), Color(0xFFFFB63B)],
+    hull: [
+      Offset(-0.37, 0.06),
+      Offset(-0.23, -0.22),
+      Offset(0.05, -0.48),
+      Offset(0.29, -0.18),
+      Offset(0.38, 0.1),
+      Offset(0.3, 0.34),
+      Offset(0.0, 0.48),
+      Offset(-0.3, 0.34),
+    ],
+  ),
+  FoodShape.grain: Piece(
+    body:
+        'M0 -49C4 -49 8 -45 12 -40C24 -26 29 -8 27 12C25 34 13 48 0 49C-13 48 -25 34 -27 12C-29 -8 -24 -26 -12 -40C-8 -45 -4 -49 0 -49Z',
+    colors: [Color(0xFFFFEBC2), Color(0xFFF3BE6E), Color(0xFFC9812F)],
+    rim: Color(0x426E3A08),
+    line: 'M0 -26C3 -10 3 12 0 32',
+    lineColor: Color(0x758C4E12),
+    lineWidth: 5.5,
+    hull: [
+      Offset(-0.27, 0.02),
+      Offset(-0.18, -0.3),
+      Offset(0.0, -0.49),
+      Offset(0.18, -0.3),
+      Offset(0.27, 0.02),
+      Offset(0.21, 0.3),
+      Offset(0.0, 0.49),
+      Offset(-0.21, 0.3),
+    ],
+  ),
+  FoodShape.egg: Piece(
+    body:
+        'M0 -48C20 -48 37 -18 38 9C38 32 22 47 0 47C-22 47 -38 32 -38 9C-37 -18 -20 -48 0 -48Z',
+    colors: [Color(0xFFFFFFFF), Color(0xFFFFFAF0), Color(0xFFE3D4C3)],
+    rim: Color(0x38785228),
+    inner: 'M0 -9A20 20 0 1 1 0 31A20 20 0 1 1 0 -9Z',
+    innerColors: [Color(0xFFFFE283), Color(0xFFFFBE2E), Color(0xFFF28E0B)],
+    hull: [
+      Offset(-0.37, 0.1),
+      Offset(-0.23, -0.32),
+      Offset(0.0, -0.48),
+      Offset(0.23, -0.32),
+      Offset(0.37, 0.1),
+      Offset(0.28, 0.36),
+      Offset(0.0, 0.47),
+      Offset(-0.28, 0.36),
+    ],
+  ),
+};
+
+const _crystalScale = [.86, 1.04, .94, 1.12];
+
+/// Крупинки соли чуть разного размера; остальные фигурки одинаковые.
+double pieceScale(FoodShape shape, int variant) =>
+    shape == FoodShape.crystal ? _crystalScale[variant % 4] : 1;
+
+List<Offset> foodHull(FoodShape shape, int variant) => [
+  for (final p in pieces[shape]!.hull) p * pieceScale(shape, variant),
 ];
-const _saltScale = [.85, 1.04, .92, 1.11];
 
-List<Offset> foodHull(FoodShape shape, int variant) => shape == FoodShape.salt
-    ? [for (final point in _saltOutlines[variant]) point * _saltScale[variant]]
-    : _hulls[shape]!;
+final _paths = <String, Path>{};
 
-final _egg = Path()
-  ..moveTo(0, -48)
-  ..cubicTo(19, -48, 36, -17, 37, 9)
-  ..cubicTo(38, 32, 22, 47, 0, 47)
-  ..cubicTo(-23, 47, -39, 31, -38, 8)
-  ..cubicTo(-37, -18, -18, -48, 0, -48)
-  ..close();
-final _butter = Path()
-  ..moveTo(-49, -11)
-  ..lineTo(-30, -30)
-  ..quadraticBezierTo(-27, -33, -23, -32)
-  ..lineTo(48, -22)
-  ..quadraticBezierTo(52, -21, 52, -17)
-  ..lineTo(52, 2)
-  ..quadraticBezierTo(52, 5, 49, 8)
-  ..lineTo(33, 25)
-  ..quadraticBezierTo(31, 28, 27, 27)
-  ..lineTo(-47, 15)
-  ..quadraticBezierTo(-51, 14, -51, 10)
-  ..lineTo(-51, -7)
-  ..quadraticBezierTo(-51, -10, -49, -11)
-  ..close();
-final _butterTop = Path()
-  ..moveTo(-49, -11)
-  ..lineTo(-30, -30)
-  ..quadraticBezierTo(-27, -33, -23, -32)
-  ..lineTo(48, -22)
-  ..quadraticBezierTo(52, -21, 51, -18)
-  ..lineTo(33, 1)
-  ..quadraticBezierTo(31, 4, 27, 3)
-  ..lineTo(-47, -8)
-  ..quadraticBezierTo(-50, -8, -49, -11)
-  ..close();
-final _butterEnd = Path()
-  ..moveTo(32, 2)
-  ..lineTo(51, -18)
-  ..quadraticBezierTo(52, -20, 52, -17)
-  ..lineTo(52, 2)
-  ..quadraticBezierTo(52, 5, 49, 8)
-  ..lineTo(33, 25)
-  ..quadraticBezierTo(31, 28, 27, 27)
-  ..lineTo(28, 5)
-  ..close();
-final _butterEdge = Path()
-  ..moveTo(-46, -8)
-  ..lineTo(27, 3)
-  ..quadraticBezierTo(31, 4, 33, 1)
-  ..lineTo(49, -16);
-final _bread = Path()
-  ..moveTo(-50, -4)
-  ..cubicTo(-47, -19, -28, -27, -8, -29)
-  ..cubicTo(13, -31, 37, -25, 47, -13)
-  ..cubicTo(55, -5, 52, 9, 44, 17)
-  ..cubicTo(27, 30, -3, 31, -28, 24)
-  ..cubicTo(-43, 20, -55, 9, -50, -4)
-  ..close();
-final _breadBase = Path()
-  ..moveTo(-51, 0)
-  ..cubicTo(-40, 10, -22, 15, -1, 16)
-  ..cubicTo(20, 17, 40, 11, 51, 1)
-  ..cubicTo(52, 9, 48, 15, 44, 17)
-  ..cubicTo(27, 30, -3, 31, -28, 24)
-  ..cubicTo(-42, 21, -51, 11, -51, 0)
-  ..close();
-final _breadScore = Path()
-  ..moveTo(-9, -13)
-  ..cubicTo(-5, -18, 4, -17, 10, -11)
-  ..cubicTo(11, -8, 7, -8, 4, -9)
-  ..cubicTo(-1, -12, -5, -13, -9, -13)
-  ..close();
-final _breadScoreRim = Path()
-  ..moveTo(-7, -12)
-  ..cubicTo(-1, -12, 4, -10, 8, -9);
-final _coal = Path()
-  ..moveTo(-47, -4)
-  ..lineTo(-33, -31)
-  ..lineTo(-2, -43)
-  ..lineTo(31, -29)
-  ..lineTo(47, -4)
-  ..lineTo(37, 25)
-  ..lineTo(11, 39)
-  ..lineTo(-29, 33)
-  ..close();
-final _fault = Path()
-  ..moveTo(-31, 24)
-  ..lineTo(-20, 9)
-  ..lineTo(-6, 7)
-  ..lineTo(-4, -4)
-  ..lineTo(6, -10)
-  ..lineTo(14, -24)
-  ..lineTo(29, -25)
-  ..moveTo(-4, -4)
-  ..lineTo(-17, -13)
-  ..lineTo(-18, -22)
-  ..moveTo(6, -10)
-  ..lineTo(19, -2)
-  ..lineTo(30, -2)
-  ..lineTo(39, 8)
-  ..moveTo(11, 34)
-  ..lineTo(11, 19)
-  ..lineTo(3, 16)
-  ..lineTo(-6, 7);
-final _coalHighlight = Path()
-  ..moveTo(-46, -5)
-  ..lineTo(-33, -31)
-  ..lineTo(-2, -43)
-  ..lineTo(-10, -22)
-  ..lineTo(-21, -9)
-  ..close();
-final _coalShadow = Path()
-  ..moveTo(-8, 18)
-  ..lineTo(7, -8)
-  ..lineTo(30, -10)
-  ..lineTo(38, 24)
-  ..lineTo(11, 39)
-  ..close();
-final _faultHighlight = Path()
-  ..moveTo(-5, 6)
-  ..lineTo(-4, -4)
-  ..lineTo(6, -10)
-  ..lineTo(12, -21)
-  ..moveTo(20, -2)
-  ..lineTo(29, -2);
+/// Путь из строки SVG: команды M, L, Q, C, A, Z с абсолютными координатами.
+Path svgPath(String d) => _paths.putIfAbsent(d, () {
+  final path = Path();
+  for (final m in RegExp(r'([MLQCAZ])([^MLQCAZ]*)').allMatches(d)) {
+    final n = [
+      for (final x in RegExp(r'-?\d*\.?\d+').allMatches(m[2]!))
+        double.parse(x[0]!),
+    ];
+    switch (m[1]) {
+      case 'M':
+        path.moveTo(n[0], n[1]);
+        for (var i = 2; i + 1 < n.length; i += 2) {
+          path.lineTo(n[i], n[i + 1]);
+        }
+      case 'L':
+        for (var i = 0; i + 1 < n.length; i += 2) {
+          path.lineTo(n[i], n[i + 1]);
+        }
+      case 'Q':
+        for (var i = 0; i + 3 < n.length; i += 4) {
+          path.quadraticBezierTo(n[i], n[i + 1], n[i + 2], n[i + 3]);
+        }
+      case 'C':
+        for (var i = 0; i + 5 < n.length; i += 6) {
+          path.cubicTo(n[i], n[i + 1], n[i + 2], n[i + 3], n[i + 4], n[i + 5]);
+        }
+      case 'A':
+        for (var i = 0; i + 6 < n.length; i += 7) {
+          path.arcToPoint(
+            Offset(n[i + 5], n[i + 6]),
+            radius: Radius.elliptical(n[i], n[i + 1]),
+            rotation: n[i + 2],
+            largeArc: n[i + 3] == 1,
+            clockwise: n[i + 4] == 1,
+          );
+        }
+      default:
+        path.close();
+    }
+  }
+  return path;
+});
 
-final _pictures = <(FoodShape, int, int, bool), ui.Picture>{};
+final _pictures = <(FoodShape, int, bool), ui.Picture>{};
 
+/// Нарисовать фигурку с центром в нуле. Холст уже повёрнут на [angle]: он нужен, чтобы блик остался сверху-слева.
 void drawFoodPiece(
   Canvas canvas,
   FoodShape shape,
@@ -228,191 +214,108 @@ void drawFoodPiece(
   bool shadow = false,
 }) {
   final frame = shadow ? 0 : (angle * 24 / (pi * 2)).round() % 24;
-  if (shape == FoodShape.butter || shape == FoodShape.bread) variant = 0;
   final picture = _pictures.putIfAbsent((
     shape,
-    variant,
     frame,
     shadow,
-  ), () => _makePicture(shape, variant, frame * pi / 12, shadow));
+  ), () => _makePicture(shape, frame * pi / 12, shadow));
   canvas.save();
-  canvas.scale(size / 100);
+  canvas.scale(size * pieceScale(shape, variant) / 100);
   canvas.drawPicture(picture);
   canvas.restore();
 }
 
-Path _poly(List<Offset> points) => Path()..addPolygon(points, true);
-
-ui.Picture _makePicture(
-  FoodShape shape,
-  int variant,
-  double angle,
-  bool shadow,
-) {
+ui.Picture _makePicture(FoodShape shape, double angle, bool shadow) {
+  final p = pieces[shape]!;
   final record = ui.PictureRecorder();
   final canvas = Canvas(record);
-  final paint = Paint();
-  final salt = shape == FoodShape.salt
-      ? foodHull(shape, variant).map((point) => point * 100).toList()
-      : const <Offset>[];
-  final path = switch (shape) {
-    FoodShape.salt => _poly(salt),
-    FoodShape.butter => _butter,
-    FoodShape.bread => _bread,
-    FoodShape.egg => _egg,
-    FoodShape.ember => _coal,
-  };
-  final light = Offset(
-    -24 * cos(angle) - 29 * sin(angle),
-    24 * sin(angle) - 29 * cos(angle),
-  );
-
-  void tint(Path outline, Color color) {
-    canvas.drawPath(
-      outline,
-      paint
-        ..shader = null
-        ..style = PaintingStyle.fill
-        ..color = color,
-    );
-  }
-
-  void material(Path outline, List<Color> colors) {
-    final gradient = ui.Gradient.radial(
-      Offset(light.dx * .55, light.dy * .77),
-      56,
-      colors,
-      [0, .57, 1],
-    );
-    canvas.drawPath(
-      outline,
-      paint
-        ..shader = gradient
-        ..style = PaintingStyle.fill
-        ..color = Colors.white,
-    );
-  }
-
-  void line(Path outline, Color color, double width) {
-    canvas.drawPath(
-      outline,
-      paint
-        ..shader = null
-        ..style = PaintingStyle.stroke
-        ..color = color
-        ..strokeWidth = width
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-  }
-
+  final body = svgPath(p.body);
   if (shadow) {
-    tint(path, const Color(0x42182558));
+    canvas.drawPath(body, Paint()..color = const Color(0x3D041069));
     return record.endRecording();
   }
-  switch (shape) {
-    case FoodShape.salt:
-      final ridge = [
-        for (final (index, point) in salt.indexed)
-          const Offset(4.5, -8.5) + point * (index % 3 == 0 ? .47 : .63),
-      ];
-      material(path, const [
-        Color(0xFFFCFEFF),
-        Color(0xFFCEE4FB),
-        Color(0xFF7898D6),
-      ]);
-      for (var index = 0; index < salt.length; index++) {
-        final next = (index + 1) % salt.length;
-        final segment = salt[next] - salt[index];
-        final dx = segment.dx * cos(angle) - segment.dy * sin(angle);
-        final dy = segment.dx * sin(angle) + segment.dy * cos(angle);
-        final shade = (dx - dy * .63) / segment.distance;
-        final color = shade > 0
-            ? Colors.white.withValues(alpha: .12 + shade * .45)
-            : const Color(0xFF224899).withValues(alpha: .10 - shade * .32);
-        tint(
-          _poly([salt[index], salt[next], ridge[next], ridge[index]]),
-          color,
-        );
-      }
-      material(_poly(ridge), const [
-        Color(0xFFFDFEFF),
-        Color(0xFFE1EFFF),
-        Color(0xFFADCDF4),
-      ]);
-    case FoodShape.egg:
-      final colors = switch (variant % 3) {
-        1 => const [Color(0xFFFFFAF0), Color(0xFFE8C7AD), Color(0xFF9D6E60)],
-        2 => const [Color(0xFFFFFEF6), Color(0xFFEADED0), Color(0xFF827983)],
-        _ => const [Color(0xFFFFF5DF), Color(0xFFE6B892), Color(0xFFA16754)],
-      };
-      material(path, colors);
-      canvas.save();
-      canvas.clipPath(path);
-      for (var index = 0; index < 15; index++) {
-        final x = ((index * 61 + variant * 31) % 65) - 32.0;
-        final y = ((index * 23 + variant * 17) % 74) - 35.0;
-        canvas.drawCircle(
-          Offset(x, y),
-          index % 5 == 0 ? 1.65 : .94,
-          paint
-            ..shader = null
-            ..color = const Color(0x42713C2B),
-        );
-      }
-      canvas.restore();
-    case FoodShape.butter:
-      material(path, const [
-        Color(0xFFFFF3B4),
-        Color(0xFFF3D080),
-        Color(0xFFD69D4C),
-      ]);
-      material(_butterEnd, const [
-        Color(0xFFEDC975),
-        Color(0xFFD7A754),
-        Color(0xFFB67D39),
-      ]);
-      material(_butterTop, const [
-        Color(0xFFFFFBE0),
-        Color(0xFFFFECAA),
-        Color(0xFFF1D284),
-      ]);
-      line(_butterEdge, const Color(0xDBFFFCE0), 2.5);
-    case FoodShape.bread:
-      material(path, const [
-        Color(0xFFEDB969),
-        Color(0xFFCF8039),
-        Color(0xFF914622),
-      ]);
-      material(_breadBase, const [
-        Color(0xFFCA853F),
-        Color(0xFFA95D2B),
-        Color(0xFF743F25),
-      ]);
-      for (final offset in const [-24.0, 0.0, 24.0]) {
-        canvas.save();
-        canvas.translate(offset, offset.abs() * .095);
-        canvas.rotate(.64);
-        line(_breadScore, const Color(0xFFA14E22), 4.6);
-        tint(_breadScore, const Color(0xFFFFE0A3));
-        line(_breadScoreRim, const Color(0xFFFFF0C1), 2.4);
-        canvas.restore();
-      }
-    case FoodShape.ember:
-      material(path, const [
-        Color(0xFF76645F),
-        Color(0xFF3D303A),
-        Color(0xFF1C1426),
-      ]);
-      tint(_coalHighlight, const Color(0x29ECA475));
-      tint(_coalShadow, const Color(0x4A0D0A1A));
-      line(_fault, const Color(0x80883E2D), 7.5);
-      line(
-        _fault,
-        variant.isOdd ? const Color(0xFFE0783C) : const Color(0xFFC75A37),
-        2.1,
-      );
-      line(_faultHighlight, const Color(0xFFFFD983), 1.4);
+  // направление света в координатах повёрнутой фигурки
+  Offset turn(double x, double y) =>
+      Offset(x * cos(angle) + y * sin(angle), -x * sin(angle) + y * cos(angle));
+  Paint shade(List<Color> c, double r, [Offset at = Offset.zero]) => Paint()
+    ..shader = ui.Gradient.linear(
+      at + turn(-r * .72, -r),
+      at + turn(r * .6, r),
+      c,
+      const [0, .5, 1],
+    );
+
+  canvas.drawPath(body, shade(p.colors, 46));
+  canvas.save();
+  canvas.clipPath(body);
+  for (final (path, light) in p.facets) {
+    canvas.drawPath(
+      svgPath(path),
+      Paint()
+        ..color = light > 0
+            ? Colors.white.withValues(alpha: light)
+            : const Color(0xFFC43A6E).withValues(alpha: -light),
+    );
   }
+  if (p.inner != null) {
+    canvas.drawPath(
+      svgPath(p.inner!),
+      shade(p.innerColors, 22, Offset(0, shape == FoodShape.egg ? 11 : 22)),
+    );
+  }
+  if (p.line != null) {
+    canvas.drawPath(
+      svgPath(p.line!),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = p.lineWidth
+        ..strokeCap = StrokeCap.round
+        ..color = p.lineColor,
+    );
+  }
+  // фаска: светлый край сверху-слева, тень снизу-справа
+  canvas.drawPath(
+    body,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = p.edge
+      ..shader = ui.Gradient.linear(
+        turn(-40, -44),
+        turn(40, 46),
+        [
+          Colors.white.withValues(alpha: .95),
+          Colors.white.withValues(alpha: .18),
+          p.rim,
+        ],
+        const [0, .42, 1],
+      ),
+  );
+  // короткий блик
+  if (shape != FoodShape.crystal) {
+    final at = turn(
+      shape == FoodShape.grain ? -11 : -17,
+      shape == FoodShape.egg ? -19 : -6,
+    );
+    canvas.translate(at.dx, at.dy);
+    canvas.rotate(-angle - .62);
+    canvas.scale(1, .42);
+    canvas.drawCircle(
+      Offset.zero,
+      15,
+      Paint()
+        ..shader = ui.Gradient.radial(Offset.zero, 15, [
+          Colors.white.withValues(alpha: .92),
+          Colors.white.withValues(alpha: 0),
+        ]),
+    );
+  }
+  canvas.restore();
+  canvas.drawPath(
+    body,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = p.rim,
+  );
   return record.endRecording();
 }

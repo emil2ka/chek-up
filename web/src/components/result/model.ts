@@ -110,7 +110,7 @@ export function metricPhrase(a: Analysis, m: MetricId): string {
   const rows = a.items.filter(it => !it.off && !it.nf && valueOf(it, m) > 0).sort((x, y) => valueOf(y, m) - valueOf(x, m));
   if (!rows.length) return t('Нет данных об этом показателе');
   const v = { x: metricTxt(a.totals[m], m), n: shortName(rows[0].n), p: Math.round(valueOf(rows[0], m) / a.totals[m] * 100) };
-  return rows.length === 1 ? t('Всего {x}, и всё из одной позиции: {n}.', v) : t('Всего {x}. Больше всего даёт {n}: {p}%.', v);
+  return rows.length === 1 ? t('Всего {x}, и всё из одной позиции: {n}.', v) : t('Всего {x}. Больше всего: {n}, {p}%.', v);
 }
 
 export type ResultModel = {

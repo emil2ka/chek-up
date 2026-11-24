@@ -19,6 +19,7 @@ describe('фигурки', () => {
   });
   it('контур столкновений не больше квадрата фигурки', () => {
     for (const s of PIECE_SHAPES) for (const [x, y] of PIECES[s].hull) { expect(Math.abs(x)).toBeLessThanOrEqual(.5); expect(Math.abs(y)).toBeLessThanOrEqual(.5); }
+    for (const s of PIECE_SHAPES) expect(PIECES[s].hull.length).toBeLessThanOrEqual(8);
   });
   it('минимализм: не больше одной детали внутри', () => {
     for (const s of PIECE_SHAPES) expect([PIECES[s].inner, PIECES[s].line, PIECES[s].facets].filter(Boolean).length).toBeLessThanOrEqual(1);

@@ -11,6 +11,7 @@ import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/forms.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 import '../ui/pile_hero.dart';
 import '../ui/share_card.dart';
 import 'edit.dart';
@@ -178,7 +179,9 @@ class _ResultPageState extends State<ResultPage> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
-                          conclusion(_r, _m.base, guests: _e.guests),
+                          _metric == MetricId.sugar
+                              ? conclusion(_r, _m.base, guests: _e.guests)
+                              : metricPhrase(_m.base, _metric),
                           style: disp(21, w: 800, h: 1.2, ls: -.03),
                         ),
                       ),
@@ -197,6 +200,14 @@ class _ResultPageState extends State<ResultPage> {
                           ].join(' · '),
                           style: body(13, color: mute),
                         ),
+                      ),
+                      const SizedBox(height: 26),
+                      SecTitle(t('Всё, что в чеке')),
+                      SixGrid(
+                        totals: _m.base.totals,
+                        available: _m.available,
+                        value: _metric,
+                        onChange: (m) => setState(() => _metric = m),
                       ),
                       if (!_r.refund) ...[
                         const SizedBox(height: 28),

@@ -46,7 +46,6 @@ class PilePalette {
   });
 }
 
-/// Сахар — белый (как раньше), соль — розовый кристалл, жиры — сливочное масло, калории — тёплый оранжевый.
 const pileSugar = PilePalette(
   top: Colors.white,
   side: Color(0xFFB4C4F6),
@@ -83,46 +82,17 @@ const _skins = <int, PilePalette>{
 };
 PilePalette skinFor(int level) => _skins[level] ?? pileSugar;
 
-const pileSalt = PilePalette(
-  shape: FoodShape.salt,
-  top: Color(0xFFFFF1F5),
-  side: Color(0xFFF2A6BE),
-  edge: Color(0xFFFAD2DE),
-  grain: Color(0x66D9709A),
+/// Сахар — кубик, остальное — фигурки (food_piece.dart).
+PilePalette _figure(MetricId m) => PilePalette(
+  top: pileSugar.top,
+  side: pileSugar.side,
+  edge: pileSugar.edge,
+  grain: pileSugar.grain,
+  shape: shapeOf[m],
 );
-const pileFat = PilePalette(
-  shape: FoodShape.butter,
-  top: Color(0xFFFFF6C9),
-  side: Color(0xFFEBBB3A),
-  edge: Color(0xFFFCE79A),
-  grain: Color(0x66D29A14),
-);
-const pileKcal = PilePalette(
-  shape: FoodShape.ember,
-  top: Color(0xFFFFE9D1),
-  side: Color(0xFFF08A3E),
-  edge: Color(0xFFFFCDA0),
-  grain: Color(0x66D86A14),
-);
-const pilePalettes = <MetricId, PilePalette>{
-  MetricId.sugar: pileSugar,
-  MetricId.salt: pileSalt,
-  MetricId.fat: pileFat,
-  MetricId.kcal: pileKcal,
-  MetricId.carbs: PilePalette(
-    top: Color(0xFFF0EBFF),
-    side: Color(0xFFB9A6F2),
-    edge: Color(0xFFCFC3F7),
-    grain: Color(0x668C6EE1),
-    shape: FoodShape.bread,
-  ),
-  MetricId.protein: PilePalette(
-    top: Color(0xFFE4FAF5),
-    side: Color(0xFF8FDCCB),
-    edge: Color(0xFFB5EBDD),
-    grain: Color(0x6632AF9B),
-    shape: FoodShape.egg,
-  ),
+final pilePalettes = <MetricId, PilePalette>{
+  for (final m in MetricId.values)
+    m: m == MetricId.sugar ? pileSugar : _figure(m),
 };
 
 class SugarPile extends StatefulWidget {
@@ -178,13 +148,13 @@ class SugarPileState extends State<SugarPile>
   int _downT = 0;
   final _heat = <f.Body, double>{};
   bool get _granular =>
-      widget.palettes.every((pal) => pal.shape == FoodShape.salt);
+      widget.palettes.every((pal) => pal.shape == FoodShape.crystal);
   StreamSubscription? _accSub, _shakeSub;
 
   int get count => _cubes.length + _queue - _popQueue;
 
   void _listenContacts() {
-    if (widget.palettes.any((pal) => pal.shape == FoodShape.ember)) {
+    if (widget.palettes.any((pal) => pal.shape == FoodShape.flame)) {
       _world.setContactListener(
         _PileContacts((contact) {
           final speed =
@@ -193,7 +163,7 @@ class SugarPileState extends State<SugarPile>
           if (speed < 5) return;
           for (final body in [contact.bodyA, contact.bodyB]) {
             if (body.userData is int &&
-                _palette(body).shape == FoodShape.ember) {
+                _palette(body).shape == FoodShape.flame) {
               _heat[body] = max(_heat[body] ?? 0, min(.86, speed / 18));
             }
           }
@@ -337,14 +307,14 @@ class SugarPileState extends State<SugarPile>
                 (_rnd.nextDouble() - .5) * w * .22)
             .clamp(_s, w - _s);
     final y = -_s * (1 + _rnd.nextDouble() * 2.5);
-    final variant = _rnd.nextInt(4);
+    final variant = _rnd.nextInt(6);
     final shape = widget.palettes[variant % widget.palettes.length].shape;
     final (density, friction, restitution) = switch (shape) {
-      FoodShape.salt => (1.15, .68, .12),
-      FoodShape.butter => (2.05, .80, .06),
-      FoodShape.bread => (.95, .58, .24),
-      FoodShape.egg => (1.55, .24, .28),
-      FoodShape.ember => (1.1, .49, .24),
+      FoodShape.crystal => (1.15, .62, .13),
+      FoodShape.drop => (1.3, .45, .12),
+      FoodShape.grain => (1.0, .55, .20),
+      FoodShape.egg => (1.5, .24, .26),
+      FoodShape.flame => (1.0, .48, .24),
       null => (1.0, .55, .14),
     };
     final collision = f.PolygonShape();
@@ -423,8 +393,8 @@ class SugarPileState extends State<SugarPile>
       hit = true;
       final shape = _palette(b).shape;
       final strength =
-          (1 - d / r) * (_granular || shape == FoodShape.butter ? .74 : 1);
-      if (shape == FoodShape.ember) _heat[b] = max(_heat[b] ?? 0, strength);
+          (1 - d / r) * (_granular || shape == FoodShape.drop ? .74 : 1);
+      if (shape == FoodShape.flame) _heat[b] = max(_heat[b] ?? 0, strength);
       final k = strength * b.mass;
       b.applyLinearImpulse(
         f.Vector2(
@@ -657,7 +627,7 @@ class _PilePainter extends CustomPainter {
       );
       _grain.color = pal.grain;
       if (s >= 16) {
-        for (final (x, y, d) in _grains[(b.userData as int?) ?? 0]) {
+        for (final (x, y, d) in _grains[((b.userData as int?) ?? 0) % 4]) {
           canvas.drawRRect(
             RRect.fromRectAndRadius(
               Rect.fromCenter(

@@ -73,7 +73,7 @@ const metrics = <MetricId, MetricDef>{
     2,
     20,
     16,
-    0xFFE0A400,
+    0xFFF3B21B,
     'ВОЗ: насыщенных жиров меньше 10% калорий, около 20 г в день',
   ),
   MetricId.kcal: MetricDef(
@@ -84,7 +84,7 @@ const metrics = <MetricId, MetricDef>{
     200,
     2000,
     1500,
-    0xFFF0792A,
+    0xFFEE5A32,
     'ориентир: 2000 ккал в день взрослому, 1500 ребёнку',
   ),
   MetricId.carbs: MetricDef(
@@ -95,7 +95,7 @@ const metrics = <MetricId, MetricDef>{
     10,
     250,
     190,
-    0xFF7B5CE5,
+    0xFFC9812F,
     'ориентир: около 250 г углеводов в день взрослому (половина калорий), 190 г ребёнку',
   ),
   MetricId.protein: MetricDef(
@@ -106,7 +106,7 @@ const metrics = <MetricId, MetricDef>{
     6,
     60,
     40,
-    0xFF1FA891,
+    0xFFF0A21E,
     'ориентир: около 60 г белка в день взрослому, 40 г ребёнку',
   ),
 };
@@ -257,6 +257,7 @@ const Forms sugarCubesF = ('кубик сахара', 'кубика сахара
 const Forms weeksF = ('неделя', 'недели', 'недель');
 const Forms freezesF = ('заморозка', 'заморозки', 'заморозок');
 const Forms positionsF = ('позицию', 'позиции', 'позиций');
+const Forms itemsF = ('позиция', 'позиции', 'позиций');
 const Forms daysF = ('день', 'дня', 'дней');
 const Forms pointsF = ('балл', 'балла', 'баллов');
 const Forms junkF = ('вредный товар', 'вредных товара', 'вредных товаров');
@@ -301,15 +302,16 @@ bool isHarmfulMetric(MetricId m) =>
 const pileHints = {
   MetricId.sugar: 'Тапни, чтобы подбросить кубики',
   MetricId.salt: 'Тапни, чтобы рассыпать крупинки',
-  MetricId.kcal: 'Тапни, чтобы разлетелись угольки',
-  MetricId.fat: 'Тапни, чтобы подбросить кусочки масла',
-  MetricId.carbs: 'Тапни, чтобы подбросить батоны',
+  MetricId.kcal: 'Тапни, чтобы разлетелись огоньки',
+  MetricId.fat: 'Тапни, чтобы подбросить капли',
+  MetricId.carbs: 'Тапни, чтобы подбросить зёрна',
   MetricId.protein: 'Тапни, чтобы яйца покатились',
 };
 
 String bigNum(num value, MetricId m) => isCubeMetric(m)
     ? '${cubesOfValue(value, m)}'
-    : m != MetricId.kcal && value != value.round()
+    // десятые важны у соли и небольших чисел; у сотен они только мешают
+    : m != MetricId.kcal && value < 100 && value != value.round()
     ? num1(value)
     : '${value.round()}';
 
@@ -337,15 +339,15 @@ String amountTxt(num v, MetricId m) =>
 
 String unitNote(MetricId m) => switch (m) {
   MetricId.sugar => t('1 кубик = 5 г добавленного сахара'),
-  MetricId.salt => t('крупинки показывают количество соли, число — в граммах'),
-  MetricId.fat => t('1 фигурка масла = 2 г насыщенных жиров'),
-  MetricId.kcal => t('1 уголёк = 200 ккал'),
-  MetricId.carbs => t('1 фигурка батона = 10 г углеводов'),
+  MetricId.salt => t('чем больше крупинок, тем больше соли'),
+  MetricId.fat => t('1 капля = 2 г насыщенных жиров'),
+  MetricId.kcal => t('1 огонёк = 200 ккал'),
+  MetricId.carbs => t('1 зёрнышко = 10 г углеводов'),
   MetricId.protein => t('1 яйцо = 6 г белка'),
 };
 
 const unitsNote =
-    'Только сахар показываем кубиками по 5 г. Для соли — крупинки, для жиров — кусочки масла по 2 г, для калорий — угольки по 200 ккал, для углеводов — батоны по 10 г, для белка — яйца по 6 г.';
+    'Кубик: 5 г сахара. Капля: 2 г насыщенных жиров. Огонёк: 200 ккал. Зёрнышко: 10 г углеводов. Яйцо: 6 г белка. Крупинки показывают, много ли соли, число рядом в граммах.';
 
 int saltGrainCount(num grams) {
   if (!grams.isFinite || grams <= 0) return 0;
@@ -363,7 +365,7 @@ int pileCount(num value, MetricId metric, {int? limit}) =>
 double metricPileSize(MetricId metric, double width, double space, int count) {
   if (metric == MetricId.salt) return (width * .045).clamp(10.0, 18.0);
   final fitted = cubeSize(width, space, count);
-  return metric == MetricId.carbs ? min(56.0, fitted * 1.22) : fitted;
+  return metric == MetricId.carbs ? min(60.0, fitted * 1.2) : fitted;
 }
 
 int familyDaily(Profile p, MetricId m) =>

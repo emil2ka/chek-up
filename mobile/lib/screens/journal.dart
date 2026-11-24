@@ -10,13 +10,16 @@ import '../core/plan.dart';
 import '../core/store.dart';
 import '../ui/forms.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 import 'shell.dart';
 
 /// Строка чека: магазин, дата и пометки, кубики (или другой показатель) и точка оценки.
 class ReceiptRow extends StatelessWidget {
   final HistoryEntry entry;
-  final MetricId metric;
-  const ReceiptRow(this.entry, {super.key, this.metric = MetricId.sugar});
+
+  /// число справа по этому показателю; null — все главные строкой и оценка
+  final MetricId? metric;
+  const ReceiptRow(this.entry, {super.key, this.metric});
   @override
   Widget build(BuildContext context) {
     final e = entry, r = receiptOf(e)!;
@@ -73,12 +76,18 @@ class ReceiptRow extends StatelessWidget {
                       ].join(' · '),
                       style: body(13, color: mute),
                     ),
+                    if (metric == null) ...[
+                      const SizedBox(height: 2),
+                      MetricLine(a.totals),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 10),
               Text(
-                '${r.refund ? '−' : ''}${bigNum(a.totals[metric]!, metric)}',
+                metric == null
+                    ? '$score'
+                    : '${r.refund ? '−' : ''}${bigNum(a.totals[metric]!, metric!)}',
                 style: disp(20),
               ),
               const SizedBox(width: 9),
@@ -137,12 +146,8 @@ class _JournalState extends State<Journal> {
           return d != 0 ? d : b.savedAt - a.savedAt;
         });
     final first = dowOf('$_ym-01'), n = daysInMonth(_ym);
-    final maxCubes = days.values.fold<int>(
-      1,
-      (m, d) => d.cubes > m ? d.cubes : m,
-    );
-    final diff = prev.cubes > 0
-        ? ((sum.cubes - prev.cubes) / prev.cubes * 100).round()
+    final diff = prev.food > 0
+        ? ((sum.food - prev.food) / prev.food * 100).round()
         : 0;
 
     Widget nav(IconData icon, String label, VoidCallback? onTap) => Press(
@@ -210,37 +215,49 @@ class _JournalState extends State<Journal> {
                   return Press(
                     scale: .93,
                     label:
-                        '${dayTxt(iso)}: ${d == null ? t('чеков нет') : '${d.n} ${pl(d.n, receiptsF)}, ${d.cubes} ${pl(d.cubes, cubesF)}'}',
+                        '${dayTxt(iso)}: ${d == null ? t('чеков нет') : '${d.n} ${pl(d.n, receiptsF)}, ${t('оценка')} ${d.score}'}',
                     onTap: () => d == null
                         ? null
                         : setState(() => _day = _day == iso ? null : iso),
-                    child: Container(
+                    child: Stack(
                       alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: d == null
-                            ? null
-                            : Color.lerp(
-                                blue3,
-                                blue1,
-                                .45 + .55 * d.cubes / maxCubes,
-                              ),
-                        borderRadius: BorderRadius.circular(12),
-                        border: _day == iso
-                            ? Border.all(color: ink, width: 3)
-                            : null,
-                      ),
-                      child: Text(
-                        '$i',
-                        style: body(
-                          14,
-                          w: 800,
-                          color: d != null
-                              ? Colors.white
-                              : iso == today
-                              ? blue1
-                              : mute,
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: d == null ? null : blue1,
+                              borderRadius: BorderRadius.circular(12),
+                              border: _day == iso
+                                  ? Border.all(color: ink, width: 3)
+                                  : null,
+                            ),
+                          ),
                         ),
-                      ),
+                        Text(
+                          '$i',
+                          style: body(
+                            14,
+                            w: 800,
+                            color: d != null
+                                ? Colors.white
+                                : iso == today
+                                ? blue1
+                                : mute,
+                          ),
+                        ),
+                        if (d != null)
+                          Positioned(
+                            bottom: 4,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: toneColor(verdict(d.score).tone),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 }(),
@@ -249,34 +266,13 @@ class _JournalState extends State<Journal> {
         ),
         const SizedBox(height: 28),
         SecTitle(t('Итог месяца')),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Tile(
-                  child: stat(
-                    t('Сахар куплен'),
-                    '${sum.cubes}',
-                    '${pl(sum.cubes, cubesF)}${prev.cubes > 0 ? ' · ${diff > 0
-                              ? '+'
-                              : diff < 0
-                              ? '−'
-                              : ''}${diff.abs()}% ${t('к прошлому')}' : ''}',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Tile(
-                  child: stat(
-                    hide ? t('Чеков') : t('На продукты'),
-                    hide ? '${sum.receipts}' : money(sum.food),
-                    '${sum.receipts} ${pl(sum.receipts, receiptsF)}',
-                  ),
-                ),
-              ),
-            ],
+        SixGrid(totals: sum.totals),
+        const SizedBox(height: 8),
+        Tile(
+          child: stat(
+            hide ? t('Чеков') : t('На продукты'),
+            hide ? '${sum.receipts}' : money(sum.food),
+            '${sum.receipts} ${pl(sum.receipts, receiptsF)}${diff != 0 && !hide ? ' · ${diff > 0 ? '+' : '−'}${diff.abs()}% ${t('к прошлому')}' : ''}',
           ),
         ),
         if (!hide) ...[

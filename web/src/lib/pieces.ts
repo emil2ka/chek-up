@@ -20,7 +20,7 @@ export type Piece = {
   /** цвет тонкого контура и толщина светлой фаски */
   rim: string;
   edge?: number;
-  /** выпуклый контур для столкновений, в долях стороны */
+  /** выпуклый контур для столкновений, в долях стороны; не больше 8 вершин — столько умеет физика приложения */
   hull: readonly (readonly [number, number])[];
   material: { friction: number; frictionStatic: number; frictionAir: number; restitution: number; density: number };
 };
@@ -47,7 +47,7 @@ export const PIECES: Record<PieceShape, Piece> = {
     body: 'M0 -48C4 -48 6 -45 9 -40C18 -24 37 -8 37 14C37 34 21 48 0 48C-21 48 -37 34 -37 14C-37 -8 -18 -24 -9 -40C-6 -45 -4 -48 0 -48Z',
     colors: ['#FFF3B8', '#FFCE45', '#F39B0E'],
     rim: 'rgba(160, 86, 0, .26)',
-    hull: [[-.36, .06], [-.25, -.18], [0, -.48], [.25, -.18], [.36, .06], [.33, .27], [.17, .44], [-.17, .44], [-.33, .27]],
+    hull: [[-.36, .06], [-.22, -.22], [0, -.48], [.22, -.22], [.36, .06], [.30, .33], [0, .48], [-.30, .33]],
     material: { friction: .45, frictionStatic: .7, frictionAir: .011, restitution: .12, density: .0026 },
   },
   flame: {
@@ -56,7 +56,7 @@ export const PIECES: Record<PieceShape, Piece> = {
     inner: { path: 'M2 -4C3 -6 6 -6 7 -4C10 6 21 11 21 25C21 38 12 46 0 46C-12 46 -21 38 -21 25C-21 16 -16 11 -12 6C-10 4 -8 5 -7 7C-6 9 -5 10 -3 11C-4 5 -2 0 2 -4Z', colors: ['#FFF4C7', '#FFDB73', '#FFB63B'] },
     rim: 'rgba(140, 24, 8, .24)',
     edge: 6,
-    hull: [[-.37, .06], [-.24, -.21], [.05, -.48], [.30, -.16], [.38, .10], [.33, .29], [.17, .44], [-.17, .44], [-.33, .29]],
+    hull: [[-.37, .06], [-.23, -.22], [.05, -.48], [.29, -.18], [.38, .10], [.30, .34], [0, .48], [-.30, .34]],
     material: { friction: .48, frictionStatic: .72, frictionAir: .012, restitution: .24, density: .0020 },
   },
   grain: {
@@ -72,7 +72,7 @@ export const PIECES: Record<PieceShape, Piece> = {
     colors: ['#FFFFFF', '#FFFAF0', '#E3D4C3'],
     inner: { path: 'M0 -9A20 20 0 1 1 0 31A20 20 0 1 1 0 -9Z', colors: ['#FFE283', '#FFBE2E', '#F28E0B'] },
     rim: 'rgba(120, 82, 40, .22)',
-    hull: [[-.36, .20], [-.35, -.06], [-.21, -.36], [0, -.48], [.21, -.36], [.35, -.06], [.36, .20], [.20, .42], [-.20, .42]],
+    hull: [[-.37, .10], [-.23, -.32], [0, -.48], [.23, -.32], [.37, .10], [.28, .36], [0, .47], [-.28, .36]],
     material: { friction: .24, frictionStatic: .42, frictionAir: .008, restitution: .26, density: .0030 },
   },
 };

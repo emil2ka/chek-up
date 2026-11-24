@@ -314,14 +314,16 @@ GoalState goalState(
 
 // ── месяц ──
 class PeriodStats {
-  int receipts = 0, total = 0, food = 0, junk = 0, cubes = 0, saved = 0;
+  int receipts = 0, total = 0, food = 0, junk = 0, saved = 0;
+  Map<MetricId, double> totals = _zero();
+  int get cubes => cubesOfValue(totals[MetricId.sugar]!, MetricId.sugar);
   List<({String name, int total, int n})> stores = const [];
 }
 
 PeriodStats monthStats(List<HistoryEntry> entries, String ym) {
   final out = PeriodStats();
   final stores = <String, (num, int)>{};
-  num total = 0, food = 0, junk = 0, sugar = 0;
+  num total = 0, food = 0, junk = 0;
   for (final e in entries) {
     if (!isIso(e.date) || monthOf(e.date) != ym) continue;
     final r = receiptOf(e);
@@ -332,7 +334,11 @@ PeriodStats monthStats(List<HistoryEntry> entries, String ym) {
     total += sign * a.total;
     food += sign * a.food;
     junk += sign * a.junk;
-    if (!e.guests) sugar += sign * a.sugar;
+    if (!e.guests) {
+      for (final m in metricIds) {
+        out.totals[m] = out.totals[m]! + sign * a.totals[m]!;
+      }
+    }
     final s = stores[r.store] ?? (0, 0);
     stores[r.store] = (s.$1 + sign * a.total, s.$2 + (r.refund ? 0 : 1));
   }
@@ -340,7 +346,7 @@ PeriodStats monthStats(List<HistoryEntry> entries, String ym) {
     ..total = total.round()
     ..food = food.round()
     ..junk = max(0, junk.round())
-    ..cubes = max(0, cubesOfValue(sugar, MetricId.sugar))
+    ..totals = {for (final m in metricIds) m: max(0, _round1(out.totals[m]!))}
     ..saved =
         confirmedSwaps([
               for (final e in entries)
@@ -356,20 +362,23 @@ PeriodStats monthStats(List<HistoryEntry> entries, String ym) {
   return out;
 }
 
-/// Журнал по дням для календаря месяца: сколько чеков и кубиков.
-Map<String, ({int n, int cubes})> monthDays(
+/// Журнал по дням для календаря месяца: сколько чеков и средняя оценка.
+Map<String, ({int n, int score})> monthDays(
   List<HistoryEntry> entries,
   String ym,
 ) {
-  final out = <String, ({int n, int cubes})>{};
+  final sums = <String, (int, int)>{};
   for (final e in entries) {
     if (!isIso(e.date) || monthOf(e.date) != ym) continue;
     final r = receiptOf(e);
     if (r == null || r.refund) continue;
-    final d = out[e.date] ?? (n: 0, cubes: 0);
-    out[e.date] = (n: d.n + 1, cubes: d.cubes + factOf(e, r).cubes);
+    final d = sums[e.date] ?? (0, 0);
+    sums[e.date] = (d.$1 + 1, d.$2 + (r.masked ? e.score : factOf(e, r).score));
   }
-  return out;
+  return {
+    for (final d in sums.entries)
+      d.key: (n: d.value.$1, score: (d.value.$2 / d.value.$1).round()),
+  };
 }
 
 // ── достижения ──
@@ -798,6 +807,24 @@ String conclusion(Receipt r, Analysis a, {bool guests = false}) {
               'm': money(a.flaggedSum),
             });
   }
+}
+
+/// Мысль о выбранном показателе. Сахар — главная, с него начинает conclusion.
+String metricPhrase(Analysis a, MetricId m) {
+  final rows = [
+    for (final it in a.items)
+      if (it.counted && it.item.valueOf(m) > 0) it.item,
+  ];
+  if (rows.isEmpty) return t('Нет данных об этом показателе');
+  final top = rows.reduce((x, y) => y.valueOf(m) > x.valueOf(m) ? y : x);
+  final v = {
+    'x': metricTxt(a.totals[m]!, m),
+    'n': shortName(top.n),
+    'p': (top.valueOf(m) / a.totals[m]! * 100).round(),
+  };
+  return rows.length == 1
+      ? t('Всего {x}, и всё из одной позиции: {n}.', v)
+      : t('Всего {x}. Больше всего: {n}, {p}%.', v);
 }
 
 class FlaggedLine {

@@ -9,6 +9,7 @@ import '../core/reminder.dart';
 import '../core/store.dart';
 import '../ui/forms.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 import 'account.dart';
 import 'shell.dart';
 
@@ -55,18 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 4),
         Row(
           children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: Color(metrics[m]!.color),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: .85),
-                  width: 1.5,
-                ),
-              ),
-            ),
+            MetricIcon(m, 20),
             const SizedBox(width: 5),
             Expanded(
               child: Text(

@@ -10,6 +10,7 @@ import '../core/i18n.dart';
 import '../core/models.dart';
 import 'kit.dart';
 import 'food_piece.dart';
+import 'metric_icon.dart';
 import 'pile.dart';
 
 Future<Uint8List> _render({
@@ -113,7 +114,7 @@ Future<Uint8List> _render({
       drawFoodPiece(
         c,
         shape,
-        shape == FoodShape.salt ? s * .66 : s,
+        shape == FoodShape.crystal ? s * .66 : s,
         variant: i % 4,
       );
       c.restore();
@@ -135,11 +136,10 @@ Future<Uint8List> _render({
   final colW = (w - 120) / metricIds.length;
   for (final (i, m) in metricIds.indexed) {
     final cx = 60 + colW * (i + .5);
-    c.drawCircle(
-      Offset(cx, h - 188),
-      10,
-      Paint()..color = Color(metrics[m]!.color),
-    );
+    c.save();
+    c.translate(cx, h - 190);
+    drawMetric(c, m, 40);
+    c.restore();
     text(
       available.contains(m) ? bigNum(totals[m]!, m) : '—',
       disp(32, w: 900, ls: -.04),

@@ -6,6 +6,7 @@ import '../core/i18n.dart';
 import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 
 /// Слова заголовка по одному: плашка переносится вместе с ними.
 List<Widget> _words(String text, TextStyle st) => [
@@ -28,8 +29,6 @@ class _OnboardingState extends State<Onboarding> {
     final mq = MediaQuery.of(context);
     final p = store.profile;
     final last = _step == _steps - 1;
-    const norm = 10;
-    final cola = (106 / cubeG).round();
     final h1 = disp(
       (mq.size.width.clamp(0, 430) * .104).clamp(32.0, 44.0),
       color: Colors.white,
@@ -43,36 +42,39 @@ class _OnboardingState extends State<Onboarding> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(
+          Center(
             child: SizedBox(
-              width: 224,
-              height: 176,
-              child: Stack(
+              width: 290,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                runSpacing: 14,
                 children: [
-                  Positioned(
-                    top: 8,
-                    left: 12,
-                    child: CubeIcon(144, angle: -12),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: CubeIcon(88, angle: 14),
-                  ),
-                  Positioned(top: 0, right: 24, child: CubeIcon(48, angle: 28)),
+                  for (final (i, m) in metricIds.indexed)
+                    Rise(
+                      delay: i * 60,
+                      child: Transform.rotate(
+                        angle: i.isOdd ? .14 : -.14,
+                        child: MetricIcon(m, 82),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 36),
+          const SizedBox(height: 34),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
-            children: [..._words(t('Чек знает, что ты'), h1), Hl(t('ешь'), h1)],
+            children: [
+              ..._words(t('Узнай'), h1),
+              Hl(t('всё,'), h1),
+              Text(' ', style: h1),
+              ..._words(t('что в твоих чеках'), h1),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
             t(
-              'Сфоткай чек из магазина. Покажем, сколько в нём сахара, соли и жиров, и подскажем, что заменить.',
+              'Сфоткай чек из магазина: покажем, что внутри покупок, сколько ушло денег и что взять вместо.',
             ),
             style: sub,
           ),
@@ -80,40 +82,56 @@ class _OnboardingState extends State<Onboarding> {
       ),
       1 => Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: SizedBox(
-              width: 5 * 52 + 4 * 10,
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (var i = 0; i < norm; i++)
-                    Rise(
-                      delay: i * 45,
-                      child: CubeIcon(52, angle: i.isOdd ? 6 : -6),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 36),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ..._words(t('Сахар считаем'), h1),
-              Hl(t('кубиками'), h1),
-            ],
+            children: [..._words(t('Видно'), h1), Hl(t('глазами'), h1)],
           ),
-          const SizedBox(height: 16),
-          Text(
-            t(
-              'Один кубик: 5 г сахара. В литре колы около {a} {w}, а взрослому хватит {b} в день.',
-              {'a': cola, 'w': pl(cola, cubesF), 'b': norm},
+          const SizedBox(height: 20),
+          for (final (i, m) in metricIds.indexed)
+            Rise(
+              delay: i * 50,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .13),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    MetricIcon(m, 36),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t(metrics[m]!.label),
+                            style: disp(
+                              15,
+                              w: 700,
+                              color: Colors.white,
+                              h: 1.2,
+                              ls: -.02,
+                            ),
+                          ),
+                          Text(
+                            unitNote(m),
+                            style: body(
+                              13,
+                              color: Colors.white.withValues(alpha: .88),
+                              h: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            style: sub,
-          ),
         ],
       ),
       _ => Column(

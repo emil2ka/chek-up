@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../core/engine.dart';
 import '../core/i18n.dart';
 import '../core/models.dart';
+import 'metric_icon.dart';
 
 // ── Токены (те же, что в web/src/app/globals.css) ──
 const blue1 = Color(0xFF1238F5);
@@ -778,7 +779,7 @@ class MetricTabs extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     height: 40,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       color: m == value
                           ? Colors.white
@@ -787,20 +788,7 @@ class MetricTabs extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: Color(metrics[m]!.color),
-                            shape: BoxShape.circle,
-                            border: m == value
-                                ? null
-                                : Border.all(
-                                    color: Colors.white.withValues(alpha: .85),
-                                    width: 1.5,
-                                  ),
-                          ),
-                        ),
+                        MetricIcon(m, 20),
                         const SizedBox(width: 6),
                         Text(
                           t(metrics[m]!.label),

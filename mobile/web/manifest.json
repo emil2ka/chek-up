@@ -1,11 +1,11 @@
 {
-    "name": "chek_up",
-    "short_name": "chek_up",
+    "name": "Чек-ап",
+    "short_name": "Чек-ап",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1238F5",
+    "theme_color": "#1238F5",
+    "description": "Чек-ап: узнай всё, что в твоих чеках",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

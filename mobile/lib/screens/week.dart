@@ -11,6 +11,7 @@ import '../core/models.dart';
 import '../core/store.dart';
 import '../ui/forms.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 import '../ui/pile_hero.dart';
 import '../ui/share_card.dart';
 import '../ui/streak_view.dart';
@@ -32,7 +33,6 @@ class _WeekScreenState extends State<WeekScreen> {
 
   Future<void> _shareWeek(String week) {
     final w = weekStats(store.real, store.profile, week: week);
-    final pct = (w.ratio * 100).round();
     return shareResult(
       metric: MetricId.sugar,
       cubesBy: {for (final m in metricIds) m: w.metrics[m]!.cubes},
@@ -47,10 +47,13 @@ class _WeekScreenState extends State<WeekScreen> {
       where: weekTxt(week),
       kick: t('За неделю'),
       level: store.streak.level,
-      text: t(
-        '{s} в «Чек-ап»: за неделю {n} кубиков сахара, {p}% нормы семьи.',
-        {'s': streakTitle(store.streak), 'n': w.cubes, 'p': pct},
-      ),
+      text: t('{s} в «Чек-ап». За неделю в наших чеках: {list}.', {
+        's': streakTitle(store.streak),
+        'list': [
+          for (final m in const [MetricId.sugar, MetricId.salt, MetricId.fat])
+            metricTxt(w.metrics[m]!.total, m),
+        ].join(', '),
+      }),
     );
   }
 
@@ -176,9 +179,29 @@ class _WeekScreenState extends State<WeekScreen> {
                     ],
                     SecTitle(t('Норма семьи')),
                     Tile(child: _norm(mw, tone, pct, st, empty, incomplete)),
+                    if (!empty) ...[
+                      const SizedBox(height: 28),
+                      SecTitle(
+                        t('Всё за неделю'),
+                        trailing: Text(
+                          t('% от нормы'),
+                          style: body(13, w: 700, color: mute),
+                        ),
+                      ),
+                      SixGrid(
+                        totals: {
+                          for (final m in metricIds) m: st.metrics[m]!.total,
+                        },
+                        ratio: {
+                          for (final m in metricIds) m: st.metrics[m]!.ratio,
+                        },
+                        value: _metric,
+                        onChange: (m) => setState(() => _metric = m),
+                      ),
+                    ],
                     if (isCubeMetric(_metric)) ...[
                       const SizedBox(height: 28),
-                      SecTitle(t('Цель')),
+                      SecTitle(t('Цель по сахару')),
                       Tile(child: _goal(week)),
                     ],
                     // ── по дням ──

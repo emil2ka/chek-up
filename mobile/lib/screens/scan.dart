@@ -13,15 +13,16 @@ import '../core/models.dart';
 import '../core/outbox.dart';
 import '../core/store.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 import 'shell.dart';
 
 const _duration =
     2600; // мс — минимум; настоящее распознавание может идти дольше
 const _wait = [
-  'Ищу сладкое, солёное и жирное',
+  'Читаю позиции',
   'Разбираю сокращения кассы',
   'Сверяю со справочником',
-  'Считаю сахар, соль и жиры',
+  'Считаю шесть показателей',
   'Ещё немного',
 ];
 const _lines = [.92, .64, .80, .48, .86, .70, .58, .90, .44, .76, .66, .84];
@@ -48,7 +49,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   Timer? _waiter;
   Uint8List? _bytes;
   Receipt? _found;
-  (int, String, String)? _tick;
+  (int, MetricId, String, String)? _tick;
   int _count = 0, _waitI = 0;
 
   final _jobId = Outbox.newId();
@@ -131,10 +132,11 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
           final w = worst(it);
           _tick = (
             k,
+            w.m,
             it.item.n,
             '${amountTxt(w.v, w.m)} ${t(metrics[w.m]!.of)}',
           );
-          _count = (a.cubes * (k + 1) / sweet.length).round();
+          _count = (a.items.length * (k + 1) / sweet.length).round();
         });
       });
     }
@@ -471,22 +473,15 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 9,
-                                  height: 9,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                ),
+                                MetricIcon(_tick!.$2, 24),
                                 const SizedBox(width: 9),
                                 Flexible(
                                   child: Text.rich(
                                     TextSpan(
                                       children: [
-                                        TextSpan(text: '${_tick!.$2}: '),
+                                        TextSpan(text: '${_tick!.$3}: '),
                                         TextSpan(
-                                          text: _tick!.$3.replaceAll(' ', ' '),
+                                          text: _tick!.$4.replaceAll(' ', ' '),
                                           style: disp(
                                             14,
                                             w: 800,
@@ -533,7 +528,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 6),
               Text(
-                pl(_count, sugarCubesF),
+                pl(_count, itemsF),
                 style: body(
                   14,
                   w: 700,

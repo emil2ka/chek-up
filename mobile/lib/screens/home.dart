@@ -11,11 +11,12 @@ import '../core/plan.dart';
 import '../core/store.dart';
 import '../ui/forms.dart';
 import '../ui/kit.dart';
+import '../ui/metric_icon.dart';
 import '../ui/pile.dart';
 import '../ui/streak_view.dart';
 import 'shell.dart';
 
-const _homeCubes = 9;
+const _homeCubes = 11;
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onWeek;
@@ -61,11 +62,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final heroH = box.maxHeight - tabBarSpace(context) - (has ? 58 : 0);
         final short = heroH < 690;
         final h1 = disp(
-          (w * .104).clamp(30.0, 45.0),
+          (w * (mine ? .08 : .114)).clamp(26.0, mine ? 33.0 : 49.0),
           color: Colors.white,
-          h: .98,
+          h: 1,
           ls: -.045,
         );
+        final week = weekStats(store.real, store.profile);
+        final bought = week.metrics.values.any((m) => m.total > 0);
 
         Widget headBtn(
           IconData icon,
@@ -126,12 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 Positioned.fill(
                   child: SugarPile(
                     key: _pile,
-                    // кубики сахара и другие фигурки
+                    // все шесть фигурок
                     palettes: [
                       skinFor(store.streak.level),
-                      pileFat,
-                      pilePalettes[MetricId.carbs]!,
-                      pilePalettes[MetricId.protein]!,
+                      for (final m in metricIds.skip(1)) pilePalettes[m]!,
                     ],
                     target: _homeCubes,
                     cubeSize: (_) => cube,
@@ -179,25 +180,38 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Wrap(
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text('${t('Что')} ', style: h1),
-                            Hl(t('прячется'), h1),
+                            Text('${t('Узнай')} ', style: h1),
+                            Hl(t('всё,'), h1),
                           ],
                         ),
                       ),
                       Rise(
                         delay: 90,
-                        child: Text(t('в твоём чеке?'), style: h1),
+                        child: Text(t('что в твоих чеках'), style: h1),
                       ),
                       if (mine) ...[
                         const SizedBox(height: 14),
                         StreakPill(onTap: widget.onWeek),
+                        if (bought) ...[
+                          const SizedBox(height: 10),
+                          Press(
+                            scale: .985,
+                            onTap: widget.onWeek,
+                            child: SixRow(
+                              totals: {
+                                for (final m in metricIds)
+                                  m: week.metrics[m]!.total,
+                              },
+                            ),
+                          ),
+                        ],
                       ] else ...[
                         SizedBox(height: short ? 12 : 18),
                         Rise(
                           delay: 220,
                           child: Text(
                             t(
-                              'Сфоткай чек из магазина. Покажем состав покупок, сколько они стоили и что можно заменить.',
+                              'Сфоткай чек: покажем, что внутри покупок, сколько ушло денег и что взять вместо.',
                             ),
                             style: body(
                               short ? 16 : 17,
@@ -207,39 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Rise(
-                          delay: 280,
-                          child: Container(
-                            padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
-                            decoration: BoxDecoration(
-                              color: ink.withValues(alpha: .18),
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: .18),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const CubeIcon(24),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    t(
-                                      'Норма взрослого: 10 кубиков сахара в день',
-                                    ),
-                                    style: body(
-                                      13,
-                                      color: Colors.white.withValues(
-                                        alpha: .92,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        const Rise(delay: 280, child: SixRow()),
                       ],
                       const _Queue(),
                       const Spacer(),
@@ -314,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 opacity: _hint ? 1 : 0,
                                 duration: const Duration(milliseconds: 400),
                                 child: Text(
-                                  t('Тапни по кубикам или наклони телефон'),
+                                  t('Тапни по фигуркам или наклони телефон'),
                                   textAlign: TextAlign.center,
                                   style: body(
                                     13,
@@ -478,7 +460,6 @@ class _MyChecks extends StatelessWidget {
   Widget _row(BuildContext context, HistoryEntry e) {
     final r = receiptOf(e);
     final a = r == null ? null : factOf(e, r);
-    final cubes = a?.cubes ?? e.cubes;
     final score = a == null || r!.masked ? e.score : a.score;
     return Press(
       scale: .985,
@@ -526,19 +507,12 @@ class _MyChecks extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: body(13, color: mute),
                   ),
+                  if (a != null) ...[
+                    const SizedBox(height: 2),
+                    MetricLine(a.totals),
+                  ],
                 ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('$cubes', style: disp(22)),
-                Text(
-                  pl(cubes, cubesF),
-                  style: body(12, w: 700, color: mute, h: 1.2),
-                ),
-              ],
             ),
             const SizedBox(width: 12),
             Container(
